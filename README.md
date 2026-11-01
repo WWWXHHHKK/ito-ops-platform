@@ -4,6 +4,15 @@
 
 纯前端实现，无构建步骤、无后端依赖、无 CDN 依赖。
 
+## 在线演示
+
+- 驾驶舱：<https://wwwxhhhkk.github.io/ito-ops-platform/>
+- 管理后台：<https://wwwxhhhkk.github.io/ito-ops-platform/admin.html>
+- 后台指定身份：<https://wwwxhhhkk.github.io/ito-ops-platform/admin.html?role=leader#/dashboard>
+
+GitHub 仓库：<https://github.com/WWWXHHHKK/ito-ops-platform>
+
+
 | 驾驶舱大屏 | 管理后台 |
 | --- | --- |
 | ![驾驶舱预览](preview.png) | ![后台预览](admin-preview.png) |
