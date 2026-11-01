@@ -1,0 +1,160 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITO 运维管理平台 · 管理后台</title>
+<meta name="description" content="ITO 运维管理平台 · 任务、巡检、值班与运维运营管理后台">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%23EB612A'/><text x='50' y='69' font-size='54' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'>I</text></svg>">
+<link rel="stylesheet" href="assets/css/admin.css?v=20261101g">
+</head>
+<body>
+
+<!-- ============ 登录 / 身份选择 ============ -->
+<div id="loginView" class="login">
+  <div class="login-atmosphere" aria-hidden="true"></div>
+  <div class="login-shell">
+    <section class="login-brand">
+      <div class="brand-mark">I</div>
+      <div class="brand-kicker">ITO OPERATIONS · 2026</div>
+      <h1>让每一次运维<br>都有迹可循</h1>
+      <p class="brand-sub">任务线上化 · 过程有迹可循 · 考核有依有据</p>
+
+      <ul class="brand-points">
+        <li>
+          <span class="point-icon">
+            <svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg>
+          </span>
+          <span><b>任务全生命周期</b><small>拆分、派发、审批、交付与验收</small></span>
+        </li>
+        <li>
+          <span class="point-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="8"/></svg>
+          </span>
+          <span><b>专业组协同</b><small>应用、通信、在线、基础设施统一调度</small></span>
+        </li>
+        <li>
+          <span class="point-icon">
+            <svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>
+          </span>
+          <span><b>数据驱动考核</b><small>工时、质量、响应与贡献自动汇总</small></span>
+        </li>
+      </ul>
+
+      <div class="brand-foot">
+        <span class="status-dot"></span>
+        <span>演示环境运行中</span>
+        <i></i>
+        <span>SHA-01 · v3.6.2</span>
+      </div>
+    </section>
+
+    <section class="login-panel">
+      <div class="login-panel-head">
+        <span class="eyebrow">SELECT ROLE</span>
+        <h2>选择演示身份</h2>
+        <p>不同角色拥有不同的菜单与操作权限，进入后可随时切换。</p>
+      </div>
+      <div class="role-grid" id="roleGrid"></div>
+      <div class="login-note">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+        <span>纯前端高保真演示，数据为模拟数据，不会写入服务器。</span>
+      </div>
+      <a class="back-to-screen" href="index.html">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        直接查看驾驶舱大屏
+        <span>→</span>
+      </a>
+    </section>
+  </div>
+</div>
+
+<!-- ============ 应用 ============ -->
+<div id="appView" class="app" hidden>
+  <aside class="sidebar" id="sidebar">
+    <div class="side-brand">
+      <div class="side-mark">I</div>
+      <div class="side-brand-text">
+        <b>ITO 运维管理</b>
+        <span>OPERATIONS CONSOLE</span>
+      </div>
+    </div>
+
+    <div class="side-role" id="sideRole"></div>
+
+    <nav class="side-nav" id="sideNav" aria-label="主导航"></nav>
+
+    <div class="side-foot">
+      <div class="side-user" id="sideUser"></div>
+      <button class="side-switch" id="switchRoleBtn" type="button">
+        <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+        切换身份
+      </button>
+    </div>
+  </aside>
+
+  <div class="app-body">
+    <header class="appbar">
+      <div class="appbar-left">
+        <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="打开菜单">
+          <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div class="crumb">
+          <span>ITO 运维中心</span>
+          <i>/</i>
+          <b id="crumbPage">驾驶舱</b>
+        </div>
+      </div>
+
+      <div class="appbar-right">
+        <label class="global-search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+          <input id="globalSearch" type="search" placeholder="搜索任务、人员或编号" autocomplete="off">
+          <kbd>↵</kbd>
+        </label>
+
+        <span class="date-chip" id="dateChip">2026.11.01 周日</span>
+
+        <button class="icon-btn bell-btn" id="bellBtn" type="button" aria-label="消息通知">
+          <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
+          <i class="bell-dot" id="bellDot"></i>
+        </button>
+
+        <a class="screen-link" href="index.html">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          驾驶舱大屏
+        </a>
+
+        <div class="appbar-user" id="appbarUser"></div>
+      </div>
+    </header>
+
+    <main class="page" id="pageRoot"></main>
+  </div>
+
+  <div class="sidebar-scrim" id="sidebarScrim"></div>
+</div>
+
+<div id="modalRoot"></div>
+<div id="drawerRoot"></div>
+<div id="toastRoot" class="toast-root" aria-live="polite"></div>
+
+<script src="vendor/echarts.min.js"></script>
+<script src="assets/js/ito-data.js?v=20261101g"></script>
+<script src="assets/js/admin.js?v=20261101g"></script>
+<script src="assets/js/admin-pages-dashboard.js?v=20261101g"></script>
+<script src="assets/js/admin-pages-tasks.js?v=20261101g"></script>
+<script src="assets/js/admin-pages-dispatch.js?v=20261101g"></script>
+<script src="assets/js/admin-pages-ops.js?v=20261101g"></script>
+<script src="assets/js/admin-pages-duty.js?v=20261101g"></script>
+<script src="assets/js/admin-pages-auth.js?v=20261101g"></script>
+<script src="assets/js/admin-pages-messages.js?v=20261101g"></script>
+<script src="assets/js/admin-pages-config.js?v=20261101g"></script>
+</body>
+</html>
+
+
+
+
+
+
