@@ -350,7 +350,7 @@
 
   function tagChips(tags, max) {
     const list = tags || [];
-    if (!list.length) return '<span class="muted">未选择</span>';
+    if (!list.length) return max ? '' : '<span class="muted">未选择</span>';
     const shown = max ? list.slice(0, max) : list;
     return shown.map(function (tag) {
       return '<span class="tag-inline">' + U().esc(tag) + '</span>';
