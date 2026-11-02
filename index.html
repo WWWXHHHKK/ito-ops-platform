@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>ITO 智能运维管理平台 · 运维驾驶舱</title>
-<link rel="stylesheet" href="assets/css/style.css?v=20261101d" />
+<link rel="stylesheet" href="assets/css/style.css?v=20261102d" />
 </head>
 <body>
 <div class="stage-shell">
@@ -181,305 +181,14 @@
       </section>
 
       <!-- 中列 -->
-      <section class="col col-center">
+      <!-- 06 专业组运行态 · 数字孪生 -->
+      <section class="col col-center center-c" id="centerColumn" aria-label="专业组运行态"></section>
 
-        <section class="panel panel-overview">
-          <div class="panel-head">
-            <div class="ph-left"><i class="ph-idx">04</i><h2>运行总览</h2><span class="ph-en">OPERATIONAL PULSE</span></div>
-            <span class="head-refresh">数据刷新 <b id="refreshTime">09:42:10</b></span>
-          </div>
-          <div class="panel-body kpi-body">
-            <div class="kpi-grid">
-              <div class="kpi">
-                <span class="kpi-label">纳管服务</span>
-                <div class="kpi-value"><b data-count="128">128</b><em>个</em></div>
-                <p class="kpi-sub">覆盖 12 个资源池</p>
-              </div>
-              <div class="kpi">
-                <span class="kpi-label">今日工单</span>
-                <div class="kpi-value"><b data-count="286">286</b><em>单</em></div>
-                <p class="kpi-sub"><i class="up">+12.4%</i> 较昨日</p>
-              </div>
-              <div class="kpi">
-                <span class="kpi-label">平均响应</span>
-                <div class="kpi-value"><b>3<i class="unit">m</i>12<i class="unit">s</i></b></div>
-                <p class="kpi-sub"><i class="down">-18s</i> 较昨日</p>
-              </div>
-              <div class="kpi">
-                <span class="kpi-label">自动化执行</span>
-                <div class="kpi-value"><b data-count="1042" data-format="comma">1,042</b><em>次</em></div>
-                <p class="kpi-sub">成功率 <span class="c-teal">92.7%</span></p>
-              </div>
-              <div class="kpi">
-                <span class="kpi-label">重大事件</span>
-                <div class="kpi-value"><b class="c-teal" data-count="0">0</b><em>起</em></div>
-                <p class="kpi-sub">连续 46 天无 P1</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="panel panel-topo">
-          <div class="panel-head">
-            <div class="ph-left"><i class="ph-idx">05</i><h2>核心服务拓扑</h2><span class="ph-en">SERVICE MESH</span></div>
-            <div class="topo-legend">
-              <span><i class="dot-green"></i>正常 7</span>
-              <span><i class="dot-amber"></i>告警 1</span>
-              <span><i class="dot-red"></i>故障 1</span>
-            </div>
-          </div>
-          <div class="panel-body topo-body">
-            <div class="topo-corner tl">LIVE TOPOLOGY · 核心链路</div>
-            <div class="topo-corner tr">AUTO SYNC · 5s</div>
-            <div class="topo-radar" aria-hidden="true"><div class="topo-sweep"></div></div>
-            <div class="topo-canvas">
-              <svg class="topo-svg" viewBox="0 0 920 330" preserveAspectRatio="xMidYMid meet" aria-label="核心服务拓扑关系图">
-                <defs>
-                  <radialGradient id="hubGlow" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stop-color="#35e0ff" stop-opacity=".26"/>
-                    <stop offset="52%" stop-color="#1aa8ff" stop-opacity=".06"/>
-                    <stop offset="100%" stop-color="#1aa8ff" stop-opacity="0"/>
-                  </radialGradient>
-                  <filter id="nodeGlow" x="-200%" y="-200%" width="500%" height="500%">
-                    <feGaussianBlur stdDeviation="2.6" result="b"/>
-                    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-                  </filter>
-                  <filter id="linkGlow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="1.2" result="b"/>
-                    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-                  </filter>
-                </defs>
-
-                <g class="topo-grid" aria-hidden="true">
-                  <ellipse cx="460" cy="160" rx="62" ry="62"/>
-                  <ellipse cx="460" cy="160" rx="132" ry="102"/>
-                  <ellipse cx="460" cy="160" rx="238" ry="138"/>
-                  <ellipse cx="460" cy="160" rx="392" ry="172" stroke-dasharray="2 9"/>
-                  <ellipse cx="460" cy="160" rx="414" ry="182" stroke-dasharray="1 14"/>
-                  <line x1="460" y1="2" x2="460" y2="328"/>
-                  <line x1="30" y1="160" x2="890" y2="160"/>
-                  <g class="axis-ticks">
-                    <line x1="100" y1="154" x2="100" y2="166"/><line x1="160" y1="157" x2="160" y2="163"/>
-                    <line x1="220" y1="157" x2="220" y2="163"/><line x1="280" y1="154" x2="280" y2="166"/>
-                    <line x1="340" y1="157" x2="340" y2="163"/><line x1="400" y1="157" x2="400" y2="163"/>
-                    <line x1="520" y1="157" x2="520" y2="163"/><line x1="580" y1="154" x2="580" y2="166"/>
-                    <line x1="640" y1="157" x2="640" y2="163"/><line x1="700" y1="157" x2="700" y2="163"/>
-                    <line x1="760" y1="154" x2="760" y2="166"/><line x1="820" y1="157" x2="820" y2="163"/>
-                  </g>
-                  <g class="grid-diamonds">
-                    <rect x="456" y="4" width="8" height="8" transform="rotate(45 460 8)"/>
-                    <rect x="456" y="308" width="8" height="8" transform="rotate(45 460 312)"/>
-                    <rect x="36" y="156" width="8" height="8" transform="rotate(45 40 160)"/>
-                    <rect x="844" y="156" width="8" height="8" transform="rotate(45 848 160)"/>
-                  </g>
-                  <path d="M460 42 L474 28 M460 42 L446 28"/>
-                  <path class="grid-bracket" d="M18 26 H34 M18 26 V42"/>
-                  <path class="grid-bracket" d="M902 26 H886 M902 26 V42"/>
-                  <path class="grid-bracket" d="M18 294 H34 M18 294 V278"/>
-                  <path class="grid-bracket" d="M902 294 H886 M902 294 V278"/>
-                  <text x="60" y="26" class="grid-label">EDGE / 接入域</text>
-                  <text x="772" y="26" class="grid-label">PLATFORM / 平台域</text>
-                  <text x="60" y="318" class="grid-label">OBSERVABILITY</text>
-                  <text x="768" y="318" class="grid-label">DATA PLANE</text>
-                </g>
-
-                <g class="topo-links" aria-hidden="true">
-                  <path class="link flow" d="M460 160 V50"/>
-                  <path class="link flow" d="M460 160 H330 V92 H135"/>
-                  <path class="link flow" d="M460 160 H590 V92 H785"/>
-                  <path class="link flow" d="M460 160 V286"/>
-                  <path class="link" d="M135 92 V216 H105"/>
-                  <path class="link" d="M105 216 H292 V286"/>
-                  <path class="link" d="M785 92 V216 H815"/>
-                  <path class="link" d="M815 216 H628 V286"/>
-                  <path class="link dashed" d="M292 286 H460"/>
-                  <path class="link dashed" d="M460 286 H628"/>
-                  <rect class="junction" x="327" y="89" width="6" height="6" transform="rotate(45 330 92)"/>
-                  <rect class="junction" x="587" y="89" width="6" height="6" transform="rotate(45 590 92)"/>
-                  <rect class="junction" x="289" y="213" width="6" height="6" transform="rotate(45 292 216)"/>
-                  <rect class="junction" x="625" y="213" width="6" height="6" transform="rotate(45 628 216)"/>
-                  <text class="link-label" x="470" y="110">LAT 8ms</text>
-                  <text class="link-label" x="376" y="153">LAT 18ms</text>
-                  <text class="link-label" x="538" y="153">LAT 24ms</text>
-                  <text class="link-label" x="470" y="242">LAT 42ms</text>
-                </g>
-
-                <g class="topo-nodes">
-                  <g class="node hub status-ok" transform="translate(460,160)"
-                     data-name="统一门户" data-status="运行正常" data-req="8.6k req/s" data-lat="12ms" data-owner="平台架构组">
-                    <circle class="hub-glow" r="82" fill="url(#hubGlow)"/>
-                    <circle class="hub-orbit" r="46"/>
-                    <polygon class="hub-dash" points="0,-38 32.9,-19 32.9,19 0,38 -32.9,19 -32.9,-19"/>
-                    <polygon class="node-halo" points="0,-30 26,-15 26,15 0,30 -26,15 -26,-15"/>
-                    <polygon class="node-ring" points="0,-17 14.7,-8.5 14.7,8.5 0,17 -14.7,8.5 -14.7,-8.5"/>
-                    <circle class="node-core" r="5"/>
-                    <text class="node-label" y="50">统一门户</text>
-                    <text class="node-sub" y="63">CORE PORTAL</text>
-                  </g>
-
-                  <g class="node status-ok" transform="translate(460,50)"
-                     data-name="API 网关" data-status="运行正常" data-req="12.4k req/s" data-lat="8ms" data-owner="中间件组">
-                    <circle class="node-ground" r="24"/>
-                    <polygon class="node-halo" points="0,-17 14.7,-8.5 14.7,8.5 0,17 -14.7,8.5 -14.7,-8.5"/>
-                    <polygon class="node-ring" points="0,-9 7.8,-4.5 7.8,4.5 0,9 -7.8,4.5 -7.8,-4.5"/>
-                    <circle class="node-core" r="3"/>
-                    <path class="node-ticks" d="M0 -22 V-19 M0 22 V19 M-22 0 H-19 M22 0 H19"/>
-                    <text class="node-label" y="-28">API 网关</text>
-                    <text class="node-sub" y="-16">GATEWAY</text>
-                  </g>
-
-                  <g class="node status-ok" transform="translate(135,92)"
-                     data-name="服务台" data-status="运行正常" data-req="1.2k req/s" data-lat="22ms" data-owner="服务运营组">
-                    <circle class="node-ground" r="24"/>
-                    <polygon class="node-halo" points="0,-17 14.7,-8.5 14.7,8.5 0,17 -14.7,8.5 -14.7,-8.5"/>
-                    <polygon class="node-ring" points="0,-9 7.8,-4.5 7.8,4.5 0,9 -7.8,4.5 -7.8,-4.5"/>
-                    <circle class="node-core" r="3"/>
-                    <path class="node-ticks" d="M0 -22 V-19 M0 22 V19 M-22 0 H-19 M22 0 H19"/>
-                    <text class="node-label" y="-30">服务台</text>
-                    <text class="node-sub" y="-18">SERVICE DESK</text>
-                  </g>
-
-                  <g class="node status-warn" transform="translate(105,216)"
-                     data-name="工单中心" data-status="告警 · P2" data-req="1.8k req/s" data-lat="96ms" data-owner="陈子昂">
-                    <circle class="node-ground" r="28"/>
-                    <polygon class="node-halo" points="0,-21 18.2,-10.5 18.2,10.5 0,21 -18.2,10.5 -18.2,-10.5"/>
-                    <polygon class="node-ring" points="0,-11 9.5,-5.5 9.5,5.5 0,11 -9.5,5.5 -9.5,-5.5"/>
-                    <circle class="node-core" r="3.2"/>
-                    <path class="node-ticks" d="M0 -26 V-22 M0 26 V22 M-26 0 H-22 M26 0 H22"/>
-                    <g class="node-badge"><rect x="19" y="-7" width="24" height="13"/><text x="31" y="3.5">P2</text></g>
-                    <text class="node-label" y="-32">工单中心</text>
-                    <text class="node-sub" y="-20">TICKET HUB</text>
-                  </g>
-
-                  <g class="node status-ok" transform="translate(292,286)"
-                     data-name="知识库" data-status="运行正常" data-req="640 req/s" data-lat="31ms" data-owner="知识运营组">
-                    <circle class="node-ground" r="24"/>
-                    <polygon class="node-halo" points="0,-17 14.7,-8.5 14.7,8.5 0,17 -14.7,8.5 -14.7,-8.5"/>
-                    <polygon class="node-ring" points="0,-9 7.8,-4.5 7.8,4.5 0,9 -7.8,4.5 -7.8,-4.5"/>
-                    <circle class="node-core" r="3"/>
-                    <path class="node-ticks" d="M0 -22 V-19 M0 22 V19 M-22 0 H-19 M22 0 H19"/>
-                    <text class="node-label" y="25">知识库</text>
-                    <text class="node-sub" y="36">KNOWLEDGE</text>
-                  </g>
-
-                  <g class="node status-ok" transform="translate(785,92)"
-                     data-name="监控告警" data-status="运行正常" data-req="24.8k 指标/s" data-lat="6ms" data-owner="SRE 组">
-                    <circle class="node-ground" r="24"/>
-                    <polygon class="node-halo" points="0,-17 14.7,-8.5 14.7,8.5 0,17 -14.7,8.5 -14.7,-8.5"/>
-                    <polygon class="node-ring" points="0,-9 7.8,-4.5 7.8,4.5 0,9 -7.8,4.5 -7.8,-4.5"/>
-                    <circle class="node-core" r="3"/>
-                    <path class="node-ticks" d="M0 -22 V-19 M0 22 V19 M-22 0 H-19 M22 0 H19"/>
-                    <text class="node-label" y="-30">监控告警</text>
-                    <text class="node-sub" y="-18">OBSERVABILITY</text>
-                  </g>
-
-                  <g class="node status-ok" transform="translate(815,216)"
-                     data-name="CMDB" data-status="运行正常" data-req="860 req/s" data-lat="18ms" data-owner="配置管理组">
-                    <circle class="node-ground" r="24"/>
-                    <polygon class="node-halo" points="0,-17 14.7,-8.5 14.7,8.5 0,17 -14.7,8.5 -14.7,-8.5"/>
-                    <polygon class="node-ring" points="0,-9 7.8,-4.5 7.8,4.5 0,9 -7.8,4.5 -7.8,-4.5"/>
-                    <circle class="node-core" r="3"/>
-                    <path class="node-ticks" d="M0 -22 V-19 M0 22 V19 M-22 0 H-19 M22 0 H19"/>
-                    <text class="node-label" y="-32">CMDB</text>
-                    <text class="node-sub" y="-20">CONFIG BASE</text>
-                  </g>
-
-                  <g class="node status-ok" transform="translate(628,286)"
-                     data-name="自动化平台" data-status="运行正常" data-req="420 任务/h" data-lat="27ms" data-owner="自动化组">
-                    <circle class="node-ground" r="24"/>
-                    <polygon class="node-halo" points="0,-17 14.7,-8.5 14.7,8.5 0,17 -14.7,8.5 -14.7,-8.5"/>
-                    <polygon class="node-ring" points="0,-9 7.8,-4.5 7.8,4.5 0,9 -7.8,4.5 -7.8,-4.5"/>
-                    <circle class="node-core" r="3"/>
-                    <path class="node-ticks" d="M0 -22 V-19 M0 22 V19 M-22 0 H-19 M22 0 H19"/>
-                    <text class="node-label" y="25">自动化平台</text>
-                    <text class="node-sub" y="36">AUTOMATION</text>
-                  </g>
-
-                  <g class="node status-crit" transform="translate(460,286)"
-                     data-name="数据中台" data-status="故障 · P2 处置中" data-req="3.2k req/s" data-lat="1.2s" data-owner="数据平台组">
-                    <circle class="node-ground" r="28"/>
-                    <polygon class="node-halo" points="0,-21 18.2,-10.5 18.2,10.5 0,21 -18.2,10.5 -18.2,-10.5"/>
-                    <polygon class="node-ring" points="0,-11 9.5,-5.5 9.5,5.5 0,11 -9.5,5.5 -9.5,-5.5"/>
-                    <circle class="node-core" r="3.2"/>
-                    <path class="node-ticks" d="M0 -26 V-22 M0 26 V22 M-26 0 H-22 M26 0 H22"/>
-                    <g class="node-badge crit"><rect x="19" y="-7" width="24" height="13"/><text x="31" y="3.5">P2</text></g>
-                    <text class="node-label" y="25">数据中台</text>
-                    <text class="node-sub" y="36">DATA PLATFORM</text>
-                  </g>
-                </g>
-              </svg>
-            </div>
-            <div class="topo-foot">
-              <span>节点 <b>09</b></span>
-              <span>链路 <b>10</b></span>
-              <span>平均时延 <b>38ms</b></span>
-              <span>链路可用性 <b class="c-green">99.97%</b></span>
-            </div>
-          </div>
-        </section>
-
-        <div class="bottom-split">
-
-          <section class="panel panel-events">
-            <div class="panel-head">
-              <div class="ph-left"><i class="ph-idx">06</i><h2>实时事件流</h2><span class="ph-en">INCIDENT STREAM</span></div>
-              <div class="ev-head-right">
-                <span class="live-mini"><i></i>LIVE</span>
-                <div class="seg seg-sm" id="eventTabs">
-                  <button type="button" class="is-active" data-filter="all" aria-pressed="true">全部</button>
-                  <button type="button" data-filter="p1" aria-pressed="false">P1</button>
-                  <button type="button" data-filter="p2" aria-pressed="false">P2</button>
-                </div>
-              </div>
-            </div>
-            <div class="panel-body events-body">
-              <div class="ev-head">
-                <span>时间</span><span>级别</span><span>服务</span><span>事件描述</span><span>状态</span>
-              </div>
-              <div class="ev-list" id="eventList"></div>
-            </div>
-          </section>
-
-          <section class="panel panel-changes">
-            <div class="panel-head">
-              <div class="ph-left"><i class="ph-idx">07</i><h2>变更窗口</h2><span class="ph-en">CHANGE WINDOW</span></div>
-              <span class="head-tag">24H</span>
-            </div>
-            <div class="panel-body change-body">
-              <div class="change-list">
-                <div class="change-item">
-                  <span class="change-time">22:00 — 23:30</span>
-                  <h3>核心数据库主备切换</h3>
-                  <p><span class="risk mid">中风险</span>DB-CORE-03 · 已审批</p>
-                </div>
-                <div class="change-item">
-                  <span class="change-time">明日 01:00 — 02:00</span>
-                  <h3>API 网关灰度升级</h3>
-                  <p><span class="risk low">低风险</span>GW-PROD-07 · 灰度 10%</p>
-                </div>
-                <div class="change-item">
-                  <span class="change-time">明日 03:00 — 04:00</span>
-                  <h3>存储集群在线扩容</h3>
-                  <p><span class="risk high">高风险</span>STOR-OSD-12 · 已会签</p>
-                </div>
-                <div class="change-item">
-                  <span class="change-time">明日 05:00 — 05:30</span>
-                  <h3>全网 TLS 证书轮换</h3>
-                  <p><span class="risk low">低风险</span>CERT-MGR · 自动执行</p>
-                </div>
-              </div>
-              <div class="change-foot"><span>未来 24 小时</span><b>4 项变更已排期</b></div>
-            </div>
-          </section>
-        </div>
-      </section>
-
-      <!-- 右列 -->
       <section class="col col-right">
 
         <section class="panel panel-sla">
           <div class="panel-head">
-            <div class="ph-left"><i class="ph-idx">08</i><h2>SLA 达成</h2><span class="ph-en">SERVICE LEVEL</span></div>
+            <div class="ph-left"><i class="ph-idx">09</i><h2>SLA 达成</h2><span class="ph-en">SERVICE LEVEL</span></div>
             <span class="head-tag tag-ok"><i class="dot-teal"></i>达标</span>
           </div>
           <div class="panel-body sla-body">
@@ -518,7 +227,7 @@
 
         <section class="panel panel-res">
           <div class="panel-head">
-            <div class="ph-left"><i class="ph-idx">09</i><h2>资源负载</h2><span class="ph-en">RESOURCE LOAD</span></div>
+            <div class="ph-left"><i class="ph-idx">10</i><h2>资源负载</h2><span class="ph-en">RESOURCE LOAD</span></div>
             <span class="head-refresh">集群 <b>12</b> 节点</span>
           </div>
           <div class="panel-body res-body">
@@ -548,7 +257,7 @@
 
         <section class="panel panel-oncall">
           <div class="panel-head">
-            <div class="ph-left"><i class="ph-idx">10</i><h2>值班响应</h2><span class="ph-en">ON-CALL BOARD</span></div>
+            <div class="ph-left"><i class="ph-idx">11</i><h2>值班响应</h2><span class="ph-en">ON-CALL BOARD</span></div>
             <span class="head-tag"><i class="dot-teal"></i>A 班 · 5 人在线</span>
           </div>
           <div class="panel-body oncall-body">
@@ -614,8 +323,12 @@
 <div class="topo-tip" id="topoTip" role="tooltip" aria-hidden="true"></div>
 
 <script src="vendor/echarts.min.js"></script>
-<script src="assets/js/app.js"></script>
+<script src="assets/js/ito-data.js?v=20261102d"></script>
+<script src="assets/js/app.js?v=20261102d"></script>
+<script src="assets/js/center-demo.js?v=20261102d"></script>
 </body>
 </html>
+
+
 
 

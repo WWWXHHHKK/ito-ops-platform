@@ -371,6 +371,7 @@
     liveChip.classList.toggle('is-paused', !live);
     liveLabel.textContent = live ? '实时态势' : '数据已暂停';
     stage.classList.toggle('is-paused', !live);
+    document.dispatchEvent(new CustomEvent('ito:livechange', { detail: { live } }));
   }
 
   if (liveToggle) {
