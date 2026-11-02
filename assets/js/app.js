@@ -67,7 +67,7 @@
   /* health ring */
   const healthRing = $('#healthRing');
   const HEALTH_C = 2 * Math.PI * 46;
-  const healthTarget = HEALTH_C * (1 - 0.968);
+  const healthTarget = HEALTH_C * (1 - 0.89);
   healthRing.style.strokeDasharray = HEALTH_C.toFixed(2);
   healthRing.style.strokeDashoffset = STILL ? healthTarget.toFixed(2) : HEALTH_C.toFixed(2);
   if (!STILL) {
@@ -77,13 +77,13 @@
   }
   const healthValueEl = $('#healthValue');
   if (STILL) {
-    healthValueEl.textContent = '96.8';
+    healthValueEl.textContent = '89.0';
   } else {
     const hvStart = performance.now();
     (function animateHealth(now) {
       const p = Math.min((now - hvStart) / 1400, 1);
       const eased = 1 - Math.pow(1 - p, 3);
-      healthValueEl.textContent = (96.8 * eased).toFixed(1);
+      healthValueEl.textContent = (89.0 * eased).toFixed(1);
       if (p < 1) requestAnimationFrame(animateHealth);
     })(performance.now());
   }
@@ -112,22 +112,32 @@
   const chartEl = $('#ticketChart');
   let ticketChart = null;
 
-  const TREND = {
-    today: {
-      labels: ['08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'],
-      created: [14, 18, 17, 22, 26, 21, 31, 34, 27, 30, 22, 16, 8],
-      resolved: [10, 15, 13, 20, 24, 19, 28, 31, 25, 29, 21, 25, 11],
-      newTotal: 286, doneTotal: 271, backlog: 15,
-      newDelta: '+12.4%', doneDelta: '-4.1%', backlogNote: '当日'
-    },
-    week: {
-      labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
-      created: [268, 312, 296, 341, 305, 254, 286],
-      resolved: [251, 298, 281, 332, 296, 241, 271],
-      newTotal: 2062, doneTotal: 1970, backlog: 92,
-      newDelta: '+6.8%', doneDelta: '+9.2%', backlogNote: '周累计'
-    }
-  };
+  const TREND = (() => {
+    const D = window.ITO_DATA;
+    const sum = list => list.reduce((n, v) => n + v, 0);
+    const last7New = D.trend.newTasks.slice(-7);
+    const last7Done = D.trend.completed.slice(-7);
+    return {
+      '30': {
+        labels: D.trend.daily,
+        created: D.trend.newTasks,
+        resolved: D.trend.completed,
+        newTotal: D.dashboard.newTasks,
+        doneTotal: D.dashboard.closed,
+        backlog: D.dashboard.active,
+        newDelta: '+12.4%', doneDelta: '-4.1%', backlogNote: '当前'
+      },
+      '7': {
+        labels: D.trend.daily.slice(-7),
+        created: last7New,
+        resolved: last7Done,
+        newTotal: sum(last7New),
+        doneTotal: sum(last7Done),
+        backlog: D.dashboard.active,
+        newDelta: '+8.2%', doneDelta: '+6.4%', backlogNote: '当前'
+      }
+    };
+  })();
 
   function trendOption(key) {
     const d = TREND[key];
@@ -148,8 +158,8 @@
         formatter(params) {
           const rows = params.map(p => `<div style="display:flex;justify-content:space-between;gap:22px;line-height:1.8">
             <span style="color:#7b9fbc">${p.marker}${p.seriesName}</span>
-            <b style="font-weight:500;color:#e9f8ff">${p.value} 单</b></div>`).join('');
-          return `<div style="padding-bottom:4px;margin-bottom:3px;border-bottom:1px solid rgba(64,178,255,.18);color:#a9cbe2;letter-spacing:.06em">${params[0].axisValue}${key === 'today' ? ':00' : ''}</div>${rows}`;
+            <b style="font-weight:500;color:#e9f8ff">${p.value} 件</b></div>`).join('');
+          return `<div style="padding-bottom:4px;margin-bottom:3px;border-bottom:1px solid rgba(64,178,255,.18);color:#a9cbe2;letter-spacing:.06em">${params[0].axisValue}</div>${rows}`;
         }
       },
       xAxis: {
@@ -163,7 +173,9 @@
           fontSize: 8.5,
           fontFamily: 'Bahnschrift, "Microsoft YaHei UI", sans-serif',
           margin: 10,
-          interval: key === 'today' ? 1 : 0
+          interval: key === '30' ? 4 : 0,
+          showMinLabel: true,
+          showMaxLabel: true
         }
       },
       yAxis: {
@@ -176,7 +188,7 @@
       },
       series: [
         {
-          name: '新建工单',
+          name: '新增任务',
           type: 'line',
           smooth: 0.32,
           showSymbol: false,
@@ -194,7 +206,7 @@
           emphasis: { focus: 'series', scale: 1.4 }
         },
         {
-          name: '已解决',
+          name: '闭环任务',
           type: 'line',
           smooth: 0.32,
           showSymbol: false,
@@ -350,7 +362,7 @@
     const now = new Date();
     const stamp = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
     if (refreshEl) refreshEl.textContent = stamp;
-    if (lastSweepEl) lastSweepEl.textContent = stamp;
+    if (lastSweepEl) lastSweepEl.textContent = window.ITO_DATA ? window.ITO_DATA.meta.demoNow.slice(11) : stamp;
   }
   stampRefresh();
 
@@ -369,7 +381,7 @@
     liveToggle.classList.toggle('is-paused', !live);
     liveToggle.setAttribute('aria-pressed', String(!live));
     liveChip.classList.toggle('is-paused', !live);
-    liveLabel.textContent = live ? '实时态势' : '数据已暂停';
+    liveLabel.textContent = live ? '任务态势' : '任务态势已暂停';
     stage.classList.toggle('is-paused', !live);
     document.dispatchEvent(new CustomEvent('ito:livechange', { detail: { live } }));
   }
@@ -458,7 +470,7 @@
   function initChart() {
     if (!chartEl || typeof echarts === 'undefined') return;
     ticketChart = echarts.init(chartEl, null, { renderer: 'canvas' });
-    renderTrend('today');
+    renderTrend('30');
 
     const tabs = $('#trendTabs');
     tabs?.addEventListener('click', e => {

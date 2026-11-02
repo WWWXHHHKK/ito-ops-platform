@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>ITO 智能运维管理平台 · 运维驾驶舱</title>
-<link rel="stylesheet" href="assets/css/style.css?v=20261102d" />
+<link rel="stylesheet" href="assets/css/style.css?v=20261102f" />
 </head>
 <body>
 <div class="stage-shell">
@@ -32,9 +32,9 @@
           <time class="dt-time" id="clock">00:00:00</time>
         </div>
         <div class="ts-row">
-          <span class="ts"><i class="dot-green"></i>在线服务 <b>128</b></span>
-          <span class="ts"><i class="dot-yellow"></i>告警 <b>37</b></span>
-          <span class="ts"><i class="dot-red"></i>P1 <b>0</b></span>
+          <span class="ts"><i class="dot-green"></i>在办任务 <b id="tsActive">128</b></span>
+          <span class="ts"><i class="dot-yellow"></i>超期 <b id="tsOverdue">7</b></span>
+          <span class="ts"><i class="dot-red"></i>待处理 <b id="tsPending">9</b></span>
         </div>
       </div>
 
@@ -48,8 +48,8 @@
       </div>
 
       <div class="topbar-right">
-        <span class="live-chip" id="liveChip"><i></i><em id="liveLabel">实时态势</em></span>
-        <span class="env-badge"><b>PROD</b>生产环境</span>
+        <span class="live-chip" id="liveChip"><i></i><em id="liveLabel">任务态势</em></span>
+        <span class="env-badge"><b>DEMO</b>演示环境</span>
         <span class="topbar-meta">华东区 · SHA-01</span>
         <a class="admin-link" href="admin.html" title="进入运维管理后台">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3M7 9h4M7 13h7"/></svg>
@@ -74,8 +74,8 @@
 
         <section class="panel panel-health">
           <div class="panel-head">
-            <div class="ph-left"><i class="ph-idx">01</i><h2>全域健康</h2><span class="ph-en">FLEET HEALTH</span></div>
-            <span class="head-tag">巡检完成</span>
+            <div class="ph-left"><i class="ph-idx">01</i><h2>任务健康</h2><span class="ph-en">TASK HEALTH</span></div>
+            <span class="head-tag tag-ok"><i class="dot-teal"></i>按期 89.0%</span>
           </div>
           <div class="panel-body health-body">
             <div class="ring-wrap">
@@ -94,89 +94,58 @@
                 <circle class="ring-ticks" cx="62" cy="62" r="55"/>
                 <circle class="ring-inner" cx="62" cy="62" r="36"/>
                 <circle class="ring-track" cx="62" cy="62" r="46"/>
-                <circle class="ring-value" id="healthRing" cx="62" cy="62" r="46" stroke="url(#healthGrad)" stroke-dasharray="289.03" stroke-dashoffset="9.25" filter="url(#ringGlow)"/>
+                <circle class="ring-value" id="healthRing" cx="62" cy="62" r="46" stroke="url(#healthGrad)" stroke-dasharray="289.03" stroke-dashoffset="31.79" filter="url(#ringGlow)"/>
               </svg>
               <div class="ring-center">
-                <strong id="healthValue">96.8</strong><span>%</span>
-                <small>健康度</small>
+                <strong id="healthValue">89.0</strong><span>%</span>
+                <small>按期闭环</small>
               </div>
             </div>
             <div class="health-side">
               <div class="health-bar" aria-hidden="true">
-                <i class="ok" style="flex:121"></i><i class="warn" style="flex:5"></i><i class="bad" style="flex:2"></i>
+                <i class="ok" style="flex:89"></i><i class="bad" style="flex:11"></i>
               </div>
               <div class="health-stats">
-                <div><b class="c-ok" data-count="121">121</b><span>健康服务</span></div>
-                <div><b class="c-warn" data-count="5">5</b><span>告警服务</span></div>
-                <div><b class="c-bad" data-count="2">2</b><span>故障服务</span></div>
+                <div><b class="c-ok" data-count="342">342</b><span>已闭环</span></div>
+                <div><b class="c-teal" data-count="128">128</b><span>在办任务</span></div>
+                <div><b class="c-bad" data-count="7">7</b><span>超期任务</span></div>
               </div>
-              <p class="health-note"><i class="dot-amber"></i>较昨日提升 0.4% · 2 项故障处置中</p>
+              <p class="health-note"><i class="dot-amber"></i>较上月 +2.1% · 高风险 3 项</p>
             </div>
           </div>
-          <div class="panel-foot"><span>LAST SWEEP <b id="lastSweep">00:00:00</b></span><span>COVERAGE 12 / 12 POOLS</span></div>
+          <div class="panel-foot"><span>数据截至 <b id="lastSweep">20:56</b></span><span>专业组 4 / 在办 128</span></div>
         </section>
 
         <section class="panel panel-trend">
           <div class="panel-head">
-            <div class="ph-left"><i class="ph-idx">02</i><h2>工单流量</h2><span class="ph-en">TICKET FLOW</span></div>
+            <div class="ph-left"><i class="ph-idx">02</i><h2>任务流量</h2><span class="ph-en">TASK FLOW</span></div>
             <div class="seg" id="trendTabs">
-              <button type="button" class="is-active" data-range="today" aria-pressed="true">今日</button>
-              <button type="button" data-range="week" aria-pressed="false">近 7 天</button>
+              <button type="button" class="is-active" data-range="30" aria-pressed="true">近 30 天</button>
+              <button type="button" data-range="7" aria-pressed="false">近 7 天</button>
             </div>
           </div>
           <div class="panel-body trend-body">
             <div class="trend-summary">
-              <div><span>新建工单</span><b id="trendNew">286</b><em class="up">+12.4%</em></div>
-              <div><span>已解决</span><b id="trendDone">271</b><em class="down">-4.1%</em></div>
-              <div><span>积压</span><b id="trendBacklog">15</b><em class="neutral">当日</em></div>
+              <div><span>新增任务</span><b id="trendNew">384</b><em class="up">+12.4%</em></div>
+              <div><span>闭环任务</span><b id="trendDone">342</b><em class="down">-4.1%</em></div>
+              <div><span>当前在办</span><b id="trendBacklog">128</b><em class="neutral">当前</em></div>
             </div>
-            <div class="chart-box"><div id="ticketChart" role="img" aria-label="工单新建与解决趋势折线图"></div></div>
+            <div class="chart-box"><div id="ticketChart" role="img" aria-label="任务新增与闭环趋势折线图"></div></div>
             <div class="chart-legend">
-              <span><i class="l-amber"></i>新建工单</span>
-              <span><i class="l-teal"></i>已解决</span>
-              <span class="legend-note">单位：单</span>
+              <span><i class="l-amber"></i>新增任务</span>
+              <span><i class="l-teal"></i>闭环任务</span>
+              <span class="legend-note">单位：件</span>
             </div>
           </div>
         </section>
 
         <section class="panel panel-alerts">
           <div class="panel-head">
-            <div class="ph-left"><i class="ph-idx">03</i><h2>告警分布</h2><span class="ph-en">ALERT PROFILE</span></div>
-            <span class="head-total">今日 <b>37</b> 条</span>
+            <div class="ph-left"><i class="ph-idx">03</i><h2>巡检执行</h2><span class="ph-en">INSPECTION</span></div>
+            <span class="head-total">4 / 5 启用</span>
           </div>
-          <div class="panel-body alert-body">
-            <div class="alert-row">
-              <span class="alert-name"><i class="a-red"></i>应用异常</span>
-              <div class="alert-track"><i class="a-red" style="--w:100%"></i></div>
-              <span class="alert-num">12</span><span class="alert-delta up">+3</span>
-            </div>
-            <div class="alert-row">
-              <span class="alert-name"><i class="a-amber"></i>数据库</span>
-              <div class="alert-track"><i class="a-amber" style="--w:75%"></i></div>
-              <span class="alert-num">9</span><span class="alert-delta up">+1</span>
-            </div>
-            <div class="alert-row">
-              <span class="alert-name"><i class="a-amber"></i>网络链路</span>
-              <div class="alert-track"><i class="a-amber" style="--w:58%"></i></div>
-              <span class="alert-num">7</span><span class="alert-delta down">-2</span>
-            </div>
-            <div class="alert-row">
-              <span class="alert-name"><i class="a-blue"></i>存储容量</span>
-              <div class="alert-track"><i class="a-blue" style="--w:42%"></i></div>
-              <span class="alert-num">5</span><span class="alert-delta down">-1</span>
-            </div>
-            <div class="alert-row">
-              <span class="alert-name"><i class="a-blue"></i>安全策略</span>
-              <div class="alert-track"><i class="a-blue" style="--w:25%"></i></div>
-              <span class="alert-num">3</span><span class="alert-delta neutral">0</span>
-            </div>
-            <div class="alert-row">
-              <span class="alert-name"><i class="a-dim"></i>其他</span>
-              <div class="alert-track"><i class="a-dim" style="--w:8%"></i></div>
-              <span class="alert-num">1</span><span class="alert-delta down">-1</span>
-            </div>
-            <div class="alert-foot"><span><i class="dot-teal"></i>自动收敛率 78.4%</span><span>P1 告警 0 条</span></div>
-          </div>
+          <div class="panel-body inspection-body" id="inspectionList"></div>
+          <div class="panel-foot"><span>巡检记录 <b id="inspRecordCount">5</b> 条</span><span>异常 <b id="inspAbnormalCount">2</b> 项 · 整改 100%</span></div>
         </section>
       </section>
 
@@ -188,7 +157,7 @@
 
         <section class="panel panel-sla">
           <div class="panel-head">
-            <div class="ph-left"><i class="ph-idx">09</i><h2>SLA 达成</h2><span class="ph-en">SERVICE LEVEL</span></div>
+            <div class="ph-left"><i class="ph-idx">09</i><h2>任务 SLA</h2><span class="ph-en">TASK SLA</span></div>
             <span class="head-tag tag-ok"><i class="dot-teal"></i>达标</span>
           </div>
           <div class="panel-body sla-body">
@@ -209,95 +178,38 @@
                 <circle class="gauge-deco inner" cx="75" cy="75" r="42"/>
                 <g id="gaugeTicks"></g>
                 <circle class="gauge-track" cx="75" cy="75" r="54" transform="rotate(135 75 75)"/>
-                <circle class="gauge-value" cx="75" cy="75" r="54" transform="rotate(135 75 75)" stroke="url(#slaGrad)" filter="url(#slaGlow)"/>
+                <circle class="gauge-value" cx="75" cy="75" r="54" transform="rotate(135 75 75)" stroke="url(#slaGrad)" filter="url(#slaGlow)" style="stroke-dasharray:244.82 339.29"/>
               </svg>
               <div class="gauge-center">
-                <strong>99.972</strong><span>%</span>
-                <small>SLA 达成率</small>
+                <strong>96.2</strong><span>%</span>
+                <small>任务 SLA</small>
               </div>
             </div>
             <div class="sla-metrics">
-              <div class="sla-metric"><span>MTTR 平均修复</span><b>18m 24s</b><em class="down">-12.0%</em></div>
-              <div class="sla-metric"><span>MTTA 平均响应</span><b>2m 48s</b><em class="down">-8.2%</em></div>
-              <div class="sla-metric"><span>一次解决率</span><b>92.4%</b><em class="up-good">+1.6%</em></div>
+              <div class="sla-metric"><span>按期闭环率</span><b>89.0%</b><em class="up-good">+2.1%</em></div>
+              <div class="sla-metric"><span>平均闭环时长</span><b>6h 12m</b><em class="down">-0.4h</em></div>
+              <div class="sla-metric"><span>超期率</span><b>5.5%</b><em class="down">-0.8%</em></div>
             </div>
           </div>
-          <div class="panel-foot"><span><i class="dot-teal"></i>连续 31 天达成服务目标</span><span>TARGET 99.95%</span></div>
+          <div class="panel-foot"><span><i class="dot-teal"></i>月度目标 95.0%</span><span>当前 96.2%</span></div>
         </section>
 
         <section class="panel panel-res">
           <div class="panel-head">
-            <div class="ph-left"><i class="ph-idx">10</i><h2>资源负载</h2><span class="ph-en">RESOURCE LOAD</span></div>
-            <span class="head-refresh">集群 <b>12</b> 节点</span>
+            <div class="ph-left"><i class="ph-idx">10</i><h2>维保计划</h2><span class="ph-en">MAINTENANCE</span></div>
+            <span class="head-refresh"><b id="maintEnabled">3</b> / 4 启用</span>
           </div>
-          <div class="panel-body res-body">
-            <div class="res-row" data-res="cpu">
-              <div class="res-top"><span>处理器</span><b><em>42.6</em>%</b></div>
-              <div class="res-track"><i style="width:42.6%"></i></div>
-              <div class="res-detail"><span>1,284 vCPU</span><span>P95 68.2%</span></div>
-            </div>
-            <div class="res-row" data-res="mem">
-              <div class="res-top"><span>内存</span><b><em>68.2</em>%</b></div>
-              <div class="res-track"><i style="width:68.2%"></i></div>
-              <div class="res-detail"><span>2.1 TB / 3.1 TB</span><span>P95 81.4%</span></div>
-            </div>
-            <div class="res-row" data-res="disk">
-              <div class="res-top"><span>存储</span><b><em>74.1</em>%</b></div>
-              <div class="res-track"><i style="width:74.1%"></i></div>
-              <div class="res-detail"><span>186 TB / 251 TB</span><span>日增 1.2 TB</span></div>
-            </div>
-            <div class="res-row" data-res="net">
-              <div class="res-top"><span>网络出口</span><b><em>31.8</em>%</b></div>
-              <div class="res-track"><i style="width:31.8%"></i></div>
-              <div class="res-detail"><span>4.8 Gbps / 15 Gbps</span><span>丢包 0.02%</span></div>
-            </div>
-            <div class="res-foot"><i class="dot-teal"></i>自动扩容已开启 · 预计可承载 30% 峰值增长</div>
-          </div>
+          <div class="panel-body maint-body" id="maintenanceList"></div>
+          <div class="panel-foot"><span>下次维保 <b id="maintNext">11-06</b></span><span>厂商 3 家</span></div>
         </section>
 
         <section class="panel panel-oncall">
           <div class="panel-head">
-            <div class="ph-left"><i class="ph-idx">11</i><h2>值班响应</h2><span class="ph-en">ON-CALL BOARD</span></div>
-            <span class="head-tag"><i class="dot-teal"></i>A 班 · 5 人在线</span>
+            <div class="ph-left"><i class="ph-idx">11</i><h2>待办与消息</h2><span class="ph-en">ACTION CENTER</span></div>
+            <span class="head-tag"><i class="dot-amber"></i>未读 <b id="msgUnread">3</b></span>
           </div>
-          <div class="panel-body oncall-body">
-            <div class="duty-row">
-              <span class="duty-rank top">01</span>
-              <span class="avatar av-amber">陈</span>
-              <div class="duty-id"><b>陈子昂</b><small>基础架构组</small></div>
-              <div class="duty-bar"><i style="--w:94%"></i></div>
-              <div class="duty-time"><b>1m 42s</b><small>38 单</small></div>
-            </div>
-            <div class="duty-row">
-              <span class="duty-rank">02</span>
-              <span class="avatar">林</span>
-              <div class="duty-id"><b>林知夏</b><small>SRE 组</small></div>
-              <div class="duty-bar"><i style="--w:86%"></i></div>
-              <div class="duty-time"><b>2m 06s</b><small>31 单</small></div>
-            </div>
-            <div class="duty-row">
-              <span class="duty-rank">03</span>
-              <span class="avatar">周</span>
-              <div class="duty-id"><b>周叙白</b><small>数据平台组</small></div>
-              <div class="duty-bar"><i style="--w:74%"></i></div>
-              <div class="duty-time"><b>2m 41s</b><small>27 单</small></div>
-            </div>
-            <div class="duty-row">
-              <span class="duty-rank">04</span>
-              <span class="avatar">沈</span>
-              <div class="duty-id"><b>沈见微</b><small>服务运营组</small></div>
-              <div class="duty-bar"><i style="--w:61%"></i></div>
-              <div class="duty-time"><b>3m 18s</b><small>22 单</small></div>
-            </div>
-            <div class="duty-row">
-              <span class="duty-rank">05</span>
-              <span class="avatar">顾</span>
-              <div class="duty-id"><b>顾行舟</b><small>安全合规组</small></div>
-              <div class="duty-bar"><i style="--w:48%"></i></div>
-              <div class="duty-time"><b>3m 55s</b><small>14 单</small></div>
-            </div>
-          </div>
-          <div class="panel-foot"><span>响应达标率</span><b class="c-teal">98.6%</b><span class="foot-right">MEDIAN 2m 41s</span></div>
+          <div class="panel-body action-body" id="actionList"></div>
+          <div class="panel-foot"><span>未读 <b id="msgUnreadFoot">3</b> 条</span><span>共 <b id="msgTotal">6</b> 条</span></div>
         </section>
       </section>
     </main>
@@ -307,12 +219,12 @@
       <div class="ticker-label"><i></i>运维快讯<em>OPS WIRE</em></div>
       <div class="ticker-viewport">
         <div class="ticker-track" id="tickerTrack">
-          <span>工单中心 API 超时告警已自动扩容恢复</span><b>◆</b>
-          <span>华东网络出口丢包率回落至 0.1%</span><b>◆</b>
-          <span>CMDB 同步任务完成，共更新 12,840 条配置项</span><b>◆</b>
-          <span>自动化平台本月执行量突破 1,000 次</span><b>◆</b>
-          <span>核心数据库主备切换演练通过，RTO 42 秒</span><b>◆</b>
-        </div>
+          <span>T10023-01 防火墙策略评审超期，已升级通信组</span><b>◆</b>
+          <span>IR-1026 网络设备日检发现 2 项异常，已生成整改任务</span><b>◆</b>
+          <span>今日白班：李工、陈工 · 夜班：赵工</span><b>◆</b>
+          <span>吴工工作班成员授权已过期，请及时续期</span><b>◆</b>
+          <span>10 月运维月报已生成，可在管理后台导出</span><b>◆</b>
+                </div>
       </div>
       <div class="ticker-meta">SHA-01 · UTC+08 · v3.6.2</div>
     </footer>
@@ -323,11 +235,14 @@
 <div class="topo-tip" id="topoTip" role="tooltip" aria-hidden="true"></div>
 
 <script src="vendor/echarts.min.js"></script>
-<script src="assets/js/ito-data.js?v=20261102d"></script>
-<script src="assets/js/app.js?v=20261102d"></script>
+<script src="assets/js/ito-data.js?v=20261102f"></script>
+<script src="assets/js/platform-panels.js?v=20261102f"></script>
+<script src="assets/js/app.js?v=20261102f"></script>
 <script src="assets/js/center-demo.js?v=20261102g"></script>
 </body>
 </html>
+
+
 
 
 

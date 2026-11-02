@@ -48,15 +48,6 @@
   const baseSla = Number(D.dashboard.sla);
   const baseOnTime = Number(D.dashboard.onTimeRate);
 
-  const recoveredGroups = baseGroups.map(g => {
-    if (g.name !== '通信组') return { ...g };
-    return {
-      ...g,
-      active: Math.max(0, g.active - 1),
-      overdue: Math.max(0, g.overdue - 1)
-    };
-  });
-
   const validAuths = D.auths.filter(a => {
     if (a.status === '已撤销') return false;
     return parse(a.validTo) >= today;
@@ -80,16 +71,15 @@
     },
     {
       id: 'handling', label: '处置', tone: 'warn',
-      active: baseActive, closed: baseClosed, overdue: baseOverdue, sla: Number((baseSla - 0.3).toFixed(1)),
-      ontime: 88.7, groups: baseGroups, highRisk: 2,
+      active: baseActive, closed: baseClosed, overdue: baseOverdue, sla: baseSla,
+      ontime: baseOnTime, groups: baseGroups, highRisk: 3,
       title: '高风险审批升级处置', note: '已升级至王主管 · 高风险授权审批中 · 关联割接任务等待执行'
     },
     {
       id: 'recovered', label: '闭环', tone: 'ok',
-      active: Math.max(0, baseActive - 1), closed: baseClosed + 1,
-      overdue: Math.max(0, baseOverdue - 1), sla: Number((baseSla + 0.2).toFixed(1)),
-      ontime: 89.1, groups: recoveredGroups, highRisk: 2,
-      title: '授权通过，任务恢复', note: 'T10023-01 已闭环 · 割接进入执行 · 当前超期降至 6 项'
+      active: baseActive, closed: baseClosed, overdue: baseOverdue, sla: baseSla,
+      ontime: baseOnTime, groups: baseGroups, highRisk: 3,
+      title: '授权通过，任务恢复', note: 'T10023-01 已闭环 · 其余超期任务继续跟踪'
     }
   ];
 
