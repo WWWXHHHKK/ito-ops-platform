@@ -83,6 +83,18 @@ python -m http.server 4173
 
 在线预览：<https://wwwxhhhkk.github.io/ito-ops-platform/prototypes/center-full-options.html#a>
 
+### 展会版中间列
+
+`prototypes/exhibition-center-options.html` 是面向客户展台的版本，不使用 API 网关 / 数据中台 / CMDB 等外部系统口径，全部改为平台自己的任务与专业组数据：
+
+- **A 任务流转**：待派发 → 待审批 → 待接收 → 执行中 → 闭环
+- **B 超期处置**：防火墙策略评审超期 → 升级 → 授权 → 闭环
+- **C 专业组孪生**：4 个专业组负荷、超期分布、值班与授权
+
+同样支持 10 秒自动轮播和人工暂停 / 上一步 / 下一步 / 状态切换。
+
+在线预览：<https://wwwxhhhkk.github.io/ito-ops-platform/prototypes/exhibition-center-options.html#a>
+
 ## 演示数据口径
 
 - 在办 **128** = 期初积压 **86** + 近 30 天新增 **384** − 近 30 天完成 **342**。
