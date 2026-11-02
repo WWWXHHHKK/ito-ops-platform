@@ -109,7 +109,7 @@
     '已完成': 'green', '完成': 'green', '正常': 'green', '启用': 'green', '有效': 'green',
     '超期': 'red', '异常': 'red', '已过期': 'red', '紧急': 'red', '高风险作业': 'red',
     '重要': 'yellow', '一般': 'gray', '停用': 'gray', '已撤销': 'gray',
-    '待处理': 'yellow', '计划中': 'gray'
+    '待处理': 'yellow', '计划中': 'gray', '草稿': 'gray'
   };
 
   function badge(text, tone) {
@@ -125,7 +125,7 @@
 
   function avatar(name, small) {
     const person = state.staff.find((s) => s.name === name);
-    const g = person ? groupById(person.group) : null;
+    const g = person ? groupById(person.group) : state.groups.find((group) => group.manager === name);
     const bg = g ? g.color : '#EB612A';
     const initial = String(name || '?').slice(0, 1);
     return '<span class="avatar' + (small ? ' avatar-sm' : '') + '" style="background:' + bg + '">' + esc(initial) + '</span>';
@@ -136,11 +136,12 @@
   }
 
   function isOverdue(sub) {
-    return sub.status !== '已完成' && parseDate(sub.due) < parseDate(D.meta.demoNow);
+    return sub.status !== '已完成' && sub.status !== '草稿' && parseDate(sub.due) < parseDate(D.meta.demoNow);
   }
 
   function mainStatus(task) {
     const subs = task.subs;
+    if (task.draft) return '草稿';
     if (!subs.length) return '待处理';
     if (subs.every((s) => s.status === '已完成')) return '已完成';
     if (subs.some((s) => s.status === '执行中')) return '执行中';
@@ -177,7 +178,7 @@
     if (!state.user) return 0;
     let n = 0;
     state.tasks.forEach((t) => t.subs.forEach((s) => {
-      if (s.owner === state.user.name && s.status !== '已完成') n += 1;
+      if (s.owner === state.user.name && s.status !== '已完成' && s.status !== '草稿') n += 1;
     }));
     return n;
   }
@@ -244,7 +245,7 @@
 
     root.innerHTML =
       '<div class="modal-backdrop">' +
-        '<div class="modal' + (o.wide ? ' wide' : '') + '" role="dialog" aria-modal="true" aria-label="' + esc(o.title) + '">' +
+        '<div class="modal' + (o.xwide ? ' xwide' : o.wide ? ' wide' : '') + '" role="dialog" aria-modal="true" aria-label="' + esc(o.title) + '">' +
           '<div class="modal-head">' +
             '<div><h2>' + esc(o.title) + '</h2>' + (o.sub ? '<p>' + esc(o.sub) + '</p>' : '') + '</div>' +
             '<button class="modal-close" type="button" aria-label="关闭">' + icon('close') + '</button>' +
@@ -300,7 +301,7 @@
 
     root.innerHTML =
       '<div class="drawer-backdrop">' +
-        '<aside class="drawer" role="dialog" aria-modal="true" aria-label="' + esc(o.title) + '">' +
+        '<aside class="drawer' + (o.wide ? ' wide' : '') + '" role="dialog" aria-modal="true" aria-label="' + esc(o.title) + '">' +
           '<div class="drawer-head">' +
             '<div><h2>' + esc(o.title) + '</h2>' + (o.sub ? '<p>' + esc(o.sub) + '</p>' : '') + '</div>' +
             '<button class="modal-close" type="button" aria-label="关闭">' + icon('close') + '</button>' +
@@ -647,7 +648,7 @@
   ITO.ui = {
     $, $$, esc, icon, badge, groupPill, avatar, progressBar, isOverdue, mainStatus,
     mainProgress, pageHead, emptyState, csv, download, toast, modal, confirm: confirmDialog,
-    drawer, chart, groupOptions, staffOptions, statusOptions, formRow, shortDate, addCycle
+    drawer, chart, groupOptions, staffOptions, peopleOptions, statusOptions, formRow, shortDate, addCycle
   };
   ITO.go = go;
   ITO.refresh = refresh;
@@ -670,6 +671,17 @@
       .filter((s) => !groupId || s.group === groupId)
       .map((s) => '<option value="' + esc(s.name) + '"' + (s.name === selected ? ' selected' : '') + '>' + esc(s.name) + ' · ' + esc(s.title) + '</option>')
       .join('');
+  }
+
+  function peopleOptions(groupId, selected) {
+    const group = state.groups.find((g) => g.id === groupId);
+    const list = [];
+    if (group && group.manager) list.push({ name: group.manager, title: '组主管' });
+    state.staff.filter((s) => !groupId || s.group === groupId).forEach((s) => list.push(s));
+    return list.map((p) =>
+      '<option value="' + esc(p.name) + '"' + (p.name === selected ? ' selected' : '') + '>' +
+        esc(p.name) + ' · ' + esc(p.title) + '</option>'
+    ).join('');
   }
 
   function statusOptions(list, selected) {

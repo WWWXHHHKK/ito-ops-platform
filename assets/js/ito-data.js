@@ -306,6 +306,18 @@ window.ITO_DATA = (() => {
     admin:    { name: '系统管理员', role: '系统管理员', avatar: '管', title: '平台管理员', desc: '账号权限、组织架构与审计' }
   };
 
+  const taskTags = [
+    '机房', '终端', 'KCC', 'KNS', 'KDN', 'KSM', 'DTT', 'DKM', 'DTD', 'DTC', 'DTW',
+    'DTP', 'DTG', 'DTA', 'DTS', 'DTI', 'DTV', '视频会议系统', '卫星电话系统',
+    '无线对讲系统', '厂房通信系统'
+  ];
+
+  const authTypes = [
+    '无需授权', '工作负责人授权', '准备工程师授权', '高风险作业授权',
+    'RP1 授权', 'RP2 授权', '登高车作业授权', '低压电工证', '高压电工证', '工具库授权'
+  ];
+
+
   function shiftSnapshot(value, offset, key) {
     if (Array.isArray(value)) {
       return value.map(function (item) { return shiftSnapshot(item, offset, null); });
@@ -360,6 +372,7 @@ window.ITO_DATA = (() => {
     maintenancePlans, maintenanceRecords,
     duty, auths, messages, alertRules, logs, achievements,
     permissions, roleInfo
+    , taskTags, authTypes
   };
 
   shiftSnapshot(data, OFFSET_DAYS);

@@ -116,7 +116,7 @@
     const items = [];
     st.tasks.forEach(function (t) {
       t.subs.forEach(function (s) {
-        if (s.owner === st.user.name && s.status !== '待派发' && s.status !== '待审批') items.push({ task: t, sub: s });
+        if (s.owner === st.user.name && s.status !== '待派发' && s.status !== '待审批' && s.status !== '草稿') items.push({ task: t, sub: s });
       });
     });
     return items;
