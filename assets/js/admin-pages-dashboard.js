@@ -118,7 +118,7 @@
 
       return U.pageHead({
         title: '运维驾驶舱',
-        sub: '2026 年 11 月 1 日 · 全局任务、专业组负荷与今日值班 · 数据截至 20:56',
+        sub: '2026 年 11 月 2 日 · 全局任务、专业组负荷与今日值班 · 数据截至 20:56',
         actions:
           '<button class="btn btn-ghost" id="exportReportBtn" type="button">' + U.icon('download') + '导出月报</button>' +
           (canCreate ? '<button class="btn btn-primary" id="newTaskBtn" type="button">' + U.icon('plus') + '新建任务</button>' : '')
@@ -220,7 +220,13 @@
             data: labels,
             axisLine: { lineStyle: { color: 'rgba(29,29,31,.10)' } },
             axisTick: { show: false },
-            axisLabel: { color: '#AEAEB2', fontSize: 9, interval: days > 10 ? 4 : 0, margin: 10 }
+            axisLabel: {
+              color: '#AEAEB2', fontSize: 9, margin: 10,
+              showMinLabel: true, showMaxLabel: true,
+              interval: days > 10 ? function (index) {
+                return index === 0 || index === labels.length - 1 || index % 5 === 0;
+              } : 0
+            }
           },
           yAxis: {
             type: 'value',

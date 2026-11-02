@@ -8,8 +8,8 @@
 window.ITO_DATA = (() => {
   'use strict';
 
-  const DEMO_NOW = '2026-11-01 20:56';
-  const TODAY = '2026-11-01';
+  const DEMO_NOW = '2026-11-02 20:56';
+  const TODAY = '2026-11-02';
 
   const groups = [
     { id: 'app',    name: '应用组',     code: 'APP',    manager: '王主管', color: '#EB612A', desc: '业务系统、接口与版本发布' },
@@ -43,13 +43,13 @@ window.ITO_DATA = (() => {
   };
 
   const trend = {
-    labels: ['10/03', '10/08', '10/13', '10/18', '10/23', '10/28', '11/01'],
-    newTasks: [10, 12, 9, 13, 14, 7, 6, 11, 13, 10, 14, 15, 9, 8, 13, 15, 14, 17, 18, 10, 9, 14, 16, 15, 18, 19, 11, 10, 16, 18],
-    completed: [8, 10, 8, 11, 13, 7, 6, 10, 12, 10, 13, 14, 8, 7, 11, 13, 12, 15, 16, 9, 8, 12, 14, 13, 16, 17, 10, 9, 14, 16],
+    labels: ['10/04', '10/09', '10/14', '10/19', '10/24', '10/29', '11/02'],
+    newTasks: [12, 9, 13, 14, 7, 6, 11, 13, 10, 14, 15, 9, 8, 13, 15, 14, 17, 18, 10, 9, 14, 16, 15, 18, 19, 11, 10, 16, 18, 10],
+    completed: [10, 8, 11, 13, 7, 6, 10, 12, 10, 13, 14, 8, 7, 11, 13, 12, 15, 16, 9, 8, 12, 14, 13, 16, 17, 10, 9, 14, 16, 8],
     daily: [
-      '10/03', '10/04', '10/05', '10/06', '10/07', '10/08', '10/09', '10/10', '10/11', '10/12',
-      '10/13', '10/14', '10/15', '10/16', '10/17', '10/18', '10/19', '10/20', '10/21', '10/22',
-      '10/23', '10/24', '10/25', '10/26', '10/27', '10/28', '10/29', '10/30', '10/31', '11/01'
+      '10/04', '10/05', '10/06', '10/07', '10/08', '10/09', '10/10', '10/11', '10/12', '10/13',
+      '10/14', '10/15', '10/16', '10/17', '10/18', '10/19', '10/20', '10/21', '10/22', '10/23',
+      '10/24', '10/25', '10/26', '10/27', '10/28', '10/29', '10/30', '10/31', '11/01', '11/02'
     ]
   };
 
@@ -60,7 +60,7 @@ window.ITO_DATA = (() => {
       desc: '覆盖核心机房环境、空调、UPS 与消防系统，输出整改闭环清单。',
       subs: [
         { id: 'T10027-01', name: '核心机房环境巡检', group: 'infra', owner: '刘工', initiator: '张总', level: '重要', type: '巡检', status: '执行中', due: '2026-10-31 18:00', hours: 8,  progress: 75, auth: '工作负责人授权', ticket: true },
-        { id: 'T10027-02', name: '机房空调系统检测', group: 'infra', owner: '郑工', initiator: '张总', level: '一般', type: '维保', status: '待派发', due: '2026-11-02 17:00', hours: 4,  progress: 0,  auth: '准备工程师授权', ticket: false },
+        { id: 'T10027-02', name: '机房空调系统检测', group: 'infra', owner: '郑工', initiator: '张总', level: '一般', type: '维保', status: '待派发', due: '2026-11-03 17:00', hours: 4,  progress: 0,  auth: '准备工程师授权', ticket: false },
         { id: 'T10027-03', name: 'UPS 电池组测试',    group: 'infra', owner: '郑工', initiator: '张总', level: '紧急', type: '试验', status: '待审批', due: '2026-10-27 20:00', hours: 6,  progress: 0,  auth: '高风险作业授权', ticket: true }
       ]
     },
@@ -93,10 +93,10 @@ window.ITO_DATA = (() => {
     },
     {
       id: 'T10023', name: '防火墙策略变更', group: 'comm', owner: '赵工', initiator: '张总',
-      level: '紧急', type: '变更', due: '2026-11-01 22:00', tags: ['防火墙', '策略'],
+      level: '紧急', type: '变更', due: '2026-11-02 22:00', tags: ['防火墙', '策略'],
       desc: '按最小权限原则收敛互联网出口策略，完成审批后实施。',
       subs: [
-        { id: 'T10023-01', name: '策略评审与审批', group: 'comm', owner: '周工', initiator: '张总', level: '紧急', type: '变更', status: '待审批', due: '2026-11-01 18:00', hours: 2, progress: 0, auth: '高风险作业授权', ticket: true }
+        { id: 'T10023-01', name: '策略评审与审批', group: 'comm', owner: '周工', initiator: '张总', level: '紧急', type: '变更', status: '待审批', due: '2026-11-02 18:00', hours: 2, progress: 0, auth: '高风险作业授权', ticket: true }
       ]
     },
     {
@@ -151,29 +151,29 @@ window.ITO_DATA = (() => {
     },
     {
       id: 'T10016', name: '监测数据补录与核对', group: 'online', owner: '孙工', initiator: '张总',
-      level: '一般', type: '操作', due: '2026-11-02 18:00', tags: ['监测', '数据质量'],
+      level: '一般', type: '操作', due: '2026-11-03 18:00', tags: ['监测', '数据质量'],
       desc: '补录 10 月缺失监测数据，完成跨系统一致性核对。',
       subs: [
         { id: 'T10016-01', name: '10 月缺失数据补录', group: 'online', owner: '孙工', initiator: '张总', level: '一般', type: '操作', status: '已完成', due: '2026-10-31 18:00', hours: 4, progress: 100, auth: '—', ticket: false },
-        { id: 'T10016-02', name: '数据一致性核对',     group: 'online', owner: '吴工', initiator: '张总', level: '一般', type: '操作', status: '待接收', due: '2026-11-02 18:00', hours: 3, progress: 0,   auth: '—', ticket: false }
+        { id: 'T10016-02', name: '数据一致性核对',     group: 'online', owner: '吴工', initiator: '张总', level: '一般', type: '操作', status: '待接收', due: '2026-11-03 18:00', hours: 3, progress: 0,   auth: '—', ticket: false }
       ]
     }
   ];
 
   const activity = [
-    { time: '2026-11-01 20:12', task: '防火墙策略变更', sub: '策略评审与审批', group: 'comm', owner: '周工', status: '待审批' },
-    { time: '2026-11-01 19:40', task: '通信网络割接', sub: '割接实施与回退验证', group: 'comm', owner: '周工', status: '待接收' },
-    { time: '2026-11-01 18:25', task: '核心机房季度巡检与整改', sub: 'UPS 电池组测试', group: 'infra', owner: '郑工', status: '待审批' },
-    { time: '2026-11-01 16:10', task: '业务系统版本升级', sub: '开发与测试', group: 'app', owner: '李工', status: '执行中' },
+    { time: '2026-11-02 20:12', task: '防火墙策略变更', sub: '策略评审与审批', group: 'comm', owner: '周工', status: '待审批' },
+    { time: '2026-11-02 19:40', task: '通信网络割接', sub: '割接实施与回退验证', group: 'comm', owner: '周工', status: '待接收' },
+    { time: '2026-11-02 18:25', task: '核心机房季度巡检与整改', sub: 'UPS 电池组测试', group: 'infra', owner: '郑工', status: '待审批' },
+    { time: '2026-11-02 16:10', task: '业务系统版本升级', sub: '开发与测试', group: 'app', owner: '李工', status: '执行中' },
     { time: '2026-10-31 17:40', task: '在线监测平台告警治理', sub: '误报规则收敛', group: 'online', owner: '吴工', status: '执行中' },
     { time: '2026-10-31 15:10', task: '机房空调系统维保', sub: '滤网清洗与冷媒检测', group: 'infra', owner: '郑工', status: '已完成' }
   ];
 
   const inspectionPlans = [
-    { id: 'IP-001', name: '核心机房周检', group: 'infra',  cycle: '每周', owner: '刘工', next: '2026-11-02 08:00', status: '启用', content: '机房温度、湿度、UPS、空调系统、消防设备', standard: '温度 20–26℃，湿度 40–60%，UPS 电池电压正常' },
-    { id: 'IP-002', name: '网络设备日检', group: 'comm',   cycle: '每日', owner: '赵工', next: '2026-11-02 07:30', status: '启用', content: '交换机、路由器、防火墙运行状态', standard: 'CPU < 70%，内存 < 80%，无端口错包' },
+    { id: 'IP-001', name: '核心机房周检', group: 'infra',  cycle: '每周', owner: '刘工', next: '2026-11-03 08:00', status: '启用', content: '机房温度、湿度、UPS、空调系统、消防设备', standard: '温度 20–26℃，湿度 40–60%，UPS 电池电压正常' },
+    { id: 'IP-002', name: '网络设备日检', group: 'comm',   cycle: '每日', owner: '赵工', next: '2026-11-03 07:30', status: '启用', content: '交换机、路由器、防火墙运行状态', standard: 'CPU < 70%，内存 < 80%，无端口错包' },
     { id: 'IP-003', name: '应用系统月检', group: 'app',    cycle: '每月', owner: '陈工', next: '2026-11-05 15:00', status: '启用', content: '应用服务器、数据库、中间件', standard: '服务正常运行，无 error 日志' },
-    { id: 'IP-004', name: '在线监测平台巡检', group: 'online', cycle: '每日', owner: '孙工', next: '2026-11-02 09:00', status: '启用', content: '采集通道、数据完整率、告警推送', standard: '数据完整率 ≥ 99%，告警延迟 < 30s' },
+    { id: 'IP-004', name: '在线监测平台巡检', group: 'online', cycle: '每日', owner: '孙工', next: '2026-11-03 09:00', status: '启用', content: '采集通道、数据完整率、告警推送', standard: '数据完整率 ≥ 99%，告警延迟 < 30s' },
     { id: 'IP-005', name: 'UPS 电池组月检', group: 'infra', cycle: '每月', owner: '郑工', next: '2026-11-06 10:00', status: '停用', content: '电池组电压、内阻、外观', standard: '单体电压偏差 < 0.05V' }
   ];
 
@@ -202,13 +202,13 @@ window.ITO_DATA = (() => {
   const duty = {
     todayIndex: 6,
     week: [
-      { date: '10/26', weekday: '周一', manager: '王主管', day: ['李工', '陈工'], night: ['赵工'], backup: '孙工' },
       { date: '10/27', weekday: '周二', manager: '赵主管', day: ['陈工', '李工'], night: ['周工'], backup: '吴工' },
       { date: '10/28', weekday: '周三', manager: '李主管', day: ['李工', '赵工'], night: ['刘工'], backup: '陈工' },
       { date: '10/29', weekday: '周四', manager: '刘主管', day: ['陈工', '周工'], night: ['郑工'], backup: '李工' },
       { date: '10/30', weekday: '周五', manager: '王主管', day: ['李工', '赵工'], night: ['孙工'], backup: '吴工' },
       { date: '10/31', weekday: '周六', manager: '赵主管', day: ['孙工'], night: ['吴工'], backup: '刘工' },
-      { date: '11/01', weekday: '周日', manager: '李主管', day: ['刘工', '郑工'], night: ['陈工'], backup: '吴工' }
+      { date: '11/01', weekday: '周日', manager: '李主管', day: ['刘工', '郑工'], night: ['陈工'], backup: '吴工' },
+      { date: '11/02', weekday: '周一', manager: '王主管', day: ['李工', '陈工'], night: ['赵工'], backup: '孙工' }
     ]
   };
 
@@ -224,10 +224,10 @@ window.ITO_DATA = (() => {
   ];
 
   const messages = [
-    { id: 'MSG-001', type: '审批', title: '高风险作业授权待审批', body: 'T10027-03「UPS 电池组测试」已提交高风险作业授权，请尽快完成审批。', time: '2026-11-01 18:20', read: false },
-    { id: 'MSG-002', type: '超期', title: '防火墙策略评审已超期', body: 'T10023-01「策略评审与审批」已超过截止时间 2 小时，请关注。', time: '2026-11-01 20:00', read: false },
+    { id: 'MSG-001', type: '审批', title: '高风险作业授权待审批', body: 'T10027-03「UPS 电池组测试」已提交高风险作业授权，请尽快完成审批。', time: '2026-11-02 18:20', read: false },
+    { id: 'MSG-002', type: '超期', title: '防火墙策略评审已超期', body: 'T10023-01「策略评审与审批」已超过截止时间近 3 小时，请关注。', time: '2026-11-02 20:00', read: false },
     { id: 'MSG-003', type: '巡检', title: '网络设备日检发现 2 项异常', body: '核心交换机 2 个端口错包增长，系统已自动生成整改任务。', time: '2026-10-31 07:40', read: false },
-    { id: 'MSG-004', type: '值班', title: '明日白班交接提醒', body: '11 月 2 日白班：刘工、郑工；夜班：陈工。请提前完成交接。', time: '2026-10-31 18:00', read: true },
+    { id: 'MSG-004', type: '值班', title: '明日白班交接提醒', body: '11 月 2 日白班：李工、陈工；夜班：赵工。请提前完成交接。', time: '2026-11-01 18:00', read: true },
     { id: 'MSG-005', type: '发布', title: '业务系统 v3.6.2 发布完成', body: 'KNS 业务系统 v3.6.2 已于 22:10 完成发布，回归验证通过。', time: '2026-10-30 22:10', read: true },
     { id: 'MSG-006', type: '报表', title: '10 月运维月报已生成', body: '10 月运维月报已生成，可在驾驶舱「导出月报」中下载。', time: '2026-10-31 09:00', read: true }
   ];
@@ -241,11 +241,11 @@ window.ITO_DATA = (() => {
   ];
 
   const logs = [
-    { time: '2026-11-01 20:12', actor: '王主管', action: '审批通过', target: 'T10027-03 UPS 电池组测试', type: '审批' },
-    { time: '2026-11-01 19:40', actor: '周工',   action: '接收任务', target: 'T10025-02 割接实施与回退验证', type: '任务' },
-    { time: '2026-11-01 18:25', actor: '系统',   action: '发送超期提醒', target: 'T10023-01 策略评审与审批', type: '系统' },
-    { time: '2026-11-01 16:10', actor: '李工',   action: '提交交付物', target: 'T10026-02 开发与测试', type: '任务' },
-    { time: '2026-10-31 18:00', actor: '系统',   action: '生成值班交接提醒', target: '11/01 值班班次', type: '系统' },
+    { time: '2026-11-02 20:12', actor: '郑工',   action: '提交高风险审批', target: 'T10027-03 UPS 电池组测试', type: '审批' },
+    { time: '2026-11-02 19:40', actor: '赵工',   action: '派发任务', target: 'T10025-02 割接实施与回退验证', type: '任务' },
+    { time: '2026-11-02 18:25', actor: '系统',   action: '发送超期提醒', target: 'T10023-01 策略评审与审批', type: '系统' },
+    { time: '2026-11-02 16:10', actor: '李工',   action: '更新任务进度', target: 'T10026-02 开发与测试', type: '任务' },
+    { time: '2026-11-01 18:00', actor: '系统',   action: '生成值班交接提醒', target: '11/02 值班班次', type: '系统' },
     { time: '2026-10-31 15:20', actor: '刘工',   action: '完成维保记录', target: 'MR-301 机房空调季度维保', type: '维保' },
     { time: '2026-10-31 09:00', actor: '系统',   action: '生成月度报表', target: '2026 年 10 月运维月报', type: '系统' },
     { time: '2026-10-30 22:10', actor: '陈工',   action: '发布版本', target: 'KNS v3.6.2', type: '变更' },

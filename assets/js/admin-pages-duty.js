@@ -101,13 +101,13 @@
       }) +
       summary([
         { icon: 'users', value: (1 + today.day.length + today.night.length + 1), label: '今日在岗' },
-        { icon: 'calendar', value: shifts, label: '本周班次', tone: 'blue' },
+        { icon: 'calendar', value: shifts, label: '近 7 天班次', tone: 'blue' },
         { icon: 'shield', value: new Set(week.map(function (d) { return d.manager; })).size, label: '值班主管', tone: 'green' },
         { icon: 'clock', value: '08:00', label: '下次交接', tone: '' }
       ]) +
 
       '<section class="card duty-board">' +
-        '<div class="duty-board-head"><h3>本周排班表</h3><span>2026-10-26 至 2026-11-01 · 华东区 SHA-01</span></div>' +
+        '<div class="duty-board-head"><h3>近 7 天排班表</h3><span>2026-10-27 至 2026-11-02 · 华东区 SHA-01</span></div>' +
         '<div class="table-wrap"><div class="duty-grid">' +
           head +
           row('值班主管', 'ON CALL', function (d) { return [d.manager]; }, 'manager') +
@@ -144,8 +144,8 @@
         st.duty.week.forEach(function (d) {
           rows.push([d.date, d.weekday, d.manager, d.day.join(' / '), d.night.join(' / '), d.backup]);
         });
-        U().download('ITO值班排班-2026-W44.csv', U().csv(rows));
-        ITO.log('导出值班排班', '2026-W44', '值班');
+        U().download('ITO值班排班-2026-W45.csv', U().csv(rows));
+        ITO.log('导出值班排班', '2026-W45', '值班');
         U().toast('值班排班已导出');
       });
     }
@@ -195,7 +195,7 @@
           U().formRow({ label: '专业组', control: '<select id="gmGroup">' + U().groupOptions(member ? member.group : 'app') + '</select>' }) +
           U().formRow({ label: '联系电话', control: '<input id="gmPhone" type="text" value="' + U().esc(member ? member.phone : '138****0000') + '">' }) +
           U().formRow({ label: '能力标签', full: true, control: '<input id="gmTags" type="text" value="' + U().esc(member ? member.tags.join('、') : '工程师') + '" placeholder="用、或逗号分隔，例如：核心岗、KCC">' }) +
-          U().formRow({ label: '入组时间', control: '<input id="gmJoined" type="date" value="' + (member ? member.joined : '2026-11-01') + '">' }) +
+          U().formRow({ label: '入组时间', control: '<input id="gmJoined" type="date" value="' + (member ? member.joined : '2026-11-02') + '">' }) +
         '</div>',
       foot: '<button class="btn btn-ghost" data-cancel type="button">取消</button><button class="btn btn-primary" data-save type="button">' + (editing ? '保存修改' : '添加成员') + '</button>',
       onMount: function (close, root) {

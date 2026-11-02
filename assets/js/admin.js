@@ -460,7 +460,7 @@
       '<div><b>' + esc(u.name) + '</b><span>' + esc(u.title) + '</span></div>';
     $('#appbarUser').innerHTML = avatar(u.name, true) +
       '<div><b>' + esc(u.name) + '</b><span>' + esc(u.role === u.name ? u.title : u.role) + '</span></div>';
-    $('#dateChip').textContent = '2026.11.01 周日';
+    $('#dateChip').textContent = '2026.11.02 周一';
     $('#bellDot').classList.toggle('on', unreadCount() > 0);
   }
 

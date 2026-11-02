@@ -76,7 +76,7 @@
           U().formRow({ label: '专业组', control: '<select id="ipGroup">' + U().groupOptions(plan ? plan.group : 'infra') + '</select>' }) +
           U().formRow({ label: '执行负责人', control: '<select id="ipOwner">' + U().staffOptions(plan ? plan.group : 'infra', plan ? plan.owner : '') + '</select>' }) +
           U().formRow({ label: '执行周期', control: '<select id="ipCycle">' + planCycleOptions(plan ? plan.cycle : '每周') + '</select>' }) +
-          U().formRow({ label: '下次执行', required: true, control: '<input id="ipNext" type="datetime-local" value="' + String(plan ? plan.next : '2026-11-02 08:00').replace(' ', 'T') + '">' }) +
+          U().formRow({ label: '下次执行', required: true, control: '<input id="ipNext" type="datetime-local" value="' + String(plan ? plan.next : '2026-11-03 08:00').replace(' ', 'T') + '">' }) +
           U().formRow({ label: '巡检内容', full: true, control: '<textarea id="ipContent" placeholder="填写巡检范围与检查项">' + U().esc(plan ? plan.content : '') + '</textarea>' }) +
           U().formRow({ label: '合格标准', full: true, control: '<textarea id="ipStandard" placeholder="填写判定标准与阈值">' + U().esc(plan ? plan.standard : '') + '</textarea>' }) +
         '</div>',

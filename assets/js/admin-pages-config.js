@@ -253,7 +253,7 @@
   P.logs = {
     render: function () {
       const st = S();
-      const today = st.logs.filter(function (l) { return l.time.indexOf('2026-11-01') === 0; }).length;
+      const today = st.logs.filter(function (l) { return l.time.indexOf('2026-11-02') === 0; }).length;
       const system = st.logs.filter(function (l) { return l.actor === '系统'; }).length;
       const actors = new Set(st.logs.map(function (l) { return l.actor; })).size;
       const types = Array.from(new Set(st.logs.map(function (l) { return l.type; })));
