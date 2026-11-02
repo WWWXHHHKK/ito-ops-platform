@@ -111,6 +111,9 @@
 
   AUTH.create = function () {
     const st = S();
+    const valid = new Date(D.meta.today.replace(/-/g, '/'));
+    valid.setFullYear(valid.getFullYear() + 1);
+    const validDefault = valid.getFullYear() + '-' + String(valid.getMonth() + 1).padStart(2, '0') + '-' + String(valid.getDate()).padStart(2, '0');
     U().modal({
       title: '新增作业授权',
       sub: '授权生效后将同步到任务派发与审批环节',
@@ -120,7 +123,7 @@
           U().formRow({ label: '授权人员', required: true, control: '<select id="auPerson">' + U().staffOptions('', '') + '</select>' }) +
           U().formRow({ label: '授权类型', required: true, control: '<select id="auType">' + U().statusOptions(TYPES, '工作负责人') + '</select>' }) +
           U().formRow({ label: '授权范围', required: true, full: true, control: '<input id="auScope" type="text" maxlength="40" placeholder="例如：应用系统变更与发布">' }) +
-          U().formRow({ label: '有效期至', required: true, control: '<input id="auValidTo" type="date" value="2027-03-31">' }) +
+          U().formRow({ label: '有效期至', required: true, control: '<input id="auValidTo" type="date" value="' + validDefault + '">' }) +
         '</div>',
       foot: '<button class="btn btn-ghost" data-cancel type="button">取消</button><button class="btn btn-primary" data-ok type="button">新增授权</button>',
       onMount: function (close, root) {
@@ -132,7 +135,8 @@
           const validTo = root.querySelector('#auValidTo').value;
           if (!scope || !validTo) { U().toast('请补全授权范围与有效期', 'warn'); return; }
           st.authSeq = (st.authSeq || 187) + 1;
-          const id = 'AU-2026-' + String(st.authSeq).padStart(4, '0');
+          const year = new Date(D.meta.today.replace(/-/g, '/')).getFullYear();
+          const id = 'AU-' + year + '-' + String(st.authSeq).padStart(4, '0');
           const staff = st.staff.find(function (p) { return p.name === person; });
           st.auths.unshift({
             id: id, person: person, type: type, group: staff ? staff.group : 'app',

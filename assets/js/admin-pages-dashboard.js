@@ -36,6 +36,14 @@
     const S = ITO.state;
     const m = S.metrics;
     const E = ITO.ui.esc;
+    const end = new Date(D.meta.today.replace(/-/g, '/'));
+    const start = new Date(end);
+    start.setDate(start.getDate() - 29);
+    const dateOnly = function (d) {
+      const p = function (n) { return n < 10 ? '0' + n : n; };
+      return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    };
+    const startISO = dateOnly(start);
     const rows = [];
     S.tasks.forEach(function (t) {
       t.subs.forEach(function (s) {
@@ -45,7 +53,7 @@
       });
     });
 
-    return '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>ITO 运维月报 · 2026 年 10 月</title>' +
+    return '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>ITO 运维月报 · ' + D.meta.today + '</title>' +
       '<style>body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:#1D1D1F;margin:0;padding:48px;background:#F5F4F2}' +
       '.sheet{max-width:980px;margin:0 auto;background:#fff;border-radius:18px;padding:48px 52px;box-shadow:0 20px 60px rgba(0,0,0,.08)}' +
       'h1{font-size:30px;margin:0;letter-spacing:-.02em}h2{font-size:16px;margin:36px 0 12px;padding-bottom:8px;border-bottom:1px solid #eee}' +
@@ -55,16 +63,16 @@
       '.kpi{background:#FFF7F2;border:1px solid #FFE2D2;border-radius:12px;padding:16px}.kpi b{display:block;font-size:26px;letter-spacing:-.03em}' +
       '.kpi span{display:block;font-size:10px;color:#8A8A8E;margin-top:4px}.foot{margin-top:40px;font-size:10px;color:#AEAEB2;display:flex;justify-content:space-between}' +
       '</style></head><body><div class="sheet">' +
-      '<h1>ITO 运维月报</h1><div class="sub">统计周期 2026-10-01 至 2026-10-31 · 华东区 SHA-01 · 生成于 ' + S.logs[0].time + '</div>' +
-      '<div class="kpis"><div class="kpi"><b>' + m.active + '</b><span>期末在办任务</span></div>' +
+      '<h1>ITO 运维月报</h1><div class="sub">统计周期 ' + startISO + ' 至 ' + D.meta.today + ' · 近 30 天 · 华东区 SHA-01 · 生成于 ' + S.logs[0].time + '</div>' +
+      '<div class="kpis"><div class="kpi"><b>' + m.active + '</b><span>当前在办任务</span></div>' +
       '<div class="kpi"><b>' + m.closed + '</b><span>近 30 天已闭环</span></div>' +
       '<div class="kpi"><b>' + m.onTimeRate + '%</b><span>按期闭环率</span></div>' +
       '<div class="kpi"><b>' + m.sla + '%</b><span>任务 SLA 达成率</span></div></div>' +
       '<h2>任务口径</h2><table><thead><tr><th>指标</th><th>数值</th><th>说明</th></tr></thead><tbody>' +
-      '<tr><td>期初积压</td><td>' + m.openingBacklog + ' 件</td><td>2026-10-01 00:00 时点在办</td></tr>' +
-      '<tr><td>本月新增</td><td>' + m.newTasks + ' 件</td><td>含自动生成整改任务</td></tr>' +
-      '<tr><td>本月完成</td><td>' + m.closed + ' 件</td><td>验收通过并归档</td></tr>' +
-      '<tr><td>期末在办</td><td>' + m.active + ' 件</td><td>期初 + 新增 − 完成</td></tr>' +
+      '<tr><td>30 天前积压</td><td>' + m.openingBacklog + ' 件</td><td>' + startISO + ' 00:00 时点在办</td></tr>' +
+      '<tr><td>近 30 天新增</td><td>' + m.newTasks + ' 件</td><td>含自动生成整改任务</td></tr>' +
+      '<tr><td>近 30 天完成</td><td>' + m.closed + ' 件</td><td>验收通过并归档</td></tr>' +
+      '<tr><td>当前在办</td><td>' + m.active + ' 件</td><td>30 天前积压 + 新增 − 完成</td></tr>' +
       '<tr><td>超期任务</td><td>' + ITO.counts.overdueCount() + ' 件</td><td>当前时点已超过截止时间</td></tr>' +
       '</tbody></table>' +
       '<h2>专业组在办分布</h2><table><thead><tr><th>专业组</th><th>在办</th><th>负责人</th></tr></thead><tbody>' +
@@ -92,6 +100,8 @@
       const today = S.duty.week[S.duty.todayIndex];
       const unread = S.messages.filter(function (x) { return !x.read; });
       const canCreate = ITO.can('tasks') && (S.role === 'leader' || S.role === 'manager');
+      const dayObj = new Date(D.meta.today.replace(/-/g, '/'));
+      const cnDate = dayObj.getFullYear() + ' 年 ' + (dayObj.getMonth() + 1) + ' 月 ' + dayObj.getDate() + ' 日';
 
       const trendSub = '期初积压 <b>' + m.openingBacklog + '</b> + 新增 <b>' + m.newTasks + '</b> − 完成 <b>' + m.closed + '</b> = 在办 <b>' + m.active + '</b>';
 
@@ -118,7 +128,7 @@
 
       return U.pageHead({
         title: '运维驾驶舱',
-        sub: '2026 年 11 月 2 日 · 全局任务、专业组负荷与今日值班 · 数据截至 20:56',
+        sub: cnDate + ' · 全局任务、专业组负荷与今日值班 · 数据截至 20:56',
         actions:
           '<button class="btn btn-ghost" id="exportReportBtn" type="button">' + U.icon('download') + '导出月报</button>' +
           (canCreate ? '<button class="btn btn-primary" id="newTaskBtn" type="button">' + U.icon('plus') + '新建任务</button>' : '')
@@ -290,9 +300,9 @@
       const exportBtn = document.getElementById('exportReportBtn');
       if (exportBtn) {
         exportBtn.addEventListener('click', function () {
-          ITO.ui.download('ITO运维月报-2026-10.html', reportHtml(), 'text/html;charset=utf-8');
-          ITO.log('导出运维月报', '2026 年 10 月', '报表');
-          ITO.ui.toast('10 月运维月报已导出');
+          ITO.ui.download('ITO运维月报-' + D.meta.today + '.html', reportHtml(), 'text/html;charset=utf-8');
+          ITO.log('导出运维月报', D.meta.today, '报表');
+          ITO.ui.toast('运维月报已导出');
         });
       }
 

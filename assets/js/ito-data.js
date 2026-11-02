@@ -8,8 +8,38 @@
 window.ITO_DATA = (() => {
   'use strict';
 
-  const DEMO_NOW = '2026-11-02 20:56';
-  const TODAY = '2026-11-02';
+  const BASE_YEAR = 2026;
+  const BASE_DAY = '2026-11-02';
+  const DEMO_TIME = '20:56';
+  const WEEK_CN = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+  const pad2 = (n) => (n < 10 ? '0' + n : String(n));
+  const dayKey = (d) => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+
+  function parseDay(str) {
+    const m = String(str).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return null;
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  }
+
+  function readDemoOverride() {
+    try {
+      if (typeof location === 'undefined' || !location.search) return null;
+      const value = new URLSearchParams(location.search).get('demo');
+      return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? parseDay(value) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  const overrideDay = readDemoOverride();
+  const realNow = new Date();
+  const anchorDay = overrideDay || new Date(realNow.getFullYear(), realNow.getMonth(), realNow.getDate());
+  const baseAnchor = parseDay(BASE_DAY);
+  const OFFSET_DAYS = Math.round((anchorDay.getTime() - baseAnchor.getTime()) / 86400000);
+  const IS_OVERRIDE = !!overrideDay;
+  const TODAY = dayKey(anchorDay);
+  const DEMO_NOW = TODAY + ' ' + DEMO_TIME;
 
   const groups = [
     { id: 'app',    name: '应用组',     code: 'APP',    manager: '王主管', color: '#EB612A', desc: '业务系统、接口与版本发布' },
@@ -227,9 +257,9 @@ window.ITO_DATA = (() => {
     { id: 'MSG-001', type: '审批', title: '高风险作业授权待审批', body: 'T10027-03「UPS 电池组测试」已提交高风险作业授权，请尽快完成审批。', time: '2026-11-02 18:20', read: false },
     { id: 'MSG-002', type: '超期', title: '防火墙策略评审已超期', body: 'T10023-01「策略评审与审批」已超过截止时间近 3 小时，请关注。', time: '2026-11-02 20:00', read: false },
     { id: 'MSG-003', type: '巡检', title: '网络设备日检发现 2 项异常', body: '核心交换机 2 个端口错包增长，系统已自动生成整改任务。', time: '2026-10-31 07:40', read: false },
-    { id: 'MSG-004', type: '值班', title: '明日白班交接提醒', body: '11 月 2 日白班：李工、陈工；夜班：赵工。请提前完成交接。', time: '2026-11-01 18:00', read: true },
+    { id: 'MSG-004', type: '值班', title: '明日白班交接提醒', body: '明日白班：李工、陈工；夜班：赵工。请提前完成交接。', time: '2026-11-01 18:00', read: true },
     { id: 'MSG-005', type: '发布', title: '业务系统 v3.6.2 发布完成', body: 'KNS 业务系统 v3.6.2 已于 22:10 完成发布，回归验证通过。', time: '2026-10-30 22:10', read: true },
-    { id: 'MSG-006', type: '报表', title: '10 月运维月报已生成', body: '10 月运维月报已生成，可在驾驶舱「导出月报」中下载。', time: '2026-10-31 09:00', read: true }
+    { id: 'MSG-006', type: '报表', title: '最近一期运维月报已生成', body: '最近一期运维月报已生成，可在驾驶舱「导出月报」中下载。', time: '2026-10-31 09:00', read: true }
   ];
 
   const alertRules = [
@@ -245,9 +275,9 @@ window.ITO_DATA = (() => {
     { time: '2026-11-02 19:40', actor: '赵工',   action: '派发任务', target: 'T10025-02 割接实施与回退验证', type: '任务' },
     { time: '2026-11-02 18:25', actor: '系统',   action: '发送超期提醒', target: 'T10023-01 策略评审与审批', type: '系统' },
     { time: '2026-11-02 16:10', actor: '李工',   action: '更新任务进度', target: 'T10026-02 开发与测试', type: '任务' },
-    { time: '2026-11-01 18:00', actor: '系统',   action: '生成值班交接提醒', target: '11/02 值班班次', type: '系统' },
+    { time: '2026-11-01 18:00', actor: '系统',   action: '生成值班交接提醒', target: '下一值班班次', type: '系统' },
     { time: '2026-10-31 15:20', actor: '刘工',   action: '完成维保记录', target: 'MR-301 机房空调季度维保', type: '维保' },
-    { time: '2026-10-31 09:00', actor: '系统',   action: '生成月度报表', target: '2026 年 10 月运维月报', type: '系统' },
+    { time: '2026-10-31 09:00', actor: '系统',   action: '生成月度报表', target: '最近一期运维月报', type: '系统' },
     { time: '2026-10-30 22:10', actor: '陈工',   action: '发布版本', target: 'KNS v3.6.2', type: '变更' },
     { time: '2026-10-30 14:05', actor: '孙工',   action: '新增预警规则', target: 'R-03 巡检异常', type: '配置' },
     { time: '2026-10-29 11:30', actor: '系统',   action: '同步组织架构', target: '4 个专业组 / 8 人', type: '系统' }
@@ -276,12 +306,52 @@ window.ITO_DATA = (() => {
     admin:    { name: '系统管理员', role: '系统管理员', avatar: '管', title: '平台管理员', desc: '账号权限、组织架构与审计' }
   };
 
-  return {
+  function shiftSnapshot(value, offset, key) {
+    if (Array.isArray(value)) {
+      return value.map(function (item) { return shiftSnapshot(item, offset, null); });
+    }
+    if (value && typeof value === 'object') {
+      Object.keys(value).forEach(function (k) {
+        if (k === 'joined' || k === 'duty') return;
+        value[k] = shiftSnapshot(value[k], offset, k);
+      });
+      return value;
+    }
+    if (typeof value === 'string' && key !== 'joined') {
+      const iso = value.match(/^(\d{4})-(\d{2})-(\d{2})( \d{2}:\d{2})?$/);
+      if (iso) {
+        const d = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+        d.setDate(d.getDate() + offset);
+        return dayKey(d) + (iso[4] || '');
+      }
+      const md = value.match(/^(\d{2})\/(\d{2})$/);
+      if (md) {
+        const d = new Date(BASE_YEAR, Number(md[1]) - 1, Number(md[2]));
+        d.setDate(d.getDate() + offset);
+        return pad2(d.getMonth() + 1) + '/' + pad2(d.getDate());
+      }
+    }
+    return value;
+  }
+
+  function shiftDutyWeek(duty, offset) {
+    duty.week.forEach(function (day) {
+      const parts = String(day.date).split('/').map(Number);
+      const d = new Date(BASE_YEAR, parts[0] - 1, parts[1]);
+      d.setDate(d.getDate() + offset);
+      day.iso = dayKey(d);
+      day.date = pad2(d.getMonth() + 1) + '/' + pad2(d.getDate());
+      day.weekday = WEEK_CN[d.getDay()];
+    });
+  }
+
+  const data = {
     meta: {
       org: 'ITO 运维中心',
       site: 'SHA-01',
       region: '华东区',
       version: 'v3.6.2',
+      baseDay: BASE_DAY,
       demoNow: DEMO_NOW,
       today: TODAY
     },
@@ -291,4 +361,15 @@ window.ITO_DATA = (() => {
     duty, auths, messages, alertRules, logs, achievements,
     permissions, roleInfo
   };
+
+  shiftSnapshot(data, OFFSET_DAYS);
+  shiftDutyWeek(data.duty, OFFSET_DAYS);
+  data.meta.baseDay = BASE_DAY;
+  data.meta.demoNow = DEMO_NOW;
+  data.meta.today = TODAY;
+  data.meta.offsetDays = OFFSET_DAYS;
+  data.meta.autoDate = !IS_OVERRIDE;
+  data.meta.demoOverride = IS_OVERRIDE;
+
+  return data;
 })();

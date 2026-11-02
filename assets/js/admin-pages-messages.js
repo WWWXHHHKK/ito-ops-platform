@@ -79,7 +79,7 @@
       const tab = st.ui.msgTab || 'all';
       const type = st.ui.msgType || '';
       const unread = st.messages.filter(function (m) { return !m.read; }).length;
-      const today = st.messages.filter(function (m) { return m.time.indexOf('2026-11-02') === 0; }).length;
+      const today = st.messages.filter(function (m) { return m.time.indexOf(D.meta.today) === 0; }).length;
       const types = Array.from(new Set(st.messages.map(function (m) { return m.type; })));
 
       const rows = st.messages.map(function (m) {

@@ -260,6 +260,10 @@
   ACT.newTask = function () {
     const st = S();
     const authOptions = ['无需授权', '工作负责人授权', '准备工程师授权', '高风险作业授权', 'RP1 授权'];
+    const dueObj = pd(D.meta.today);
+    dueObj.setDate(dueObj.getDate() + 3);
+    const dueDefault = dueObj.getFullYear() + '-' + String(dueObj.getMonth() + 1).padStart(2, '0') + '-' +
+      String(dueObj.getDate()).padStart(2, '0') + 'T18:00';
 
     const body =
       '<div class="form-grid">' +
@@ -268,7 +272,7 @@
         U().formRow({ label: '负责人', required: true, control: '<select id="ntOwner">' + U().staffOptions('app') + '</select>' }) +
         U().formRow({ label: '优先级', control: '<select id="ntLevel">' + U().statusOptions(['重要', '一般', '紧急'], '重要') + '</select>' }) +
         U().formRow({ label: '任务类型', control: '<select id="ntType">' + U().statusOptions(['变更', '操作', '巡检', '维保', '开发', '工单', '试验'], '变更') + '</select>' }) +
-        U().formRow({ label: '截止时间', required: true, control: '<input id="ntDue" type="datetime-local" value="2026-11-05T18:00">' }) +
+        U().formRow({ label: '截止时间', required: true, control: '<input id="ntDue" type="datetime-local" value="' + dueDefault + '">' }) +
         U().formRow({ label: '作业授权', control: '<select id="ntAuth">' + U().statusOptions(authOptions, '工作负责人授权') + '</select>' }) +
         U().formRow({ label: '任务描述', full: true, control: '<textarea id="ntDesc" placeholder="补充背景、交付物与验收标准"></textarea>' }) +
       '</div>' +
@@ -499,7 +503,7 @@
         rows.push([t.id, t.name, s.id, s.name, (ITO.getGroup(s.group) || {}).name, s.owner, s.level, s.status, s.progress + '%', s.due]);
       });
     });
-    U().download('ITO任务清单-2026-11-02.csv', U().csv(rows));
+    U().download('ITO任务清单-' + D.meta.today + '.csv', U().csv(rows));
     ITO.log('导出任务清单', list.length + ' 个主任务', '任务');
     U().toast('任务清单已导出');
   };

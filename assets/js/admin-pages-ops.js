@@ -28,11 +28,15 @@
     return U().statusOptions(['每日', '每周', '每月', '每季度', '每半年', '每年'], selected);
   }
 
-  function futureDate(days) {
-    const d = new Date();
+  function offsetDate(days, time) {
+    const d = new Date(D.meta.today.replace(/-/g, '/'));
     d.setDate(d.getDate() + days);
     const p = function (n) { return n < 10 ? '0' + n : n; };
-    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' 18:00';
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + (time || '18:00');
+  }
+
+  function futureDate(days) {
+    return offsetDate(days || 3, '18:00');
   }
 
   function autoRectifyTask(group, planName, note, abnormal) {
@@ -76,7 +80,7 @@
           U().formRow({ label: '专业组', control: '<select id="ipGroup">' + U().groupOptions(plan ? plan.group : 'infra') + '</select>' }) +
           U().formRow({ label: '执行负责人', control: '<select id="ipOwner">' + U().staffOptions(plan ? plan.group : 'infra', plan ? plan.owner : '') + '</select>' }) +
           U().formRow({ label: '执行周期', control: '<select id="ipCycle">' + planCycleOptions(plan ? plan.cycle : '每周') + '</select>' }) +
-          U().formRow({ label: '下次执行', required: true, control: '<input id="ipNext" type="datetime-local" value="' + String(plan ? plan.next : '2026-11-03 08:00').replace(' ', 'T') + '">' }) +
+          U().formRow({ label: '下次执行', required: true, control: '<input id="ipNext" type="datetime-local" value="' + String(plan ? plan.next : offsetDate(1, '08:00')).replace(' ', 'T') + '">' }) +
           U().formRow({ label: '巡检内容', full: true, control: '<textarea id="ipContent" placeholder="填写巡检范围与检查项">' + U().esc(plan ? plan.content : '') + '</textarea>' }) +
           U().formRow({ label: '合格标准', full: true, control: '<textarea id="ipStandard" placeholder="填写判定标准与阈值">' + U().esc(plan ? plan.standard : '') + '</textarea>' }) +
         '</div>',
@@ -320,7 +324,7 @@
           U().formRow({ label: '负责人', control: '<select id="mpOwner">' + U().staffOptions(plan ? plan.group : 'infra', plan ? plan.owner : '') + '</select>' }) +
           U().formRow({ label: '维保周期', control: '<select id="mpCycle">' + planCycleOptions(plan ? plan.cycle : '每季度') + '</select>' }) +
           U().formRow({ label: '维保厂商', control: '<input id="mpVendor" type="text" value="' + U().esc(plan ? plan.vendor : '') + '" placeholder="厂商或原厂服务">' }) +
-          U().formRow({ label: '下次执行', required: true, control: '<input id="mpNext" type="datetime-local" value="' + String(plan ? plan.next : '2026-11-06 09:00').replace(' ', 'T') + '">' }) +
+          U().formRow({ label: '下次执行', required: true, control: '<input id="mpNext" type="datetime-local" value="' + String(plan ? plan.next : offsetDate(4, '09:00')).replace(' ', 'T') + '">' }) +
           U().formRow({ label: '作业范围', full: true, control: '<textarea id="mpScope" placeholder="描述维保作业范围">' + U().esc(plan ? plan.scope : '') + '</textarea>' }) +
         '</div>',
       foot: '<button class="btn btn-ghost" data-cancel type="button">取消</button><button class="btn btn-primary" data-save type="button">' + (editing ? '保存修改' : '创建计划') + '</button>',

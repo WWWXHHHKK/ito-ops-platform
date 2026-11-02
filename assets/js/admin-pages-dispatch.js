@@ -103,7 +103,7 @@
         q.approval.forEach(function (x) {
           rows.push(['待审批', x.task.id, x.task.name, x.sub.id, x.sub.name, (ITO.getGroup(x.sub.group) || {}).name, x.sub.owner, x.sub.due, x.sub.auth, x.sub.ticket ? '是' : '否']);
         });
-        U().download('ITO派发审批队列-2026-11-02.csv', U().csv(rows));
+        U().download('ITO派发审批队列-' + D.meta.today + '.csv', U().csv(rows));
         ITO.log('导出派发审批队列', q.dispatch.length + ' 待派发 / ' + q.approval.length + ' 待审批', '任务');
         U().toast('派发审批队列已导出');
       });
@@ -219,6 +219,12 @@
     after: function () {
       const st = S();
       const items = myItems();
+      const monthBase = new Date(D.meta.today.replace(/-/g, '/'));
+      const monthLabels = [];
+      for (let i = 4; i >= 0; i -= 1) {
+        const d = new Date(monthBase.getFullYear(), monthBase.getMonth() - i, 1);
+        monthLabels.push((d.getMonth() + 1) + ' 月');
+      }
 
       U().chart('myChart', {
         tooltip: {
@@ -228,7 +234,7 @@
         },
         grid: { left: 6, right: 14, top: 24, bottom: 4, containLabel: true },
         xAxis: {
-          type: 'category', data: ['6 月', '7 月', '8 月', '9 月', '10 月'],
+          type: 'category', data: monthLabels,
           axisLine: { lineStyle: { color: 'rgba(29,29,31,.10)' } }, axisTick: { show: false },
           axisLabel: { color: '#AEAEB2', fontSize: 10 }
         },

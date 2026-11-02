@@ -88,9 +88,12 @@
   function pad(n) { return n < 10 ? '0' + n : String(n); }
 
   function nowStamp() {
+    return D.meta.demoNow;
+  }
+
+  function todayKey() {
     const d = new Date();
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
-      ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
   }
 
   function parseDate(str) {
@@ -460,7 +463,9 @@
       '<div><b>' + esc(u.name) + '</b><span>' + esc(u.title) + '</span></div>';
     $('#appbarUser').innerHTML = avatar(u.name, true) +
       '<div><b>' + esc(u.name) + '</b><span>' + esc(u.role === u.name ? u.title : u.role) + '</span></div>';
-    $('#dateChip').textContent = '2026.11.02 周一';
+    const dateObj = parseDate(D.meta.today);
+    const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][dateObj.getDay()];
+    $('#dateChip').textContent = D.meta.today.replace(/-/g, '.') + ' ' + weekday;
     $('#bellDot').classList.toggle('on', unreadCount() > 0);
   }
 
@@ -613,6 +618,12 @@
 
   function boot() {
     initState();
+
+    if (!D.meta.demoOverride) {
+      setInterval(function () {
+        if (todayKey() !== D.meta.today) location.reload();
+      }, 60000);
+    }
 
     const params = new URLSearchParams(location.search);
     if (params.get('still') === '1') document.documentElement.classList.add('still');
