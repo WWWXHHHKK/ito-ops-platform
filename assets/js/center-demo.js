@@ -1,4 +1,4 @@
-/* ─────────────────────────────────────────────
+﻿/* ─────────────────────────────────────────────
    cockpit center · professional group twin
    C variant selected for the exhibition cockpit.
    Uses the shared demo data from ito-data.js.
@@ -69,26 +69,26 @@
     {
       id: 'daily', label: '日常', tone: 'ok',
       active: baseActive, closed: baseClosed, overdue: baseOverdue, sla: baseSla,
-      ontime: baseOnTime, groups: baseGroups, highRisk: 2,
+      ontime: baseOnTime, groups: baseGroups, highRisk: 3,
       title: '任务运行平稳', note: '7 项超期均在处置窗口 · 今日新增 24 · 今日闭环 21'
     },
     {
       id: 'overdue', label: '超期', tone: 'crit',
       active: baseActive, closed: baseClosed, overdue: baseOverdue, sla: baseSla,
-      ontime: baseOnTime, groups: baseGroups, highRisk: 2,
+      ontime: baseOnTime, groups: baseGroups, highRisk: 3,
       title: '防火墙策略评审超期', note: 'T10023-01 · 通信组 · 高风险作业授权 · 已超期 2 小时 56 分'
     },
     {
       id: 'handling', label: '处置', tone: 'warn',
       active: baseActive, closed: baseClosed, overdue: baseOverdue, sla: Number((baseSla - 0.3).toFixed(1)),
-      ontime: 88.7, groups: baseGroups, highRisk: 1,
+      ontime: 88.7, groups: baseGroups, highRisk: 2,
       title: '高风险审批升级处置', note: '已升级至王主管 · 高风险授权审批中 · 关联割接任务等待执行'
     },
     {
       id: 'recovered', label: '闭环', tone: 'ok',
       active: Math.max(0, baseActive - 1), closed: baseClosed + 1,
       overdue: Math.max(0, baseOverdue - 1), sla: Number((baseSla + 0.2).toFixed(1)),
-      ontime: 89.1, groups: recoveredGroups, highRisk: 1,
+      ontime: 89.1, groups: recoveredGroups, highRisk: 2,
       title: '授权通过，任务恢复', note: 'T10023-01 已闭环 · 割接进入执行 · 当前超期降至 6 项'
     }
   ];
@@ -198,8 +198,8 @@
 
     const top = panel(4, '专业组运行总览', 'GROUP TELEMETRY',
       '<div class="twin-summary">' +
-        '<div class="twin-kpi"><span>专业组</span><b>' + groups.length + '<em>个</em></b><small>4 个组 · ' + D.staff.length + ' 名成员</small></div>' +
-        '<div class="twin-kpi"><span>在办任务</span><b>' + st.active + '<em>件</em></b><small>合计 ' + groups.map(g => g.active).join(' + ') + '</small></div>' +
+        '<div class="twin-kpi"><span>在办任务</span><b>' + st.active + '<em>件</em></b><small>4 个组 · ' + D.staff.length + ' 名成员</small></div>' +
+        '<div class="twin-kpi"><span>近 30 天闭环</span><b>' + st.closed + '<em>件</em></b><small>按期率 ' + st.ontime + '%</small></div>' +
         '<div class="twin-kpi"><span>超期任务</span><b class="' + (st.overdue ? 'crit' : '') + '">' + st.overdue + '<em>项</em></b><small>高风险 ' + st.highRisk + ' 项 · 重点任务 1</small></div>' +
         '<div class="twin-kpi"><span>任务 SLA</span><b>' + st.sla + '<em>%</em></b><small>目标 95.0% · ' + (st.sla >= 95 ? '达标' : '关注') + '</small></div>' +
       '</div>',
@@ -315,3 +315,4 @@
 
   render();
 })();
+
