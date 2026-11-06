@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ITO 运维管理平台 · 管理后台</title>
 <meta name="description" content="ITO 运维管理平台 · 任务、巡检、值班与运维运营管理后台">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%23EB612A'/><text x='50' y='69' font-size='54' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'>I</text></svg>">
-<link rel="stylesheet" href="assets/css/admin.css?v=20261101g">
+<link rel="icon" type="image/svg+xml" href="assets/img/logo-mark-orange.svg">
+<link rel="stylesheet" href="assets/css/admin.css?v=20261109v">
 </head>
 <body>
 
@@ -15,7 +15,10 @@
   <div class="login-atmosphere" aria-hidden="true"></div>
   <div class="login-shell">
     <section class="login-brand">
-      <div class="brand-mark">I</div>
+      <div class="login-lockup">
+        <div class="login-logo-mark"><img class="brand-logo" src="assets/img/logo-mark-orange.svg" alt=""></div>
+        <div class="login-logo-text"><b>ITO 运维管理系统</b><span>OPERATIONS MANAGEMENT SYSTEM</span></div>
+      </div>
       <div class="brand-kicker">ITO OPERATIONS · 2026</div>
       <h1>让每一次运维<br>都有迹可循</h1>
       <p class="brand-sub">任务线上化 · 过程有迹可循 · 考核有依有据</p>
@@ -71,64 +74,48 @@
 
 <!-- ============ 应用 ============ -->
 <div id="appView" class="app" hidden>
-  <aside class="sidebar" id="sidebar">
-    <div class="side-brand">
-      <div class="side-mark">I</div>
-      <div class="side-brand-text">
-        <b>ITO 运维管理</b>
-        <span>OPERATIONS CONSOLE</span>
+  <header class="appbar">
+    <div class="appbar-left">
+      <div class="appbar-brand">
+        <div class="brand-plate">
+          <div class="brand-mark"><img class="brand-logo" src="assets/img/logo-mark-orange.svg" alt=""></div>
+          <div class="brand-text">
+            <b>ITO 运维管理系统</b>
+          </div>
+        </div>
       </div>
+      <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="打开菜单">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
     </div>
 
-    <div class="side-role" id="sideRole"></div>
+    <div class="appbar-right">
+      <span class="date-chip" id="dateChip">--</span>
 
-    <nav class="side-nav" id="sideNav" aria-label="主导航"></nav>
+      <button class="icon-btn bell-btn" id="bellBtn" type="button" aria-label="消息通知">
+        <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
+        <b class="bell-count" id="bellCount" aria-hidden="true" hidden></b>
+      </button>
 
-    <div class="side-foot">
-      <div class="side-user" id="sideUser"></div>
-      <button class="side-switch" id="switchRoleBtn" type="button">
+      <a class="screen-link" href="index.html">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        驾驶舱大屏
+      </a>
+
+      <button class="appbar-switch" id="switchRoleBtn" type="button">
         <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
         切换身份
       </button>
+
+      <div class="appbar-user" id="appbarUser"></div>
     </div>
+  </header>
+
+  <aside class="sidebar" id="sidebar">
+    <nav class="side-nav" id="sideNav" aria-label="主导航"></nav>
   </aside>
 
   <div class="app-body">
-    <header class="appbar">
-      <div class="appbar-left">
-        <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="打开菜单">
-          <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-        </button>
-        <div class="crumb">
-          <span>ITO 运维中心</span>
-          <i>/</i>
-          <b id="crumbPage">驾驶舱</b>
-        </div>
-      </div>
-
-      <div class="appbar-right">
-        <label class="global-search">
-          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
-          <input id="globalSearch" type="search" placeholder="搜索任务、人员或编号" autocomplete="off">
-          <kbd>↵</kbd>
-        </label>
-
-        <span class="date-chip" id="dateChip">2026.11.01 周日</span>
-
-        <button class="icon-btn bell-btn" id="bellBtn" type="button" aria-label="消息通知">
-          <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
-          <i class="bell-dot" id="bellDot"></i>
-        </button>
-
-        <a class="screen-link" href="index.html">
-          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-          驾驶舱大屏
-        </a>
-
-        <div class="appbar-user" id="appbarUser"></div>
-      </div>
-    </header>
-
     <main class="page" id="pageRoot"></main>
   </div>
 
@@ -137,24 +124,37 @@
 
 <div id="modalRoot"></div>
 <div id="drawerRoot"></div>
+<div id="previewRoot"></div>
+<div id="notifyRoot" class="notify-root" aria-live="polite"></div>
 <div id="toastRoot" class="toast-root" aria-live="polite"></div>
+<div id="devDock" class="dev-dock" hidden>
+  <span class="dev-dock-label">DEV</span>
+  <button type="button" data-dev-role="leader">领导</button>
+  <button type="button" data-dev-role="manager">主管</button>
+  <button type="button" data-dev-role="employee">员工</button>
+  <button type="button" data-dev-role="admin">管理员</button>
+  <button type="button" data-dev-role="super">全局</button>
+  <button type="button" class="dev-reset" data-dev-reset="1" title="清空成果物与流程数据，恢复演示初始状态">重置</button>
+</div>
 
 <script src="vendor/echarts.min.js"></script>
-<script src="assets/js/ito-data.js?v=20261101g"></script>
-<script src="assets/js/admin.js?v=20261101g"></script>
-<script src="assets/js/admin-pages-dashboard.js?v=20261101g"></script>
-<script src="assets/js/admin-pages-tasks.js?v=20261101g"></script>
-<script src="assets/js/admin-pages-dispatch.js?v=20261101g"></script>
-<script src="assets/js/admin-pages-ops.js?v=20261101g"></script>
-<script src="assets/js/admin-pages-duty.js?v=20261101g"></script>
-<script src="assets/js/admin-pages-auth.js?v=20261101g"></script>
-<script src="assets/js/admin-pages-messages.js?v=20261101g"></script>
-<script src="assets/js/admin-pages-config.js?v=20261101g"></script>
+<script src="vendor/jszip.min.js"></script>
+<script src="vendor/docx-preview.min.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="vendor/pptx-preview.umd.js"></script>
+<script src="assets/js/ito-data.js?v=20261109v"></script>
+<script src="assets/js/admin.js?v=20261109v"></script>
+<script src="assets/js/deliverable-store.js?v=20261109v"></script>
+<script src="assets/js/deliverable-preview.js?v=20261109v"></script>
+<script src="assets/js/admin-pages-personal.js?v=20261109v"></script>
+<script src="assets/js/admin-pages-workload.js?v=20261109v"></script>
+<script src="assets/js/admin-pages-tasks.js?v=20261109v"></script>
+<script src="assets/js/admin-pages-dispatch.js?v=20261109v"></script>
+<script src="assets/js/admin-pages-ops.js?v=20261109v"></script>
+<script src="assets/js/admin-pages-duty.js?v=20261109v"></script>
+<script src="assets/js/admin-pages-auth.js?v=20261109v"></script>
+<script src="assets/js/admin-pages-auth-matrix.js?v=20261109v"></script>
+<script src="assets/js/admin-pages-messages.js?v=20261109v"></script>
+<script src="assets/js/admin-pages-config.js?v=20261109v"></script>
 </body>
 </html>
-
-
-
-
-
-

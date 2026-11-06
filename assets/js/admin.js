@@ -8,23 +8,28 @@
 
   window.ITO = window.ITO || {};
   const D = window.ITO_DATA;
+  let devMode = false;
   const state = {
     role: null,
     user: null,
-    route: 'dashboard',
+    route: 'tasks',
     routeParams: {},
     tasks: [],
     messages: [],
     logs: [],
     staff: [],
+    dutyTypes: [],
     groups: [],
     auths: [],
     alertRules: [],
     achievements: [],
+    personAchievements: [],
+    wallTags: [],
     inspectionPlans: [],
     inspectionRecords: [],
     maintenancePlans: [],
     maintenanceRecords: [],
+    planTasks: [],
     duty: null,
     permissions: {},
     metrics: {},
@@ -33,8 +38,11 @@
     taskFilters: {},
     collapsed: {},
     pendingQuery: null,
-    taskSeq: 10028,
-    charts: []
+    taskSeq: 10031,
+    charts: [],
+    notifications: [],
+    entryNotified: {},
+    notifyTimers: []
   };
 
   ITO.state = state;
@@ -88,13 +96,60 @@
   function pad(n) { return n < 10 ? '0' + n : String(n); }
 
   function nowStamp() {
+    return D.meta.demoNow;
+  }
+
+  function todayKey() {
     const d = new Date();
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
-      ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
   }
 
   function parseDate(str) {
     return new Date(String(str).replace(/-/g, '/').replace('T', ' '));
+  }
+
+  function fmtDateTime(date) {
+    return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) +
+      ' ' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+  }
+
+  function addHours(str, hours) {
+    const d = parseDate(str);
+    d.setHours(d.getHours() + hours);
+    return fmtDateTime(d);
+  }
+
+  const APPROVAL_HOURS = 72;
+  const EDITABLE_STATUS = ['草稿', '待分发', '执行中'];
+  const CANCELABLE_STATUS = ['草稿', '待分发', '执行中', '审批中', '已挂起'];
+
+  function approvalOverdue(approval) {
+    return !!(approval && approval.dueAt && parseDate(approval.dueAt) < parseDate(D.meta.demoNow));
+  }
+
+  function groupManagerName(groupId) {
+    const g = groupById(groupId);
+    return g ? g.manager : '';
+  }
+
+  function isTaskEditable(task) {
+    if (!task) return true;
+    return EDITABLE_STATUS.indexOf(mainStatus(task)) > -1 && mainStatus(task) !== '已完成';
+  }
+
+  function isTaskCancelable(task) {
+    const status = mainStatus(task);
+    return CANCELABLE_STATUS.indexOf(status) > -1;
+  }
+
+  function leaderApprovalOf(task) {
+    if (!task || task.source !== 'leader') return null;
+    return task.leaderApproval || { status: '待汇总' };
+  }
+
+  function isLeaderApprovalPending(task) {
+    const la = leaderApprovalOf(task);
+    return !!la && (la.status === '待汇总' || la.status === '审批中' || la.status === '已挂起' || la.status === '已驳回');
   }
 
   function groupById(id) {
@@ -102,11 +157,13 @@
   }
 
   const TONE = {
-    '待审批': 'yellow', '待派发': 'blue', '待接收': 'purple', '执行中': 'blue',
+    '待分发': 'blue', '待派发': 'blue', '待接收': 'purple', '执行中': 'blue',
+    '审批中': 'purple', '待审批': 'yellow', '已挂起': 'red', '已取消': 'gray',
     '已完成': 'green', '完成': 'green', '正常': 'green', '启用': 'green', '有效': 'green',
     '超期': 'red', '异常': 'red', '已过期': 'red', '紧急': 'red', '高风险作业': 'red',
     '重要': 'yellow', '一般': 'gray', '停用': 'gray', '已撤销': 'gray',
-    '待处理': 'yellow', '计划中': 'gray'
+    '待处理': 'yellow', '计划中': 'gray', '草稿': 'gray',
+    '待汇总': 'yellow', '已通过': 'green', '已驳回': 'red', '审批驳回': 'red'
   };
 
   function badge(text, tone) {
@@ -122,7 +179,7 @@
 
   function avatar(name, small) {
     const person = state.staff.find((s) => s.name === name);
-    const g = person ? groupById(person.group) : null;
+    const g = person ? groupById(person.group) : state.groups.find((group) => group.manager === name);
     const bg = g ? g.color : '#EB612A';
     const initial = String(name || '?').slice(0, 1);
     return '<span class="avatar' + (small ? ' avatar-sm' : '') + '" style="background:' + bg + '">' + esc(initial) + '</span>';
@@ -133,18 +190,29 @@
   }
 
   function isOverdue(sub) {
-    return sub.status !== '已完成' && parseDate(sub.due) < parseDate(D.meta.demoNow);
+    if (!sub || !sub.due) return false;
+    return ['已完成', '已取消', '草稿'].indexOf(sub.status) === -1 && parseDate(sub.due) < parseDate(D.meta.demoNow);
+  }
+
+  function isLateClosed(sub) {
+    if (!sub || sub.status !== '已完成' || !sub.due || !sub.completedAt) return false;
+    return parseDate(sub.completedAt) > parseDate(sub.due);
   }
 
   function mainStatus(task) {
-    const subs = task.subs;
-    if (!subs.length) return '待处理';
+    const subs = task.subs || [];
+    if (task.canceled) return '已取消';
+    if (task.draft) return '草稿';
+    if (task.summaryRework) return '执行中';
+    if (!subs.length) return '待分发';
+    if (subs.every((s) => s.status === '已取消')) return '已取消';
     if (subs.every((s) => s.status === '已完成')) return '已完成';
+    if (subs.some((s) => s.status === '已挂起')) return '已挂起';
+    if (subs.some((s) => s.status === '审批中')) return '审批中';
     if (subs.some((s) => s.status === '执行中')) return '执行中';
-    if (subs.some((s) => s.status === '待审批')) return '待审批';
-    if (subs.some((s) => s.status === '待派发')) return '待派发';
-    if (subs.some((s) => s.status === '待接收')) return '待接收';
-    return '待处理';
+    if (subs.some((s) => s.status === '待分发')) return '待分发';
+    if (subs.every((s) => s.status === '草稿')) return '草稿';
+    return '执行中';
   }
 
   function mainProgress(task) {
@@ -152,9 +220,42 @@
     return Math.round(task.subs.reduce((n, s) => n + (s.progress || 0), 0) / task.subs.length);
   }
 
+  function starForCount(count, star2, star3) {
+    const two = Number(star2) || 5;
+    const three = Number(star3) || 10;
+    if (count >= three) return 3;
+    if (count >= two) return 2;
+    return 1;
+  }
+
+  function roleChip(name, role) {
+    const label = role === 'initiator' ? '发起人' : role === 'owner' ? '负责人' : '执行人';
+    return '<span class="role-chip ' + role + '" title="' + label + '">' + esc(name || '—') + '</span>';
+  }
+
+  function displayStatus(task) {
+    if (!task) return '';
+    if (task.canceled) return '已取消';
+    if (task.draft) return '草稿';
+
+    const la = task.leaderApproval;
+    if (la) {
+      if (la.status === '待汇总') return '待汇总';
+      if (la.status === '已驳回') return '审批驳回';
+      if (la.status === '已挂起') return '已挂起';
+      if (la.status === '审批中') return approvalOverdue(la) ? '已挂起' : '审批中';
+    }
+
+    if (task.summaryRework) return '执行中';
+    return mainStatus(task);
+  }
+
   function overdueCount() {
     let n = 0;
-    state.tasks.forEach((t) => t.subs.forEach((s) => { if (isOverdue(s)) n += 1; }));
+    state.tasks.forEach((t) => {
+      if (t.canceled || t.draft) return;
+      t.subs.forEach((s) => { if (isOverdue(s)) n += 1; });
+    });
     return n;
   }
 
@@ -164,18 +265,26 @@
 
   function pendingCount() {
     let n = 0;
-    state.tasks.forEach((t) => t.subs.forEach((s) => {
-      if (s.status === '待派发' || s.status === '待审批') n += 1;
-    }));
+    state.tasks.forEach((t) => {
+      if (t.canceled || t.draft) return;
+      t.subs.forEach((s) => {
+        if (s.status === '待分发' || s.status === '审批中' || s.status === '已挂起') n += 1;
+      });
+      if (t.source === 'leader' && t.leaderApproval &&
+        (t.leaderApproval.status === '审批中' || t.leaderApproval.status === '已挂起')) n += 1;
+    });
     return n;
   }
 
   function myOpenSubs() {
     if (!state.user) return 0;
     let n = 0;
-    state.tasks.forEach((t) => t.subs.forEach((s) => {
-      if (s.owner === state.user.name && s.status !== '已完成') n += 1;
-    }));
+    state.tasks.forEach((t) => {
+      if (t.canceled) return;
+      t.subs.forEach((s) => {
+        if (s.owner === state.user.name && ['已完成', '草稿', '已取消', '待分发'].indexOf(s.status) === -1) n += 1;
+      });
+    });
     return n;
   }
 
@@ -212,6 +321,47 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 1500);
   }
 
+  function exportPreview(opts) {
+    const rows = opts.rows || [];
+    const limit = 50;
+    const head = rows.length ? rows[0] : [];
+    const body = rows.slice(1, limit + 1);
+    const total = Math.max(0, rows.length - 1);
+    const isHtml = !!opts.html;
+    const content = isHtml ? opts.html : csv(rows);
+    const mime = isHtml ? 'text/html;charset=utf-8' : 'text/csv;charset=utf-8';
+    const filename = opts.filename || ('ITO导出-' + D.meta.today + (isHtml ? '.html' : '.csv'));
+    modal({
+      title: opts.title || '导出预览',
+      sub: opts.sub || (isHtml ? '预览确认后下载 HTML' : '共 ' + total + ' 行 · 预览前 ' + Math.min(total, limit) + ' 行'),
+      wide: true,
+      body: isHtml
+        ? '<iframe class="report-frame export-preview-frame" title="导出预览"></iframe>'
+        : '<div class="export-preview-wrap"><table class="export-preview-table"><thead><tr>' +
+            head.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') +
+          '</tr></thead><tbody>' +
+            (body.length ? body.map(function (r) {
+              return '<tr>' + r.map(function (c) { return '<td>' + esc(c) + '</td>'; }).join('') + '</tr>';
+            }).join('') : '<tr><td colspan="' + Math.max(1, head.length) + '">暂无数据</td></tr>') +
+          '</tbody></table>' +
+          (total > limit ? '<p class="table-note" style="padding:10px 2px 0">仅预览前 ' + limit + ' 行，导出包含全部 ' + total + ' 行。</p>' : '') +
+          '</div>',
+      foot: '<button class="btn btn-ghost" data-cancel type="button">取消</button><span class="spacer"></span>' +
+        '<button class="btn btn-primary" data-export type="button">' + icon('download') + '确认下载</button>',
+      onMount: function (close, root) {
+        const frame = root.querySelector('.export-preview-frame');
+        if (frame && isHtml) frame.srcdoc = content;
+        root.querySelector('[data-cancel]').addEventListener('click', close);
+        root.querySelector('[data-export]').addEventListener('click', function () {
+          if (typeof opts.onDownload === 'function') opts.onDownload();
+          else download(filename, content, mime);
+          close();
+          toast('导出已开始下载');
+        });
+      }
+    });
+  }
+
   function toast(message, kind) {
     const root = $('#toastRoot');
     if (!root) return;
@@ -225,38 +375,179 @@
     }, 2400);
   }
 
+  /* ── notification popups ─────────────────── */
+  const NOTIFY_DURATION = 6000;
+  const NOTIFY_MAX = 2;
+
+  function notifyIcon(type) {
+    return ({ '审批': 'shield', '任务': 'task', '成果物': 'clipboard', '超期': 'clock', '消息': 'message', '系统': 'alert' })[type] || 'message';
+  }
+
+  function dismissNotification(card) {
+    if (!card || card.classList.contains('leaving')) return;
+    card.classList.add('leaving');
+    setTimeout(() => card.remove(), 240);
+  }
+
+  function showNotification(n) {
+    const root = $('#notifyRoot');
+    if (!root) return;
+    let active = Array.from(root.querySelectorAll('.notify-card:not(.leaving)'));
+    while (active.length >= NOTIFY_MAX) {
+      active[0].remove();
+      active = Array.from(root.querySelectorAll('.notify-card:not(.leaving)'));
+    }
+    const card = document.createElement('article');
+    card.className = 'notify-card';
+    card.setAttribute('role', 'status');
+    card.innerHTML =
+      '<div class="notify-icon">' + icon(notifyIcon(n.type)) + '</div>' +
+      '<div class="notify-main">' +
+        '<div class="notify-head"><span>' + esc(n.type || '消息') + '</span><time>' + esc(n.time || '') + '</time></div>' +
+        '<h3>' + esc(n.title || '新的消息') + '</h3>' +
+        (n.body ? '<p>' + esc(n.body) + '</p>' : '') +
+        '<div class="notify-foot">' +
+          '<span class="notify-timer">6 秒后收起</span>' +
+        '</div>' +
+      '</div>' +
+      '<button class="notify-close" type="button" aria-label="关闭通知">' + icon('close') + '</button>' +
+      '<i class="notify-progress"></i>';
+    root.appendChild(card);
+
+    let remaining = NOTIFY_DURATION;
+    let started = Date.now();
+    let timer = null;
+    const schedule = (ms) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => dismissNotification(card), Math.max(600, ms));
+      state.notifyTimers.push(timer);
+    };
+    const close = () => { clearTimeout(timer); dismissNotification(card); };
+    card.querySelector('.notify-close').addEventListener('click', (e) => { e.stopPropagation(); close(); });
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.notify-close')) return;
+      if (!n.link) return;
+      e.preventDefault();
+      close();
+      location.hash = n.link.replace(/^#/, '');
+    });
+    card.addEventListener('mouseenter', () => {
+      clearTimeout(timer);
+      remaining -= Date.now() - started;
+      card.classList.add('paused');
+    });
+    card.addEventListener('mouseleave', () => {
+      started = Date.now();
+      card.classList.remove('paused');
+      schedule(remaining);
+    });
+    schedule(remaining);
+  }
+
+  function flushNotifications() {
+    if (!state.user) return;
+    const list = state.notifications.filter((n) => n.to === state.user.name && !n.shown);
+    list.slice(0, NOTIFY_MAX).forEach((n) => { n.shown = true; showNotification(n); });
+  }
+
+  function showEntryMessages() {
+    if (!state.user || !state.role) return;
+    if (state.entryNotified[state.role]) { flushNotifications(); return; }
+    state.entryNotified[state.role] = true;
+    const unread = state.messages.filter((m) => !m.read).slice(0, NOTIFY_MAX);
+    unread.forEach((m) => {
+      showNotification({
+        id: 'ENTRY-' + m.id,
+        type: m.type,
+        title: m.title,
+        body: m.body,
+        time: m.time,
+        link: '#/messages?id=' + m.id
+      });
+    });
+    flushNotifications();
+  }
+
+  function clearNotifications() {
+    state.notifyTimers.forEach((t) => clearTimeout(t));
+    state.notifyTimers = [];
+    const root = $('#notifyRoot');
+    if (root) root.innerHTML = '';
+  }
+
+  function notify(target, payload) {
+    if (!target) return;
+    const n = {
+      id: 'N-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+      to: target,
+      type: payload.type || '任务',
+      title: payload.title || '新的任务通知',
+      body: payload.body || '',
+      time: payload.time || nowStamp(),
+      link: payload.link || '#/tasks',
+      shown: false
+    };
+    state.notifications.push(n);
+    if (state.user && state.user.name === target) {
+      n.shown = true;
+      showNotification(n);
+    }
+  }
+
   /* ── overlays ────────────────────────────── */
   function lockScroll(on) {
     document.body.style.overflow = on ? 'hidden' : '';
   }
 
+  const modalStack = [];
+
+  function onModalKey(e) {
+    if (e.key !== 'Escape' || !modalStack.length) return;
+    const top = modalStack[modalStack.length - 1];
+    if (top && top.close) top.close();
+  }
+
   function modal(o) {
     const root = $('#modalRoot');
-    const close = () => {
-      root.innerHTML = '';
-      lockScroll(false);
-      document.removeEventListener('keydown', onKey);
-    };
-    const onKey = (e) => { if (e.key === 'Escape') close(); };
-
-    root.innerHTML =
-      '<div class="modal-backdrop">' +
-        '<div class="modal' + (o.wide ? ' wide' : '') + '" role="dialog" aria-modal="true" aria-label="' + esc(o.title) + '">' +
-          '<div class="modal-head">' +
-            '<div><h2>' + esc(o.title) + '</h2>' + (o.sub ? '<p>' + esc(o.sub) + '</p>' : '') + '</div>' +
-            '<button class="modal-close" type="button" aria-label="关闭">' + icon('close') + '</button>' +
-          '</div>' +
-          '<div class="modal-body">' + (o.body || '') + '</div>' +
-          (o.foot ? '<div class="modal-foot">' + o.foot + '</div>' : '') +
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.style.zIndex = String(200 + modalStack.length * 4);
+    backdrop.innerHTML =
+      '<div class="modal' + (o.xwide ? ' xwide' : o.wide ? ' wide' : '') + (o.detail ? ' detail' : '') + (o.inset ? ' inset' : '') + '" role="dialog" aria-modal="true" aria-label="' + esc(o.title) + '">' +
+        '<div class="modal-head">' +
+          '<div><h2>' + esc(o.title) + '</h2>' + (o.sub ? '<p>' + esc(o.sub) + '</p>' : '') + '</div>' +
+          '<button class="modal-close" type="button" aria-label="关闭">' + icon('close') + '</button>' +
         '</div>' +
+        '<div class="modal-body">' + (o.body || '') + '</div>' +
+        (o.foot ? '<div class="modal-foot">' + o.foot + '</div>' : '') +
       '</div>';
+    root.appendChild(backdrop);
 
-    const backdrop = root.firstElementChild;
+    let closed = false;
+    const entry = { close: null };
+    const close = () => {
+      if (closed) return;
+      closed = true;
+      const idx = modalStack.indexOf(entry);
+      if (idx > -1) modalStack.splice(idx, 1);
+      backdrop.remove();
+      closeAllSelects();
+      if (!modalStack.length) {
+        lockScroll(false);
+        document.removeEventListener('keydown', onModalKey);
+      }
+      if (typeof o.onClose === 'function') o.onClose();
+    };
+    entry.close = close;
+    modalStack.push(entry);
+
     backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
     $('.modal-close', backdrop).addEventListener('click', close);
-    document.addEventListener('keydown', onKey);
+    if (modalStack.length === 1) document.addEventListener('keydown', onModalKey);
     lockScroll(true);
     if (typeof o.onMount === 'function') o.onMount(close, backdrop);
+    enhanceSelects(backdrop);
+    enhanceFormDates(backdrop);
     return close;
   }
 
@@ -272,18 +563,17 @@
         foot:
           '<button class="btn btn-ghost" data-confirm="no" type="button">取消</button>' +
           '<button class="btn ' + (o.danger ? 'btn-danger' : 'btn-primary') + '" data-confirm="yes" type="button">' + esc(o.okText || '确认') + '</button>',
+        onClose: function () { finish(false); },
         onMount(c, root) {
           root.querySelector('[data-confirm="no"]').addEventListener('click', () => { finish(false); c(); });
           root.querySelector('[data-confirm="yes"]').addEventListener('click', () => { finish(true); c(); });
         }
       });
-
-      const host = $('#modalRoot');
-      const obs = new MutationObserver(() => {
-        if (!host.firstElementChild) { obs.disconnect(); finish(false); }
-      });
-      obs.observe(host, { childList: true });
     });
+  }
+
+  function detailModal(o) {
+    return modal(Object.assign({}, o, { detail: true }));
   }
 
   function drawer(o) {
@@ -297,7 +587,7 @@
 
     root.innerHTML =
       '<div class="drawer-backdrop">' +
-        '<aside class="drawer" role="dialog" aria-modal="true" aria-label="' + esc(o.title) + '">' +
+        '<aside class="drawer' + (o.wide ? ' wide' : '') + '" role="dialog" aria-modal="true" aria-label="' + esc(o.title) + '">' +
           '<div class="drawer-head">' +
             '<div><h2>' + esc(o.title) + '</h2>' + (o.sub ? '<p>' + esc(o.sub) + '</p>' : '') + '</div>' +
             '<button class="modal-close" type="button" aria-label="关闭">' + icon('close') + '</button>' +
@@ -317,6 +607,9 @@
   }
 
   function closeOverlays() {
+    modalStack.length = 0;
+    closeAllSelects();
+    document.removeEventListener('keydown', onModalKey);
     $('#modalRoot').innerHTML = '';
     $('#drawerRoot').innerHTML = '';
     lockScroll(false);
@@ -342,33 +635,48 @@
   });
 
   /* ── access ──────────────────────────────── */
+  function isSuper() {
+    return state.role === 'super';
+  }
+
+  function roleIs() {
+    if (isSuper()) return true;
+    return Array.prototype.slice.call(arguments).indexOf(state.role) > -1;
+  }
+
   function perm(key) {
+    if (isSuper()) return true;
     const set = state.permissions[state.role];
     return !!(set && set[key]);
   }
 
   const ACCESS = {
-    dashboard: () => perm('dashboard'),
-    tasks: () => perm('task'),
-    dispatch: () => perm('task') && (state.role === 'leader' || state.role === 'manager'),
+    tasks: () => perm('task') && state.role !== 'employee',
+    dispatch: () => perm('task') && roleIs('leader', 'manager'),
+    regular: () => perm('task') && state.role !== 'employee',
+    workload: () => perm('task') && state.role !== 'employee',
     mine: () => perm('task'),
+    personal: () => perm('task') && state.role !== 'admin',
     inspection: () => perm('inspect'),
     duty: () => perm('duty'),
     maintenance: () => perm('maintain'),
+    overhaul: () => perm('task'),
     groups: () => perm('group'),
     auth: () => perm('auth'),
     messages: () => perm('message'),
     alerts: () => perm('config'),
-    roles: () => state.role === 'admin',
-    tags: () => perm('config'),
-    logs: () => state.role === 'leader' || state.role === 'admin'
+    roles: () => roleIs('admin'),
+    tags: () => !!state.role,
+    logs: () => roleIs('admin')
   };
 
   const ROUTE_TITLE = {
-    dashboard: '运维驾驶舱', tasks: '任务中心', dispatch: '派发与审批', mine: '我的任务',
+    tasks: '任务管理', dispatch: '派发与审批', regular: '常规任务', workload: '工时负载',
+    mine: '我的任务', personal: '个人统计',
     inspection: '巡检管理', duty: '值班管理', maintenance: '维保管理',
-    groups: '专业组', auth: '作业授权', messages: '消息中心',
-    alerts: '预警规则', roles: '角色权限', tags: '成就标签', logs: '操作日志'
+    overhaul: '大修管理',
+    groups: '组织架构', auth: '作业授权', messages: '站内消息',
+    alerts: '预警规则', roles: '角色权限', tags: '属性勋章', logs: '操作日志'
   };
 
   function can(route) {
@@ -376,9 +684,15 @@
     return fn ? fn() : false;
   }
 
+  function defaultRoute() {
+    if (state.role === 'admin') return 'roles';
+    return 'mine';
+  }
+
   function parseHash() {
     const raw = (location.hash || '').replace(/^#\/?/, '').split('?')[0];
-    return ROUTE_TITLE[raw] ? raw : 'dashboard';
+    if (ROUTE_TITLE[raw]) return raw;
+    return defaultRoute();
   }
 
   function go(route, params) {
@@ -389,7 +703,7 @@
     else location.hash = '#/' + route;
   }
 
-  function refresh() { render(); }
+  function refresh() { normalizeApprovals(); render(); }
 
   function log(action, target, type) {
     state.logs.unshift({
@@ -404,32 +718,44 @@
   /* ── nav ─────────────────────────────────── */
   const NAV = [
     {
-      label: '工作台', items: [
-        { id: 'dashboard', name: '运维驾驶舱', icon: 'dashboard' },
-        { id: 'tasks', name: '任务中心', icon: 'task' },
-        { id: 'dispatch', name: '派发与审批', icon: 'send', count: () => pendingCount() },
-        { id: 'mine', name: '我的任务', icon: 'user', count: () => myOpenSubs(), hide: () => state.role !== 'employee' }
+      label: '工作台', icon: 'dashboard', items: [
+        { id: 'mine', name: '我的任务', icon: 'user', count: () => myOpenSubs() },
+        { id: 'tasks', name: '任务管理', icon: 'task' },
+        { id: 'personal', name: '个人统计', icon: 'award' }
       ]
     },
     {
-      label: '运维执行', items: [
+      label: '运维运营', icon: 'clipboard', items: [
         { id: 'inspection', name: '巡检管理', icon: 'clipboard' },
-        { id: 'duty', name: '值班管理', icon: 'calendar' },
-        { id: 'maintenance', name: '维保管理', icon: 'wrench' }
+        { id: 'maintenance', name: '维保管理', icon: 'wrench' },
+        { id: 'duty', name: '值班管理', icon: 'calendar' }
       ]
     },
     {
-      label: '组织与授权', items: [
-        { id: 'groups', name: '专业组', icon: 'users' },
+      label: '', standalone: true, items: [
+        { id: 'overhaul', name: '大修管理', icon: 'wrench' }
+      ]
+    },
+    {
+      label: '组织与授权', icon: 'users', items: [
+        { id: 'groups', name: '组织架构', icon: 'users' },
         { id: 'auth', name: '作业授权', icon: 'shield' }
       ]
     },
     {
-      label: '平台管理', items: [
-        { id: 'messages', name: '消息中心', icon: 'message', count: () => unreadCount() },
+      label: '', standalone: true, items: [
+        { id: 'messages', name: '站内消息', icon: 'message', count: () => unreadCount() }
+      ]
+    },
+    {
+      label: '', standalone: true, items: [
+        { id: 'tags', name: '属性勋章', icon: 'award' }
+      ]
+    },
+    {
+      label: '配置中心', icon: 'key', adminOnly: true, items: [
         { id: 'alerts', name: '预警规则', icon: 'alert' },
         { id: 'roles', name: '角色权限', icon: 'key' },
-        { id: 'tags', name: '成就标签', icon: 'award' },
         { id: 'logs', name: '操作日志', icon: 'history' }
       ]
     }
@@ -437,31 +763,80 @@
 
   function navHtml() {
     return NAV.map((group) => {
+      if (group.adminOnly && !roleIs('admin')) return '';
       const items = group.items.filter((it) => can(it.id) && (!it.hide || !it.hide()));
       if (!items.length) return '';
-      const collapsed = !!state.collapsed[group.label];
-      return '<div class="nav-group' + (collapsed ? ' collapsed' : '') + '" data-group="' + esc(group.label) + '">' +
-        '<div class="nav-label">' + esc(group.label) + icon('chevron') + '</div>' +
+      const label = group.label || '';
+      const collapsed = label ? !!state.collapsed[label] : false;
+      const head = label
+        ? '<div class="nav-label">' +
+            (group.icon ? icon(group.icon, 'nav-leading-icon') : '') +
+            '<span class="nav-label-text">' + esc(label) + '</span>' +
+            icon('chevron', 'nav-chevron') +
+          '</div>'
+        : '';
+      return '<div class="nav-group' + (group.standalone ? ' standalone' : '') + (collapsed ? ' collapsed' : '') + '" data-group="' + esc(label) + '">' +
+        head +
         '<div class="nav-items">' + items.map((it) => {
           const count = it.count ? it.count() : 0;
-          return '<a class="nav-item' + (state.route === it.id ? ' active' : '') + '" href="#/' + it.id + '" data-route="' + it.id + '">' +
-            icon(it.icon) + '<span>' + esc(it.name) + '</span>' +
+          const name = esc(it.id === 'auth' && state.role === 'employee' ? '我的授权' : it.name);
+          const content = group.standalone
+            ? '<span class="nav-module-pill">' + icon(it.icon) + '<span>' + name + '</span></span>'
+            : icon(it.icon) + '<span>' + name + '</span>';
+          const active = state.route === it.id || (it.id === 'tasks' && ['dispatch', 'regular', 'workload'].indexOf(state.route) > -1);
+          return '<a class="nav-item' + (active ? ' active' : '') + '" href="#/' + it.id + '" data-route="' + it.id + '">' +
+            content +
             (count ? '<b class="nav-count">' + count + '</b>' : '') +
             '</a>';
         }).join('') + '</div></div>';
     }).join('');
   }
 
+  function updateDevDock() {
+    const dock = document.getElementById('devDock');
+    if (!dock) return;
+    const show = devMode && !!state.role && !$('#appView').hidden;
+    dock.hidden = !show;
+    if (!show) return;
+    Array.prototype.forEach.call(dock.querySelectorAll('[data-dev-role]'), function (btn) {
+      btn.classList.toggle('active', btn.dataset.devRole === state.role);
+    });
+  }
+
+  function switchRole(role) {
+    if (!D.roleInfo[role]) return;
+    if (role === 'super' && !devMode) return;
+    clearNotifications();
+    closeOverlays();
+    const url = new URL(location.href);
+    url.searchParams.set('role', role);
+    url.hash = '';
+    history.replaceState(null, '', url.pathname + url.search);
+    enterApp(role);
+  }
+
   function renderShell() {
     const u = state.user;
-    $('#sideRole').innerHTML = '<i></i><b>' + esc(u.role) + '</b><span>DEMO</span>';
     $('#sideNav').innerHTML = navHtml();
-    $('#sideUser').innerHTML = avatar(u.name) +
-      '<div><b>' + esc(u.name) + '</b><span>' + esc(u.title) + '</span></div>';
     $('#appbarUser').innerHTML = avatar(u.name, true) +
       '<div><b>' + esc(u.name) + '</b><span>' + esc(u.role === u.name ? u.title : u.role) + '</span></div>';
-    $('#dateChip').textContent = '2026.11.01 周日';
-    $('#bellDot').classList.toggle('on', unreadCount() > 0);
+    const screenLink = document.querySelector('.appbar-right .screen-link');
+    if (screenLink) screenLink.style.display = state.role === 'admin' ? 'none' : '';
+    updateDevDock();
+    const dateObj = parseDate(D.meta.today);
+    const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][dateObj.getDay()];
+    $('#dateChip').textContent = D.meta.today.replace(/-/g, '.') + ' ' + weekday;
+    const unread = unreadCount();
+    const bellCount = $('#bellCount');
+    const bellBtn = $('#bellBtn');
+    if (bellCount) {
+      bellCount.hidden = unread === 0;
+      bellCount.textContent = unread === 0 ? '' : (unread > 9 ? '9+' : String(unread));
+    }
+    if (bellBtn) {
+      bellBtn.setAttribute('aria-label', unread > 0 ? '消息通知，' + unread + ' 条未读' : '消息通知');
+      bellBtn.title = unread > 0 ? '消息通知 · ' + unread + ' 条未读' : '消息通知';
+    }
   }
 
   /* ── routing ─────────────────────────────── */
@@ -469,11 +844,12 @@
     if (!state.role) return;
     const route = parseHash();
     if (!can(route)) {
-      if (location.hash === '#/dashboard') {
+      const fallback = defaultRoute();
+      if (location.hash === '#/' + fallback) {
         toast('当前身份无权访问该模块', 'warn');
-      } else {
-        location.hash = '#/dashboard';
+        return;
       }
+      location.hash = '#/' + fallback;
       return;
     }
 
@@ -482,7 +858,7 @@
     closeOverlays();
     renderShell();
 
-    $('#crumbPage').textContent = ROUTE_TITLE[route] || '运维驾驶舱';
+    if (window.ITO_ENSURE_AUTH_TAGS) window.ITO_ENSURE_AUTH_TAGS();
 
     const def = window.ITO_PAGES && window.ITO_PAGES[route];
     const root = $('#pageRoot');
@@ -493,6 +869,8 @@
 
     root.innerHTML = def.render();
     if (typeof def.after === 'function') def.after();
+    enhanceSelects(root);
+    enhanceFormDates(root);
 
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
@@ -502,7 +880,7 @@
 
   function renderLogin() {
     const grid = $('#roleGrid');
-    grid.innerHTML = Object.keys(D.roleInfo).map((key) => {
+    grid.innerHTML = Object.keys(D.roleInfo).filter((key) => key !== 'super').map((key) => {
       const r = D.roleInfo[key];
       return '<button class="role-card" type="button" data-role="' + key + '">' +
         '<span class="role-icon ' + key + '">' + icon(ROLE_ICON[key]) + '</span>' +
@@ -520,6 +898,7 @@
 
   function enterApp(roleKey) {
     if (!D.roleInfo[roleKey]) return;
+    if (roleKey === 'super' && !devMode) return;
     state.role = roleKey;
     state.user = D.roleInfo[roleKey];
     sessionStorage.setItem('ito.admin.role', roleKey);
@@ -528,46 +907,244 @@
     $('#appView').hidden = false;
     renderShell();
 
-    const rawHash = (location.hash || '').replace(/^#\/?/, '').split('?')[0];
+    const fullHash = (location.hash || '').replace(/^#\/?/, '');
+    const qIndex = fullHash.indexOf('?');
+    const rawHash = qIndex > -1 ? fullHash.slice(0, qIndex) : fullHash;
+    const rawQuery = qIndex > -1 ? fullHash.slice(qIndex) : '';
     const saved = parseHash();
-    const target = !rawHash && roleKey === 'employee' ? 'mine' :
-      (can(saved) ? saved : (roleKey === 'employee' ? 'mine' : 'dashboard'));
-    const hash = '#/' + target;
+    const target = !rawHash ? defaultRoute() : (can(saved) ? saved : defaultRoute());
+    const hash = '#/' + target + (target === rawHash ? rawQuery : '');
     if (location.hash === hash) render();
     else location.hash = hash;
+    setTimeout(showEntryMessages, 420);
   }
 
   function logout() {
+    clearNotifications();
     state.role = null;
     state.user = null;
+    state.entryNotified = {};
     sessionStorage.removeItem('ito.admin.role');
     disposeCharts();
     closeOverlays();
     $('#appView').hidden = true;
     $('#loginView').hidden = false;
     $('#sideNav').innerHTML = '';
+    updateDevDock();
     location.hash = '';
     window.scrollTo(0, 0);
   }
 
+  /* ── task status migration / approval clock ─ */
+  function migrateTask(task) {
+    task.mode = task.mode || 'split';
+    task.draft = !!task.draft;
+    task.canceled = task.canceled || null;
+    task.summaryRework = !!task.summaryRework;
+    task.leaderApproval = task.leaderApproval || null;
+    task.source = task.source || (task.initiator === '张总' ? 'leader' : task.initiator === '系统' ? 'system' : 'self');
+
+    task.subs = (task.subs || []).map((sub) => {
+      if (sub.status === '待派发') sub.status = '待分发';
+      if (sub.status === '待接收') sub.status = '执行中';
+      if (sub.status === '待审批') sub.status = '执行中';
+      sub.tags = sub.tags || [];
+      if (sub.status === '审批中' || sub.status === '已挂起') {
+        if (!sub.approval) {
+          const submittedAt = sub.submittedAt || task.due || D.meta.demoNow;
+          sub.approval = {
+            level: 1,
+            approver: groupManagerName(sub.group) || task.owner,
+            status: sub.status === '已挂起' ? '已挂起' : '待审批',
+            submittedAt: submittedAt,
+            dueAt: addHours(submittedAt, APPROVAL_HOURS),
+            decidedAt: '',
+            comment: ''
+          };
+        }
+      }
+      return sub;
+    });
+
+    if (task.source === 'leader') {
+      const done = task.subs.length && task.subs.every((s) => s.status === '已完成');
+      if (!task.leaderApproval && done) {
+        task.leaderApproval = {
+          status: '待汇总', approver: task.initiator,
+          submittedAt: '', dueAt: '', decidedAt: '', comment: ''
+        };
+      }
+    }
+    return task;
+  }
+
+  function normalizeApprovals() {
+    state.tasks.forEach((task) => {
+      if (task.canceled) return;
+      task.subs.forEach((sub) => {
+        if (sub.status === '审批中' && sub.approval && approvalOverdue(sub.approval)) {
+          sub.status = '已挂起';
+          sub.approval.status = '已挂起';
+        }
+      });
+      if (task.source === 'leader' && task.leaderApproval &&
+        task.leaderApproval.status === '审批中' && approvalOverdue(task.leaderApproval)) {
+        task.leaderApproval.status = '已挂起';
+      }
+    });
+  }
+
   /* ── boot ────────────────────────────────── */
+  function idNum(value, prefix) {
+    const raw = String(value == null ? '' : value).replace(prefix || '', '');
+    const n = Number(String(raw).replace(/\D/g, ''));
+    return isNaN(n) ? 0 : n;
+  }
+
+  function sortNewest(list, selector) {
+    list.sort(function (a, b) {
+      const av = String(selector(a) || '');
+      const bv = String(selector(b) || '');
+      return bv.localeCompare(av);
+    });
+    return list;
+  }
+
+  function ensureAudit(obj, at, by, label) {
+    if (!obj) return;
+    obj.createdAt = obj.createdAt || at;
+    obj.createdBy = obj.createdBy || by || '系统';
+    obj.updatedAt = obj.updatedAt || obj.createdAt;
+    obj.updatedBy = obj.updatedBy || obj.createdBy;
+    obj.audit = obj.audit || [{ time: obj.createdAt, actor: obj.createdBy, action: label || '创建' }];
+  }
+
+  function planTaskId(plan, type) {
+    return 'PT-' + plan.id + '-' + String(plan.next || '').replace(/\D/g, '').slice(0, 12);
+  }
+
+  function syncPlanTasks() {
+    const st = state;
+    const pending = [];
+    const add = function (plan, type) {
+      if (!plan || plan.status !== '启用' || !plan.next) return;
+      const existing = (st.planTasks || []).find(function (task) {
+        return task.planId === plan.id && task.planType === type && task.due === plan.next && task.status !== '已完成';
+      });
+      const data = {
+        planId: plan.id,
+        planType: type,
+        name: plan.name + (type === 'inspection' ? ' · 巡检任务' : ' · 维保任务'),
+        group: plan.group,
+        owner: plan.owner,
+        executor: plan.executor || plan.owner,
+        due: plan.next,
+        hours: Number(plan.hours) || 0,
+        source: type === 'inspection' ? '巡检计划' : '维保计划',
+        tags: [type === 'inspection' ? '巡检' : '维保', plan.name],
+        status: '待执行'
+      };
+      if (existing) Object.assign(existing, data);
+      else st.planTasks.push(Object.assign({ id: planTaskId(plan, type), createdAt: D.meta.demoNow, createdBy: st.user ? st.user.name : '系统' }, data));
+      pending.push(existing || st.planTasks[st.planTasks.length - 1]);
+    };
+    (st.inspectionPlans || []).forEach(function (plan) { add(plan, 'inspection'); });
+    (st.maintenancePlans || []).forEach(function (plan) { add(plan, 'maintenance'); });
+    const wanted = {};
+    pending.forEach(function (task) { wanted[task.id] = true; });
+    st.planTasks = (st.planTasks || []).filter(function (task) {
+      return task.status === '已完成' || wanted[task.id];
+    });
+    st.planTasks.sort(function (a, b) { return String(a.due).localeCompare(String(b.due)); });
+  }
+
+  function completePlanTask(planId, type, actualHours) {
+    const task = (state.planTasks || []).find(function (item) {
+      return item.planId === planId && item.planType === type && item.status !== '已完成';
+    });
+    if (!task) return;
+    task.status = '已完成';
+    task.actualHours = Number(actualHours) || task.hours || 0;
+    task.completedAt = D.meta.demoNow;
+    task.updatedAt = D.meta.demoNow;
+    task.updatedBy = state.user ? state.user.name : '系统';
+  }
+
   function initState() {
-    state.tasks = clone(D.tasks);
+    state.tasks = clone(D.tasks).map(migrateTask);
     state.messages = clone(D.messages);
     state.logs = clone(D.logs);
     state.staff = clone(D.staff);
+    state.dutyTypes = clone(D.dutyTypes || []);
     state.groups = clone(D.groups);
     state.auths = clone(D.auths);
     state.alertRules = clone(D.alertRules);
     state.achievements = clone(D.achievements);
+    state.personAchievements = clone(D.personAchievements || []);
+    state.wallTags = clone(D.achievementWall || []);
     state.inspectionPlans = clone(D.inspectionPlans);
     state.inspectionRecords = clone(D.inspectionRecords);
     state.maintenancePlans = clone(D.maintenancePlans);
     state.maintenanceRecords = clone(D.maintenanceRecords);
+    state.planTasks = [];
+    syncPlanTasks();
     state.duty = clone(D.duty);
     state.permissions = clone(D.permissions);
     state.metrics = clone(D.dashboard);
     state.trend = clone(D.trend);
+
+    /* 统一“新建内容置顶、历史内容倒序”的展示顺序 */
+    state.tasks.sort(function (a, b) {
+      const aInactive = !!(a.canceled || a.draft);
+      const bInactive = !!(b.canceled || b.draft);
+      if (aInactive !== bInactive) return aInactive ? 1 : -1;
+      return idNum(b.id, 'T') - idNum(a.id, 'T');
+    });
+    sortNewest(state.messages, function (m) { return m.time; });
+    sortNewest(state.logs, function (l) { return l.time; });
+    sortNewest(state.inspectionRecords, function (r) { return r.time; });
+    sortNewest(state.maintenanceRecords, function (r) { return r.time; });
+    state.auths.sort(function (a, b) { return idNum(b.id, 'AU-') - idNum(a.id, 'AU-'); });
+    state.inspectionPlans.sort(function (a, b) { return idNum(b.id, 'IP-') - idNum(a.id, 'IP-'); });
+    state.maintenancePlans.sort(function (a, b) { return idNum(b.id, 'MP-') - idNum(a.id, 'MP-'); });
+
+    /* 新记录编号从现有最大值继续，避免刷新后重复 */
+    state.taskSeq = state.tasks.reduce(function (n, t) { return Math.max(n, idNum(t.id, 'T')); }, 10030) + 1;
+    state.staffSeq = state.staff.reduce(function (n, p) { return Math.max(n, idNum(p.uid, 'E')); }, 20008);
+    state.authSeq = state.auths.reduce(function (n, a) {
+      return Math.max(n, Number(String(a.id).split('-').pop()) || 0);
+    }, 187);
+    state.planSeq = state.inspectionPlans.reduce(function (n, p) { return Math.max(n, idNum(p.id, 'IP-')); }, 5);
+    state.mpPlanSeq = state.maintenancePlans.reduce(function (n, p) { return Math.max(n, idNum(p.id, 'MP-')); }, 4);
+    state.recordSeq = state.inspectionRecords.reduce(function (n, r) { return Math.max(n, idNum(r.id, 'IR-')); }, 1027);
+
+    /* 演示数据补齐审计字段，后续所有新建 / 编辑都会继续追加 */
+    state.tasks.forEach(function (t, i) {
+      ensureAudit(t, '2026-10-20 09:' + String(10 + (i % 40)).padStart(2, '0'), t.initiator || '系统', '创建任务');
+    });
+    state.inspectionPlans.forEach(function (p, i) {
+      ensureAudit(p, '2026-10-0' + ((i % 8) + 1) + ' 09:00', p.owner || '系统', '创建计划');
+      if (!p.statusChangedAt) { p.statusChangedAt = p.createdAt; p.statusChangedBy = p.createdBy; }
+    });
+    state.maintenancePlans.forEach(function (p, i) {
+      ensureAudit(p, '2026-10-0' + ((i % 8) + 1) + ' 10:00', p.owner || '系统', '创建计划');
+      if (!p.statusChangedAt) { p.statusChangedAt = p.createdAt; p.statusChangedBy = p.createdBy; }
+    });
+    state.staff.forEach(function (p) {
+      ensureAudit(p, (p.joined || D.meta.today) + ' 09:00', '系统', '加入组织');
+    });
+    state.auths.forEach(function (a) {
+      ensureAudit(a, '2026-01-01 09:00', '王主管', '创建授权');
+    });
+    state.wallTags.forEach(function (t) {
+      ensureAudit(t, '2025-01-01 09:00', '系统', '创建标签');
+    });
+    state.alertRules.forEach(function (r, i) {
+      ensureAudit(r, '2026-09-0' + ((i % 8) + 1) + ' 09:00', '系统', '创建预警规则');
+      if (!r.statusChangedAt) { r.statusChangedAt = r.createdAt; r.statusChangedBy = r.createdBy; }
+    });
+
+    normalizeApprovals();
   }
 
   function bindShell() {
@@ -585,17 +1162,35 @@
       if (e.target.closest('.nav-item')) closeMobileNav();
     });
 
-    const search = $('#globalSearch');
-    search.addEventListener('keydown', (e) => {
-      if (e.key !== 'Enter') return;
-      const q = search.value.trim();
-      state.pendingQuery = q;
-      if (state.route === 'tasks' && can('tasks')) refresh();
-      else if (can('tasks')) go('tasks', { q });
-      else toast('当前身份无任务中心权限', 'warn');
-    });
-
     $('#bellBtn').addEventListener('click', () => go('messages'));
+
+    const devDock = $('#devDock');
+    if (devDock) {
+      devDock.addEventListener('click', (e) => {
+        const reset = e.target.closest('[data-dev-reset]');
+        if (reset) {
+          confirmDialog({
+            title: '重置演示数据',
+            text: '将清空成果物、审批流程与本地演示数据，恢复初始状态。当前角色保持不变。',
+            okText: '重置并刷新',
+            danger: true
+          }).then(async function (ok) {
+            if (!ok) return;
+            try {
+              if (window.DeliverableStore && window.DeliverableStore.resetAll) {
+                await window.DeliverableStore.resetAll();
+              }
+            } catch (err) {
+              // 即使清理失败也刷新，避免页面停在旧状态
+            }
+            location.reload();
+          });
+          return;
+        }
+        const btn = e.target.closest('[data-dev-role]');
+        if (btn) switchRole(btn.dataset.devRole);
+      });
+    }
 
     $('#menuBtn').addEventListener('click', () => {
       $('#sidebar').classList.add('open');
@@ -613,38 +1208,93 @@
 
   function boot() {
     initState();
+    if (window.DeliverableStore && window.DeliverableStore.applyWorkflow) {
+      window.DeliverableStore.applyWorkflow();
+    }
+
+    if (!D.meta.demoOverride) {
+      setInterval(function () {
+        if (todayKey() !== D.meta.today) location.reload();
+      }, 60000);
+    }
 
     const params = new URLSearchParams(location.search);
     if (params.get('still') === '1') document.documentElement.classList.add('still');
+    devMode = /^(localhost|127\.0\.0\.1|::1|\[::1\])$/.test(location.hostname) || params.get('dev') === '1';
 
     renderLogin();
     bindShell();
+    updateDevDock();
 
+    if (window.DeliverableStore && window.DeliverableStore.ready) {
+      window.DeliverableStore.ready.then(function () {
+        if (window.DeliverableStore.error) {
+          toast('成果物存储初始化失败：' + (window.DeliverableStore.error.message || '请刷新页面重试'), 'warn');
+        }
+        if (window.DeliverableStore.applyWorkflow) window.DeliverableStore.applyWorkflow();
+        if (state.role) render();
+      });
+    }
+
+    const forceLogin = params.get('login') === '1' || params.get('roles') === '1';
     const saved = sessionStorage.getItem('ito.admin.role');
     const requested = params.get('role');
-    if (requested && D.roleInfo[requested]) {
+    if (!forceLogin && requested && D.roleInfo[requested] && (requested !== 'super' || devMode)) {
       enterApp(requested);
-    } else if (saved && D.roleInfo[saved]) {
+    } else if (!forceLogin && saved && D.roleInfo[saved] && (saved !== 'super' || devMode)) {
       enterApp(saved);
     } else {
       $('#appView').hidden = true;
       $('#loginView').hidden = false;
+      updateDevDock();
     }
+  }
+
+  function taskTabs(active) {
+    const items = [
+      { id: 'ledger', name: '任务台账', href: '#/tasks' },
+      { id: 'dispatch', name: '派发与审批', href: '#/dispatch' },
+      { id: 'workload', name: '工时负载', href: '#/workload' }
+    ];
+    return '<div class="tabs task-tabs">' + items.map(function (item) {
+      return '<a class="tab' + (item.id === active ? ' active' : '') + '" href="' + item.href + '">' + item.name + '</a>';
+    }).join('') + '</div>';
   }
 
   /* ── public API ──────────────────────────── */
   ITO.ui = {
-    $, $$, esc, icon, badge, groupPill, avatar, progressBar, isOverdue, mainStatus,
-    mainProgress, pageHead, emptyState, csv, download, toast, modal, confirm: confirmDialog,
-    drawer, chart, groupOptions, staffOptions, statusOptions, formRow, shortDate, addCycle
+    $, $$, esc, icon, badge, groupPill, avatar, roleChip, progressBar, isOverdue, isLateClosed, mainStatus, displayStatus,
+    mainProgress, starForCount, pageHead, emptyState, taskTabs, csv, download, exportPreview, toast, modal, confirm: confirmDialog,
+    drawer, detailModal, chart, groupOptions, staffOptions, peopleOptions, leadOptions, statusOptions, formRow, shortDate, addCycle,
+    showFieldError, clearFieldError, validateRequired, bindFieldClear, enhanceSelects, enhanceFormDates,
+    fmtDateTime, addHours, APPROVAL_HOURS, approvalOverdue, isTaskEditable, isTaskCancelable,
+    leaderApprovalOf, isLeaderApprovalPending, normalizeApprovals, groupManagerName
   };
   ITO.go = go;
   ITO.refresh = refresh;
   ITO.log = log;
+  ITO.notify = notify;
   ITO.can = can;
+  ITO.isReadOnly = () => state.role === 'admin' && !isSuper();
+  ITO.isSuper = isSuper;
+  ITO.roleIs = roleIs;
+  ITO.canSwitchDutyActor = function () { return devMode && roleIs('employee'); };
+  ITO.switchDutyActor = function (name) {
+    if (!ITO.canSwitchDutyActor()) return;
+    const member = state.staff.find(function (person) { return person.name === name; });
+    if (!member) return;
+    clearNotifications();
+    closeOverlays();
+    state.user = Object.assign({}, D.roleInfo.employee, { name: member.name, title: member.title });
+    renderShell();
+    render();
+  };
+  ITO.switchRole = switchRole;
   ITO.renderShell = renderShell;
   ITO.logout = logout;
   ITO.routes = ROUTE_TITLE;
+  ITO.syncPlanTasks = syncPlanTasks;
+  ITO.completePlanTask = completePlanTask;
   ITO.getGroup = groupById;
   ITO.counts = { overdueCount, unreadCount, pendingCount, myOpenSubs };
   ITO.disposeCharts = disposeCharts;
@@ -654,22 +1304,318 @@
     return state.groups.map((g) => '<option value="' + g.id + '"' + (g.id === selected ? ' selected' : '') + '>' + esc(g.name) + '</option>').join('');
   }
 
+  function groupOrder(gid) {
+    const idx = state.groups.findIndex((g) => g.id === gid);
+    return idx < 0 ? 99 : idx;
+  }
+
   function staffOptions(groupId, selected) {
     return state.staff
       .filter((s) => !groupId || s.group === groupId)
-      .map((s) => '<option value="' + esc(s.name) + '"' + (s.name === selected ? ' selected' : '') + '>' + esc(s.name) + ' · ' + esc(s.title) + '</option>')
+      .sort((a, b) => groupOrder(a.group) - groupOrder(b.group) || a.name.localeCompare(b.name, 'zh'))
+      .map((s) => {
+        const group = state.groups.find((g) => g.id === s.group) || {};
+        return '<option value="' + esc(s.name) + '"' +
+          (s.name === selected ? ' selected' : '') +
+          ' data-label="' + esc(s.name) + '"' +
+          ' data-meta="' + esc(s.title || '') + '"' +
+          ' data-group="' + esc(group.name || '') + '"' +
+          ' data-role="' + esc(group.leader === s.name ? '组长' : (group.manager === s.name ? '主管' : '')) + '">' +
+          esc(s.name) + ' · ' + esc(s.title) + '</option>';
+      })
       .join('');
+  }
+
+  function leadOptions(groupId, selected) {
+    const groups = state.groups.filter((g) => !groupId || g.id === groupId);
+    const names = {};
+    groups.forEach((g) => { if (g.manager) names[g.manager] = g; if (g.leader) names[g.leader] = g; });
+    return state.staff.filter((s) => names[s.name])
+      .sort((a, b) => groupOrder(a.group) - groupOrder(b.group) || a.name.localeCompare(b.name, 'zh'))
+      .map((s) => {
+      const group = names[s.name] || {};
+      return '<option value="' + esc(s.name) + '"' + (s.name === selected ? ' selected' : '') +
+        ' data-label="' + esc(s.name) + '"' +
+        ' data-meta="' + esc(group.name || '') + ' · ' + esc(s.title || '') + '"' +
+        ' data-group="' + esc(group.name || '') + '"' +
+        ' data-role="' + esc(group.manager === s.name ? '主管' : '组长') + '">' +
+        esc(s.name) + ' · ' + esc(s.title) + '</option>';
+    }).join('');
+  }
+
+  function peopleOptions(groupId, selected) {
+    const group = state.groups.find((g) => g.id === groupId);
+    const list = [];
+    const seen = {};
+    if (group && group.manager) {
+      list.push({ name: group.manager, title: '组主管', gid: group.id });
+      seen[group.manager] = true;
+    }
+    state.staff.filter((s) => !groupId || s.group === groupId).forEach((s) => {
+      if (seen[s.name]) return;
+      seen[s.name] = true;
+      list.push(s);
+    });
+    list.sort((a, b) => groupOrder(a.gid || a.group) - groupOrder(b.gid || b.group) || a.name.localeCompare(b.name, 'zh'));
+    return list.map((p) => {
+      const staff = state.staff.find((s) => s.name === p.name);
+      const group = state.groups.find((g) => g.id === (staff ? staff.group : groupId)) || {};
+      const role = group.manager === p.name ? '主管' : (group.leader === p.name ? '组长' : '');
+      return '<option value="' + esc(p.name) + '"' + (p.name === selected ? ' selected' : '') +
+        ' data-label="' + esc(p.name) + '"' +
+        ' data-meta="' + esc(p.title || '') + '"' +
+        ' data-group="' + esc(group.name || '') + '"' +
+        ' data-role="' + esc(role) + '">' +
+        esc(p.name) + ' · ' + esc(p.title) + '</option>';
+    }).join('');
   }
 
   function statusOptions(list, selected) {
     return list.map((s) => '<option value="' + esc(s) + '"' + (s === selected ? ' selected' : '') + '>' + esc(s) + '</option>').join('');
   }
 
+  /* ── custom select / person picker ─────────── */
+  let activeSelectPopup = null;
+
+  function closeAllSelects() {
+    if (!activeSelectPopup) return;
+    const current = activeSelectPopup;
+    activeSelectPopup = null;
+    current.pop.remove();
+    current.trigger.classList.remove('is-open');
+  }
+
+  function enhanceSelect(select) {
+    if (!select || select.dataset.enhanced === '1') return;
+    select.dataset.enhanced = '1';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'sel-wrap';
+    select.parentNode.insertBefore(wrap, select);
+    wrap.appendChild(select);
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'sel-trigger';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    const pop = document.createElement('div');
+    pop.className = 'sel-pop';
+    pop.hidden = true;
+    pop.innerHTML = '<div class="sel-search"><input type="search" placeholder="搜索姓名 / 专业组" aria-label="搜索选项"></div><div class="sel-list" role="listbox"></div>';
+    wrap.appendChild(trigger);
+
+    const search = pop.querySelector('.sel-search');
+    const searchInput = pop.querySelector('input');
+    const list = pop.querySelector('.sel-list');
+    let isOpen = false;
+
+    function emptyOption() {
+      return Array.prototype.find.call(select.options, function (o) { return o.value === ''; }) || null;
+    }
+
+    function placeholder() {
+      const empty = emptyOption();
+      return (empty && empty.textContent.trim()) || select.dataset.placeholder || '请选择';
+    }
+
+    function labelOf(option) {
+      if (!option) return '';
+      return option.dataset.label || String(option.textContent || '').split(' · ')[0].trim();
+    }
+
+    function syncTrigger() {
+      const option = select.options[select.selectedIndex];
+      const isEmpty = !select.value;
+      trigger.innerHTML = '<span class="sel-value' + (isEmpty ? ' is-placeholder' : '') + '">' + esc(isEmpty ? placeholder() : labelOf(option)) + '</span><i class="sel-arrow"></i>';
+      trigger.disabled = !!select.disabled;
+      trigger.classList.toggle('is-disabled', !!select.disabled);
+    }
+
+    function realOptions() {
+      return Array.prototype.filter.call(select.options, function (o) {
+        return o.value !== '' && !o.disabled;
+      });
+    }
+
+    function renderList(query) {
+      const q = String(query || '').trim().toLowerCase();
+      const options = realOptions();
+      const isPerson = options.some(function (o) { return !!o.dataset.group; });
+      search.hidden = !(isPerson || options.length > 10 || select.dataset.search === '1');
+      list.innerHTML = '';
+      if (!options.length) {
+        list.innerHTML = '<div class="sel-empty">暂无可选项</div>';
+        return;
+      }
+      let lastGroup = '';
+      let shown = 0;
+      options.forEach(function (option) {
+        const label = labelOf(option);
+        const meta = option.dataset.meta || '';
+        const role = option.dataset.role || '';
+        const group = option.dataset.group || '';
+        const hay = (label + ' ' + meta + ' ' + role + ' ' + group).toLowerCase();
+        if (q && hay.indexOf(q) === -1) return;
+        if (isPerson && !q && group && group !== lastGroup) {
+          const heading = document.createElement('div');
+          heading.className = 'sel-group';
+          heading.textContent = group;
+          list.appendChild(heading);
+          lastGroup = group;
+        }
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'sel-option' + (option.value === select.value ? ' is-selected' : '');
+        row.setAttribute('role', 'option');
+        row.innerHTML = '<span class="so-main"><b>' + esc(label) + '</b>' +
+          (meta ? '<small>' + esc(meta) + '</small>' : '') + '</span>' +
+          (role ? '<span class="so-role">' + esc(role) + '</span>' : '') +
+          (option.value === select.value ? '<span class="so-check">' + icon('check') + '</span>' : '');
+        row.addEventListener('click', function (event) {
+          event.stopPropagation();
+          select.value = option.value;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          syncTrigger();
+          closeAllSelects();
+          trigger.focus();
+        });
+        list.appendChild(row);
+        shown += 1;
+      });
+      if (!shown) list.innerHTML = '<div class="sel-empty">没有匹配项</div>';
+    }
+
+    function openPop() {
+      closeAllSelects();
+      activeSelectPopup = { pop: pop, trigger: trigger, select: select };
+      if (!pop.isConnected) document.body.appendChild(pop);
+      const rect = trigger.getBoundingClientRect();
+      const width = Math.max(rect.width, 260);
+      pop.hidden = false;
+      pop.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)) + 'px';
+      pop.style.top = (rect.bottom + 4) + 'px';
+      pop.style.width = width + 'px';
+      pop.style.maxHeight = Math.min(330, Math.max(180, window.innerHeight - rect.bottom - 16)) + 'px';
+      trigger.classList.add('is-open');
+      searchInput.value = '';
+      renderList('');
+      if (!search.hidden) setTimeout(function () { searchInput.focus(); }, 20);
+    }
+
+    trigger.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (select.disabled) return;
+      if (activeSelectPopup && activeSelectPopup.pop === pop) closeAllSelects();
+      else openPop();
+    });
+
+    searchInput.addEventListener('input', function () { renderList(searchInput.value); });
+    pop.addEventListener('click', function (event) { event.stopPropagation(); });
+    select.addEventListener('change', syncTrigger);
+    new MutationObserver(function () {
+      syncTrigger();
+      if (activeSelectPopup && activeSelectPopup.pop === pop) renderList(searchInput.value);
+    }).observe(select, { childList: true, subtree: true, attributes: true });
+
+    select.__syncPicker = syncTrigger;
+    syncTrigger();
+  }
+
+  function enhanceSelects(root) {
+    if (!root) return;
+    Array.prototype.forEach.call(root.querySelectorAll('.form-field select, .cell-select, [data-picker]'), enhanceSelect);
+  }
+
+  function enhanceFormDates(root) {
+    if (!root) return;
+    Array.prototype.forEach.call(root.querySelectorAll('.form-field input[type="date"], .form-field input[type="datetime-local"], [data-date-picker]'), function (input) {
+      if (input.closest('.date-wrap')) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'date-wrap';
+      input.parentNode.insertBefore(wrap, input);
+      wrap.appendChild(input);
+      const ph = document.createElement('span');
+      ph.className = 'date-ph';
+      ph.textContent = input.type === 'date' ? '请选择日期' : '请选择日期时间';
+      wrap.appendChild(ph);
+      const sync = function () {
+        const hasValue = !!input.value;
+        input.classList.toggle('has-value', hasValue);
+        ph.hidden = hasValue;
+      };
+      input.addEventListener('input', sync);
+      input.addEventListener('change', sync);
+      input.addEventListener('focus', function () { ph.hidden = true; });
+      input.addEventListener('blur', sync);
+      sync();
+    });
+  }
+
+  document.addEventListener('click', function (event) {
+    if (!activeSelectPopup) return;
+    if (event.target.closest('.sel-wrap') || event.target.closest('.sel-pop')) return;
+    closeAllSelects();
+  });
+  window.addEventListener('scroll', function (event) {
+    if (event.target && event.target.closest && event.target.closest('.sel-pop')) return;
+    closeAllSelects();
+  }, true);
+  window.addEventListener('resize', closeAllSelects);
+
   function formRow(o) {
     return '<div class="form-field' + (o.full ? ' full' : '') + '">' +
       '<label' + (o.required ? '' : '') + '>' + o.label + (o.required ? ' <em>*</em>' : '') + '</label>' +
       o.control + (o.hint ? '<span class="form-hint">' + esc(o.hint) + '</span>' : '') +
       '</div>';
+  }
+
+  function showFieldError(control, message) {
+    if (!control) return;
+    const field = control.closest('.form-field') || control.closest('td') || control.parentElement;
+    if (!field) return;
+    field.classList.add('has-error');
+    let err = field.querySelector('.field-error');
+    if (!err) {
+      err = document.createElement('span');
+      err.className = 'field-error';
+      field.appendChild(err);
+    }
+    err.textContent = message;
+  }
+
+  function clearFieldError(control) {
+    if (!control) return;
+    const field = control.closest('.form-field') || control.closest('td') || control.parentElement;
+    if (!field) return;
+    field.classList.remove('has-error');
+    const err = field.querySelector('.field-error');
+    if (err) err.remove();
+  }
+
+  function validateRequired(pairs) {
+    let ok = true;
+    pairs.forEach(function (pair) {
+      const control = pair[0];
+      const message = pair[1] || '请填写必填项';
+      if (!control) return;
+      if (!String(control.value || '').trim()) {
+        showFieldError(control, message);
+        ok = false;
+      } else {
+        clearFieldError(control);
+      }
+    });
+    return ok;
+  }
+
+  function bindFieldClear(root) {
+    if (!root) return;
+    Array.prototype.forEach.call(root.querySelectorAll('input, textarea, select'), function (control) {
+      const clear = function () { clearFieldError(control); };
+      control.addEventListener('input', clear);
+      control.addEventListener('change', clear);
+    });
   }
 
   function shortDate(str) {

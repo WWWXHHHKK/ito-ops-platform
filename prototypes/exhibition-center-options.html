@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITO 驾驶舱 · 展会中间列方案对比</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+<style>
+  html, body { height: 100%; margin: 0; overflow: hidden; background: #020913; }
+  body { font-family: var(--font-cn); color: var(--text); }
+
+  .proto-viewport {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: radial-gradient(1100px 700px at 50% 42%, rgba(20, 92, 142, 0.18), transparent 70%), #020913;
+  }
+  .proto-stage-wrap {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .proto-stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    flex: 0 0 auto;
+    transform-origin: center center;
+  }
+  .proto-stage iframe {
+    position: absolute;
+    inset: 0;
+    width: 1920px;
+    height: 1080px;
+    border: 0;
+    pointer-events: none;
+    background: #020913;
+  }
+
+  /* 整个中间列的精确位置：444 + 1032，102 + 930 */
+  .proto-center {
+    position: absolute;
+    left: 444px;
+    top: 102px;
+    width: 1032px;
+    height: 930px;
+    z-index: 5;
+  }
+
+  .proto-view { height: 100%; display: grid; gap: 16px; }
+  .proto-a-layout { grid-template-rows: 180px 390px 328px; }
+  .proto-b-layout { grid-template-rows: 132px 450px 316px; }
+  .proto-c-layout { grid-template-rows: 128px 500px 270px; }
+
+  .proto-bottom { display: grid; gap: 16px; min-height: 0; }
+  .proto-a-bottom { grid-template-columns: 1.35fr 1fr; }
+  .proto-b-bottom { grid-template-columns: 1.28fr 1fr; }
+  .proto-c-bottom { grid-template-columns: 1.08fr 1fr 1fr; }
+
+  .proto-panel { height: 100%; animation: none; }
+  .proto-panel .panel-head { flex: 0 0 44px; }
+  .proto-panel .panel-body { min-height: 0; }
+
+  /* ── 演示控制 ─────────────────────────────── */
+  .demo-controls {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    white-space: nowrap;
+  }
+  .demo-mode {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 8.5px;
+    color: var(--muted);
+    letter-spacing: 0.03em;
+  }
+  .demo-mode i {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 7px var(--green);
+  }
+  .demo-mode i.paused { background: var(--dim); box-shadow: none; }
+  .demo-mode em {
+    font-style: normal;
+    color: var(--cyan);
+    margin-left: 2px;
+  }
+  .demo-progress {
+    width: 44px;
+    height: 2px;
+    background: rgba(53, 224, 255, 0.13);
+    overflow: hidden;
+  }
+  .demo-progress i { display: block; width: 0; height: 100%; background: var(--cyan); transition: width 0.1s linear; }
+  .demo-btn {
+    height: 22px;
+    min-width: 22px;
+    padding: 0 5px;
+    border: 1px solid rgba(53, 224, 255, 0.16);
+    background: rgba(9, 43, 74, 0.32);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    cursor: pointer;
+    transition: 0.15s;
+  }
+  .demo-btn:hover { color: var(--cyan); border-color: rgba(53, 224, 255, 0.42); }
+  .demo-states { display: flex; gap: 3px; margin-left: 2px; }
+  .demo-state {
+    height: 21px;
+    padding: 0 6px;
+    border: 1px solid rgba(53, 224, 255, 0.10);
+    background: transparent;
+    color: var(--dim);
+    font-family: var(--font-cn);
+    font-size: 8.5px;
+    cursor: pointer;
+    transition: 0.15s;
+  }
+  .demo-state i {
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    margin-right: 4px;
+    border-radius: 50%;
+    background: var(--green);
+    vertical-align: 1px;
+  }
+  .demo-state[data-tone="crit"] i { background: var(--red); }
+  .demo-state[data-tone="warn"] i { background: var(--yellow); }
+  .demo-state:hover { color: var(--text-soft); border-color: rgba(53, 224, 255, 0.26); }
+  .demo-state.active { color: var(--cyan-hi); border-color: rgba(53, 224, 255, 0.44); background: rgba(53, 224, 255, 0.10); }
+  .demo-state.active[data-tone="crit"] { color: #ff9cac; border-color: rgba(255, 92, 114, 0.45); background: rgba(255, 92, 114, 0.10); }
+  .demo-state.active[data-tone="warn"] { color: var(--yellow); border-color: rgba(255, 207, 63, 0.40); background: rgba(255, 207, 63, 0.08); }
+
+  .head-tag { white-space: nowrap; }
+
+  /* ── 通用状态与数字 ───────────────────────── */
+  .s-ok { --sc: var(--green); }
+  .s-warn { --sc: var(--yellow); }
+  .s-crit { --sc: var(--red); }
+  .s-cyan { --sc: var(--cyan); }
+
+  .tiny-label {
+    font-family: var(--font-mono);
+    font-size: 6.5px;
+    letter-spacing: 0.12em;
+    color: var(--dim);
+  }
+
+  /* ── A · 核心业务运行态 ───────────────────── */
+  .core-summary {
+    height: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    padding: 12px 16px;
+  }
+  .core-metric {
+    position: relative;
+    min-width: 0;
+    padding: 9px 12px 8px;
+    border: 1px solid rgba(53, 224, 255, 0.10);
+    background: linear-gradient(145deg, rgba(12, 55, 92, 0.24), rgba(3, 18, 35, 0.34));
+    overflow: hidden;
+  }
+  .core-metric::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 32px;
+    height: 1px;
+    background: var(--sc, var(--cyan));
+    box-shadow: 0 0 8px var(--sc, var(--cyan));
+  }
+  .core-metric .cm-label { font-size: 9px; color: var(--muted); letter-spacing: 0.04em; }
+  .core-metric .cm-value {
+    margin-top: 8px;
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    font-family: var(--font-num);
+    font-size: 27px;
+    font-weight: 500;
+    line-height: 1;
+    color: var(--text);
+    letter-spacing: 0.02em;
+  }
+  .core-metric .cm-value em { font-style: normal; font-size: 11px; color: var(--dim); }
+  .core-metric .cm-value.crit { color: var(--red); }
+  .core-metric .cm-value.warn { color: var(--yellow); }
+  .core-metric .cm-sub { margin-top: 7px; display: flex; justify-content: space-between; gap: 6px; font-size: 8px; color: var(--dim); white-space: nowrap; }
+  .core-metric .cm-sub b { color: var(--sc, var(--cyan)); font-weight: 400; }
+  .spark-bars { display: flex; align-items: flex-end; gap: 2px; height: 16px; margin-top: 4px; }
+  .spark-bars i { width: 4px; background: var(--sc, var(--cyan)); opacity: 0.50; }
+  .spark-bars i:nth-child(2n) { opacity: 0.75; }
+  .spark-bars i:nth-child(3n) { opacity: 0.35; }
+
+  .chain-wrap {
+    position: relative;
+    height: 248px;
+    padding: 14px 14px 0;
+    display: flex;
+    align-items: center;
+  }
+  .chain-line {
+    position: absolute;
+    left: 26px;
+    right: 26px;
+    top: 50%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(53, 224, 255, 0.34) 8%, rgba(53, 224, 255, 0.34) 92%, transparent);
+    z-index: 0;
+  }
+  .chain-line::after {
+    content: "";
+    position: absolute;
+    top: -2px;
+    left: 0;
+    width: 46px;
+    height: 5px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    animation: chainFlow 4s linear infinite;
+    opacity: 0.8;
+  }
+  @keyframes chainFlow { from { left: 0; } to { left: calc(100% - 46px); } }
+  .chain {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 8px;
+    align-items: center;
+  }
+  .chain-step {
+    position: relative;
+    min-width: 0;
+    height: 192px;
+    padding: 12px 10px 10px;
+    border: 1px solid rgba(53, 224, 255, 0.14);
+    background: linear-gradient(155deg, rgba(12, 56, 96, 0.50), rgba(3, 18, 35, 0.68));
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .chain-step.s-warn { border-color: rgba(255, 207, 63, 0.36); background: linear-gradient(155deg, rgba(82, 67, 20, 0.35), rgba(25, 20, 8, 0.58)); }
+  .chain-step.s-crit { border-color: rgba(255, 92, 114, 0.48); background: linear-gradient(155deg, rgba(96, 28, 45, 0.38), rgba(32, 9, 18, 0.64)); }
+  .chain-step::after {
+    content: "›";
+    position: absolute;
+    right: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(53, 224, 255, 0.28);
+    font-family: var(--font-num);
+    font-size: 14px;
+    z-index: 2;
+  }
+  .chain-step:last-child::after { display: none; }
+  .chain-top { display: flex; align-items: center; gap: 5px; }
+  .chain-top i { width: 5px; height: 5px; border-radius: 50%; background: var(--sc, var(--green)); box-shadow: 0 0 7px var(--sc, var(--green)); }
+  .chain-top span { font-family: var(--font-mono); font-size: 6.5px; letter-spacing: 0.12em; color: var(--dim); }
+  .chain-step h3 { margin-top: 8px; font-size: 13px; font-weight: 500; color: var(--text); letter-spacing: 0.04em; white-space: nowrap; }
+  .chain-step .chain-sub { margin-top: 3px; font-family: var(--font-mono); font-size: 6.5px; letter-spacing: 0.10em; color: rgba(115, 185, 220, 0.62); }
+  .chain-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 12px; }
+  .chain-metrics div { min-width: 0; }
+  .chain-metrics em { display: block; font-style: normal; font-family: var(--font-mono); font-size: 6.5px; letter-spacing: 0.08em; color: var(--dim); }
+  .chain-metrics b { display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-num); font-size: 15px; font-weight: 500; color: var(--text-soft); }
+  .chain-step.s-warn .chain-metrics b { color: var(--yellow); }
+  .chain-step.s-crit .chain-metrics b { color: var(--red); }
+  .chain-bar { height: 2px; margin-top: 12px; background: rgba(255, 255, 255, 0.06); }
+  .chain-bar i { display: block; height: 100%; background: var(--sc, var(--green)); opacity: 0.8; }
+  .chain-state { display: block; margin-top: 8px; font-size: 8px; color: var(--sc, var(--green)); }
+  .chain-foot {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    padding: 0 14px 12px;
+  }
+  .chain-foot div { display: flex; align-items: baseline; justify-content: space-between; padding: 7px 9px; border-top: 1px solid rgba(53, 224, 255, 0.08); }
+  .chain-foot span { font-size: 8px; color: var(--dim); }
+  .chain-foot b { font-family: var(--font-num); font-size: 12px; font-weight: 500; color: var(--cyan); }
+
+  .funnel { padding: 12px 16px 10px; display: flex; flex-direction: column; gap: 9px; }
+  .funnel-row { display: grid; grid-template-columns: 56px minmax(0, 1fr) 82px; gap: 10px; align-items: center; }
+  .funnel-row > span { font-size: 9px; color: var(--muted); }
+  .funnel-track { height: 13px; background: rgba(255, 255, 255, 0.035); position: relative; overflow: hidden; }
+  .funnel-track i { display: block; height: 100%; background: var(--sc, var(--cyan)); opacity: 0.72; }
+  .funnel-track::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent); }
+  .funnel-row b { text-align: right; font-family: var(--font-num); font-size: 11px; font-weight: 500; color: var(--text-soft); }
+  .funnel-row b em { margin-left: 5px; font-style: normal; font-size: 8px; color: var(--dim); }
+  .funnel-note { margin-top: auto; display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid rgba(53, 224, 255, 0.08); font-family: var(--font-mono); font-size: 7.5px; color: var(--dim); }
+  .funnel-note b { color: var(--cyan); font-weight: 400; }
+  .funnel-chart { margin-top: 8px; padding-top: 7px; border-top: 1px dashed rgba(53, 224, 255, 0.07); }
+  .funnel-chart-head { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 6.5px; color: var(--dim); letter-spacing: 0.04em; }
+  .funnel-chart-head b { color: var(--cyan); font-weight: 400; }
+  .funnel-chart svg { display: block; width: 100%; height: 44px; margin-top: 3px; overflow: visible; }
+  .funnel-chips { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; }
+  .funnel-chips span { font-family: var(--font-mono); font-size: 6.5px; color: var(--dim); }
+  .funnel-chips b { color: var(--text-soft); font-weight: 400; }
+  .risk-owner { margin-top: 7px; padding: 8px 12px 0; border-top: 1px solid rgba(53, 224, 255, 0.08); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .risk-owner > div { padding: 6px 8px; background: rgba(9, 43, 74, 0.18); border: 1px solid rgba(53, 224, 255, 0.07); }
+  .risk-owner span { display: block; font-family: var(--font-mono); font-size: 6.5px; letter-spacing: 0.08em; color: var(--dim); }
+  .risk-owner b { display: block; margin-top: 3px; font-size: 10px; font-weight: 500; color: var(--text-soft); }
+  .risk-owner em { display: block; margin-top: 2px; font-size: 7px; font-style: normal; color: var(--muted); }
+
+  .risk-list { padding: 8px 14px 10px; display: flex; flex-direction: column; gap: 2px; }
+  .risk-row { display: grid; grid-template-columns: 7px minmax(0, 1fr) auto; gap: 9px; align-items: start; padding: 10px 2px; border-bottom: 1px dashed rgba(53, 224, 255, 0.08); }
+  .risk-row:last-child { border-bottom: 0; }
+  .risk-row > i { width: 5px; height: 5px; margin-top: 4px; border-radius: 50%; background: var(--sc, var(--green)); box-shadow: 0 0 7px var(--sc, var(--green)); }
+  .risk-row b { display: block; font-size: 10px; font-weight: 500; color: var(--text-soft); }
+  .risk-row span { display: block; margin-top: 3px; font-size: 8px; color: var(--dim); }
+  .risk-row em { font-family: var(--font-mono); font-size: 7.5px; font-style: normal; color: var(--muted); white-space: nowrap; }
+  .risk-foot { margin-top: auto; padding: 9px 16px 10px; border-top: 1px solid rgba(53, 224, 255, 0.08); font-family: var(--font-mono); font-size: 7.5px; color: var(--dim); display: flex; justify-content: space-between; }
+  .risk-foot b { color: var(--yellow); font-weight: 400; }
+
+  /* ── B · 故障演练剧场 ─────────────────────── */
+  .incident {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 18px;
+  }
+  .incident-badge {
+    flex: 0 0 auto;
+    min-width: 62px;
+    height: 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid color-mix(in srgb, var(--sc, var(--green)) 42%, transparent);
+    background: color-mix(in srgb, var(--sc, var(--green)) 8%, transparent);
+    clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+  }
+  .incident-badge b { font-family: var(--font-num); font-size: 22px; font-weight: 500; line-height: 1; color: var(--sc, var(--green)); }
+  .incident-badge span { margin-top: 4px; font-family: var(--font-mono); font-size: 6.5px; letter-spacing: 0.10em; color: var(--dim); }
+  .incident-main { min-width: 0; }
+  .incident-main h3 { font-size: 17px; font-weight: 500; letter-spacing: 0.04em; color: var(--text); }
+  .incident-main p { margin-top: 5px; font-size: 9px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .incident-stats { margin-left: auto; display: flex; gap: 20px; }
+  .incident-stat { min-width: 64px; text-align: right; }
+  .incident-stat span { display: block; font-family: var(--font-mono); font-size: 6.5px; letter-spacing: 0.10em; color: var(--dim); }
+  .incident-stat b { display: block; margin-top: 4px; font-family: var(--font-num); font-size: 17px; font-weight: 500; color: var(--text); }
+  .incident-stat b.crit { color: var(--red); }
+  .incident-stat b.warn { color: var(--yellow); }
+
+  .impact-layout { display: grid; grid-template-columns: minmax(0, 1fr) 292px; height: 100%; }
+  .impact-map { position: relative; min-height: 0; margin: 6px 8px 4px 12px; }
+  .impact-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .impact-ring { fill: none; stroke: rgba(53, 224, 255, 0.10); stroke-width: 1; }
+  .impact-ring.r2 { stroke-dasharray: 3 7; }
+  .impact-link { stroke: rgba(53, 224, 255, 0.34); stroke-width: 1; fill: none; }
+  .impact-link.warn { stroke: rgba(255, 207, 63, 0.58); stroke-dasharray: 4 6; }
+  .impact-link.crit { stroke: rgba(255, 92, 114, 0.72); stroke-dasharray: 4 6; }
+  .impact-node {
+    position: absolute;
+    width: 118px;
+    min-height: 53px;
+    padding: 7px 9px;
+    transform: translate(-50%, -50%);
+    border: 1px solid rgba(53, 224, 255, 0.16);
+    background: rgba(4, 24, 44, 0.86);
+    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+    z-index: 2;
+  }
+  .impact-node.core {
+    width: 152px;
+    min-height: 72px;
+    border-color: color-mix(in srgb, var(--sc, var(--green)) 45%, transparent);
+    background: color-mix(in srgb, var(--sc, var(--green)) 7%, rgba(4, 24, 44, 0.92));
+    padding: 10px 12px;
+  }
+  .impact-node.core::before,
+  .impact-node.core::after {
+    content: "";
+    position: absolute;
+    inset: -15px;
+    border: 1px solid color-mix(in srgb, var(--sc, var(--green)) 18%, transparent);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .impact-node.core::after { inset: -28px; opacity: 0.45; }
+  .impact-node .in-head { display: flex; align-items: center; gap: 5px; }
+  .impact-node .in-head i { width: 5px; height: 5px; border-radius: 50%; background: var(--sc, var(--green)); box-shadow: 0 0 7px var(--sc, var(--green)); }
+  .impact-node .in-head b { font-size: 10px; font-weight: 500; color: var(--text-soft); white-space: nowrap; }
+  .impact-node.core .in-head b { font-size: 13px; color: var(--text); }
+  .impact-node .in-meta { margin-top: 5px; font-family: var(--font-mono); font-size: 7px; letter-spacing: 0.02em; color: var(--dim); white-space: nowrap; }
+  .impact-node.core .in-meta { font-size: 7.5px; color: var(--muted); }
+  .impact-node.status-warn { border-color: rgba(255, 207, 63, 0.42); }
+  .impact-node.status-crit { border-color: rgba(255, 92, 114, 0.58); }
+  .pos-portal { left: 17%; top: 20%; }
+  .pos-ticket { left: 17%; top: 80%; }
+  .pos-knowledge { left: 83%; top: 20%; }
+  .pos-report { left: 83%; top: 80%; }
+  .pos-cmdb { left: 50%; top: 10%; }
+  .pos-auto { left: 50%; top: 90%; }
+  .pos-desk { left: 8%; top: 50%; }
+  .pos-monitor { left: 92%; top: 50%; }
+  .pos-core { left: 50%; top: 50%; }
+
+  .impact-stat {
+    position: absolute;
+    z-index: 3;
+    min-width: 82px;
+    padding: 6px 8px;
+    border: 1px solid rgba(53, 224, 255, 0.12);
+    background: rgba(3, 18, 35, 0.74);
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  .impact-stat span { display: block; font-family: var(--font-mono); font-size: 6px; letter-spacing: 0.08em; color: var(--dim); }
+  .impact-stat b { display: block; margin-top: 2px; font-family: var(--font-num); font-size: 13px; font-weight: 500; color: var(--text-soft); }
+  .impact-stat b.crit { color: var(--red); }
+  .impact-stat b.warn { color: var(--yellow); }
+  .stat-tl { left: 35%; top: 30%; }
+  .stat-tr { left: 65%; top: 30%; }
+  .stat-bl { left: 35%; top: 70%; }
+  .stat-br { left: 65%; top: 70%; }
+
+  .impact-side { border-left: 1px solid rgba(53, 224, 255, 0.09); padding: 8px 12px 6px; display: flex; flex-direction: column; min-height: 0; }
+  .impact-side-head { display: flex; align-items: baseline; justify-content: space-between; padding: 0 2px 7px; border-bottom: 1px solid rgba(53, 224, 255, 0.10); }
+  .impact-side-head b { font-size: 10px; font-weight: 500; letter-spacing: 0.06em; color: var(--text-soft); }
+  .impact-side-head span { font-family: var(--font-num); font-size: 15px; color: var(--sc, var(--cyan)); }
+  .impact-rows { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .impact-row { display: grid; grid-template-columns: 6px minmax(0, 1fr) auto; gap: 7px; align-items: center; padding: 9px 2px; border-bottom: 1px dashed rgba(53, 224, 255, 0.07); }
+  .impact-row:last-child { border-bottom: 0; }
+  .impact-row i { width: 5px; height: 5px; border-radius: 50%; background: var(--sc, var(--green)); }
+  .impact-row b { display: block; font-size: 9.5px; font-weight: 500; color: var(--text-soft); }
+  .impact-row span { display: block; margin-top: 2px; font-size: 7.5px; color: var(--dim); }
+  .impact-row em { font-family: var(--font-mono); font-size: 7px; font-style: normal; color: var(--muted); white-space: nowrap; }
+  .impact-side-foot { padding-top: 7px; border-top: 1px solid rgba(53, 224, 255, 0.09); font-family: var(--font-mono); font-size: 7px; color: var(--dim); display: flex; justify-content: space-between; }
+  .impact-side-foot b { color: var(--sc, var(--green)); font-weight: 400; }
+
+  .timeline { padding: 14px 18px 8px; display: flex; flex-direction: column; gap: 0; height: 100%; }
+  .timeline-track { position: relative; display: flex; gap: 0; padding-top: 4px; }
+  .timeline-track::before { content: ""; position: absolute; left: 5%; right: 5%; top: 18px; height: 1px; background: rgba(53, 224, 255, 0.13); }
+  .timeline-track::after { content: ""; position: absolute; left: 5%; top: 18px; height: 1px; width: var(--tw, 0%); background: var(--sc, var(--cyan)); opacity: 0.7; transition: width 0.4s; }
+  .tl-step { position: relative; flex: 1; padding: 26px 6px 0; }
+  .tl-step::before { content: ""; position: absolute; left: 5%; top: 14px; width: 8px; height: 8px; border-radius: 50%; background: #041526; border: 1px solid rgba(53, 224, 255, 0.25); z-index: 1; }
+  .tl-step.done::before { background: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+  .tl-step.active::before { background: var(--sc, var(--yellow)); border-color: var(--sc, var(--yellow)); box-shadow: 0 0 9px var(--sc, var(--yellow)); }
+  .tl-step b { display: block; font-size: 9px; font-weight: 500; color: var(--text-soft); }
+  .tl-step span { display: block; margin-top: 3px; font-family: var(--font-mono); font-size: 7px; color: var(--dim); }
+  .timeline-note { margin-top: auto; padding-top: 8px; border-top: 1px solid rgba(53, 224, 255, 0.08); font-size: 8px; color: var(--muted); }
+  .timeline-note b { color: var(--yellow); font-weight: 400; }
+
+  .vtimeline { height: 100%; padding: 4px 16px 8px; display: flex; flex-direction: column; }
+  .vt-step { position: relative; display: grid; grid-template-columns: 15px minmax(0, 1fr) auto; gap: 8px; padding: 10px 0 10px 4px; border-bottom: 1px dashed rgba(53, 224, 255, 0.07); }
+  .vt-step:last-child { border-bottom: 0; }
+  .vt-step::before { content: ""; position: absolute; left: 10px; top: 24px; bottom: -11px; width: 1px; background: rgba(53, 224, 255, 0.10); }
+  .vt-step:last-child::before { display: none; }
+  .vt-step > i { width: 8px; height: 8px; margin-top: 3px; border-radius: 50%; border: 1px solid rgba(53, 224, 255, 0.24); background: #041526; z-index: 1; }
+  .vt-step.done > i { background: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+  .vt-step.active > i { background: var(--sc, var(--yellow)); border-color: var(--sc, var(--yellow)); box-shadow: 0 0 9px var(--sc, var(--yellow)); }
+  .vt-step b { display: block; font-size: 9.5px; font-weight: 500; color: var(--text-soft); }
+  .vt-step span { display: block; margin-top: 3px; font-size: 7.5px; color: var(--dim); }
+  .vt-step em { font-family: var(--font-mono); font-size: 7px; font-style: normal; color: var(--muted); }
+  .vt-foot { margin-top: auto; padding-top: 7px; border-top: 1px solid rgba(53, 224, 255, 0.08); display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 7px; color: var(--dim); }
+  .vt-foot b { color: var(--sc, var(--green)); font-weight: 400; }
+
+  .impact-metrics { padding: 12px 14px; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 8px; height: 100%; }
+  .impact-metric { padding: 10px 11px; border: 1px solid rgba(53, 224, 255, 0.10); background: rgba(9, 43, 74, 0.20); }
+  .impact-metric span { display: block; font-size: 8px; color: var(--dim); }
+  .impact-metric b { display: block; margin-top: 6px; font-family: var(--font-num); font-size: 21px; font-weight: 500; color: var(--text); }
+  .impact-metric b em { margin-left: 3px; font-style: normal; font-size: 8px; color: var(--dim); }
+  .impact-metric b.crit { color: var(--red); }
+  .impact-metric b.warn { color: var(--yellow); }
+  .impact-metric small { display: block; margin-top: 4px; font-size: 7.5px; color: var(--dim); }
+
+  /* ── C · 数字孪生 ─────────────────────────── */
+  .twin-summary { height: 100%; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 10px 16px; }
+  .twin-kpi { padding: 6px 11px; border-left: 1px solid rgba(53, 224, 255, 0.12); }
+  .twin-kpi:first-child { border-left: 0; padding-left: 0; }
+  .twin-kpi span { display: block; font-size: 8px; color: var(--dim); }
+  .twin-kpi b { display: block; margin-top: 4px; font-family: var(--font-num); font-size: 20px; font-weight: 500; color: var(--text); }
+  .twin-kpi b em { margin-left: 3px; font-style: normal; font-size: 8px; color: var(--dim); }
+  .twin-kpi small { display: block; margin-top: 2px; font-family: var(--font-mono); font-size: 6.5px; letter-spacing: 0.04em; color: var(--dim); }
+
+  .twin-stage {
+    position: relative;
+    height: 100%;
+    padding: 8px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    justify-content: center;
+    background:
+      linear-gradient(90deg, transparent 0, rgba(53, 224, 255, 0.035) 50%, transparent 100%),
+      repeating-linear-gradient(0deg, transparent 0 27px, rgba(53, 224, 255, 0.025) 27px 28px);
+  }
+  .twin-stage::before {
+    content: "";
+    position: absolute;
+    left: 18%;
+    right: 18%;
+    top: 4%;
+    bottom: 4%;
+    background: linear-gradient(90deg, transparent, rgba(53, 224, 255, 0.05), transparent);
+    filter: blur(18px);
+    pointer-events: none;
+  }
+  .twin-layer {
+    position: relative;
+    height: 84px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 16px;
+    background: linear-gradient(145deg, rgba(13, 58, 98, 0.42), rgba(3, 18, 35, 0.72));
+    border: 1px solid rgba(53, 224, 255, 0.14);
+    clip-path: polygon(16px 0, 100% 0, calc(100% - 16px) 100%, 0 100%);
+    z-index: 1;
+  }
+  .twin-layer.l1 { width: 82%; border-color: rgba(53, 224, 255, 0.18); }
+  .twin-layer.l2 { width: 88%; border-color: rgba(53, 224, 255, 0.16); }
+  .twin-layer.l3 { width: 94%; border-color: rgba(53, 224, 255, 0.14); }
+  .twin-layer.l4 { width: 100%; border-color: rgba(53, 224, 255, 0.10); }
+  .twin-layer::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80px;
+    height: 1px;
+    background: var(--cyan);
+    opacity: 0.45;
+    box-shadow: 0 0 8px var(--cyan);
+  }
+  .twin-layer-label { flex: 0 0 92px; }
+  .twin-layer-label b { display: block; font-size: 10px; font-weight: 500; letter-spacing: 0.08em; color: var(--text-soft); }
+  .twin-layer-label span { display: block; margin-top: 3px; font-family: var(--font-mono); font-size: 6.5px; letter-spacing: 0.12em; color: var(--dim); }
+  .twin-items { flex: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .twin-chip {
+    min-width: 0;
+    height: 54px;
+    padding: 7px 9px;
+    border: 1px solid rgba(53, 224, 255, 0.10);
+    background: rgba(3, 18, 35, 0.48);
+  }
+  .twin-chip .tw-top { display: flex; align-items: center; gap: 5px; }
+  .twin-chip .tw-top i { width: 4px; height: 4px; border-radius: 50%; background: var(--sc, var(--green)); box-shadow: 0 0 6px var(--sc, var(--green)); }
+  .twin-chip .tw-top b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; font-weight: 500; color: var(--text-soft); }
+  .twin-chip .tw-meta { margin-top: 4px; display: flex; align-items: baseline; justify-content: space-between; gap: 4px; font-family: var(--font-mono); font-size: 6.5px; color: var(--dim); }
+  .twin-chip .tw-meta em { font-style: normal; color: var(--text-soft); }
+  .twin-chip .tw-meter { margin-top: 5px; height: 2px; background: rgba(255, 255, 255, 0.07); }
+  .twin-chip .tw-meter i { display: block; height: 100%; background: var(--sc, var(--cyan)); }
+  .twin-chip.s-warn { border-color: rgba(255, 207, 63, 0.30); }
+  .twin-chip.s-crit { border-color: rgba(255, 92, 114, 0.45); }
+  .twin-chip.s-crit .tw-top b { color: var(--red); }
+  .twin-chip.s-warn .tw-top b { color: var(--yellow); }
+
+  .twin-bottom-panel { padding: 10px 14px; height: 100%; display: flex; flex-direction: column; }
+  .capacity-row { display: grid; grid-template-columns: 48px 1fr 40px; gap: 8px; align-items: center; padding: 7px 0; border-bottom: 1px dashed rgba(53, 224, 255, 0.07); }
+  .capacity-row:last-child { border-bottom: 0; }
+  .capacity-row span { font-size: 8px; color: var(--muted); }
+  .capacity-row b { font-family: var(--font-num); font-size: 10px; font-weight: 500; color: var(--text-soft); text-align: right; }
+  .capacity-bar { height: 4px; background: rgba(255, 255, 255, 0.06); }
+  .capacity-bar i { display: block; height: 100%; background: var(--sc, var(--cyan)); }
+  .twin-risk { display: flex; flex-direction: column; gap: 0; }
+  .twin-risk-row { display: grid; grid-template-columns: 6px 1fr auto; gap: 7px; align-items: center; padding: 8px 0; border-bottom: 1px dashed rgba(53, 224, 255, 0.07); }
+  .twin-risk-row:last-child { border-bottom: 0; }
+  .twin-risk-row i { width: 4px; height: 4px; border-radius: 50%; background: var(--sc, var(--green)); }
+  .twin-risk-row b { font-size: 9px; font-weight: 400; color: var(--text-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .twin-risk-row em { font-family: var(--font-mono); font-size: 6.5px; font-style: normal; color: var(--muted); }
+  .capacity-foot { margin-top: auto; padding-top: 7px; border-top: 1px solid rgba(53, 224, 255, 0.08); display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 6.5px; color: var(--dim); }
+  .capacity-foot b { color: var(--yellow); font-weight: 400; }
+  .twin-events { margin-top: 4px; padding-top: 5px; border-top: 1px dashed rgba(53, 224, 255, 0.07); }
+  .twin-event { display: flex; justify-content: space-between; gap: 6px; padding: 4px 0; font-size: 7px; color: var(--muted); }
+  .twin-event span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .twin-event em { font-family: var(--font-mono); font-style: normal; color: var(--dim); white-space: nowrap; }
+  .dep-bar { margin-top: 5px; height: 2px; background: rgba(255, 255, 255, 0.06); }
+  .dep-bar i { display: block; height: 100%; background: var(--sc, var(--green)); }
+
+  /* ── 外层方案切换 ─────────────────────────── */
+  .proto-switch {
+    position: fixed;
+    left: 50%;
+    bottom: 3px;
+    z-index: 50;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 6px;
+    border: 1px solid rgba(53, 224, 255, 0.28);
+    background: rgba(3, 19, 34, 0.95);
+    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+    box-shadow: 0 0 18px rgba(0, 0, 0, 0.58);
+  }
+  .proto-switch > span { padding: 0 6px; font-family: var(--font-mono); font-size: 7.5px; color: var(--dim); white-space: nowrap; }
+  .proto-switch .compare-tab {
+    height: 25px;
+    padding: 0 9px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--font-cn);
+    font-size: 9px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .proto-switch .compare-tab b { color: var(--cyan); margin-right: 4px; font-family: var(--font-num); font-weight: 500; }
+  .proto-switch .compare-tab:hover { color: var(--text-soft); }
+  .proto-switch .compare-tab.active { color: var(--text); border-color: rgba(53, 224, 255, 0.40); background: rgba(53, 224, 255, 0.10); }
+  .proto-switch .compare-note { padding: 0 5px; font-size: 7.5px; color: var(--dim); white-space: nowrap; }
+
+  .proto-fallback {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 1px solid rgba(53, 224, 255, 0.25);
+    background: rgba(3, 19, 34, 0.92);
+    text-align: center;
+  }
+  .proto-fallback b { font-size: 14px; color: var(--text); font-weight: 500; }
+  .proto-fallback span { max-width: 560px; font-size: 10px; line-height: 1.7; color: var(--muted); }
+  .proto-fallback code { font-family: var(--font-mono); color: var(--cyan); }
+
+  html.still .proto-panel { animation: none; }
+  html.still .chain-line::after { animation: none; }
+  html.still .demo-progress i { transition: none; }
+
+  /* ── 展会版可读性增强 ─────────────────────── */
+  .exh-a .core-metric .cm-value { font-size: 30px; }
+  .exh-a .chain { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .exh-a .chain-step { height: 204px; padding: 12px 12px 10px; }
+  .exh-a .chain-step h3 { margin-top: 2px; font-size: 15px; }
+  .exh-a .chain-step .chain-sub { margin-top: 5px; font-size: 7.5px; }
+  .exh-a .chain-state { margin-top: 10px; font-size: 9px; }
+  .exh-a .chain-foot b { font-size: 14px; }
+  .exh-stage-count {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    margin-top: 10px;
+    font-family: var(--font-num);
+    font-size: 30px;
+    font-weight: 500;
+    line-height: 1;
+    color: var(--text);
+    letter-spacing: 0.02em;
+  }
+  .exh-stage-count em { font-style: normal; font-size: 9px; color: var(--dim); }
+  .chain-step.s-crit .exh-stage-count { color: var(--red); }
+  .chain-step.s-warn .exh-stage-count { color: var(--yellow); }
+
+  .exh-group-bars { height: 100%; padding: 9px 16px 8px; display: flex; flex-direction: column; justify-content: space-around; }
+  .exh-group-row { display: grid; grid-template-columns: 6px 100px minmax(0, 1fr) 52px; gap: 9px; align-items: center; }
+  .exh-group-row > i { width: 5px; height: 5px; border-radius: 50%; box-shadow: 0 0 7px currentColor; }
+  .exh-group-row b { display: block; font-size: 10px; font-weight: 500; color: var(--text-soft); }
+  .exh-group-row span { display: block; margin-top: 2px; font-size: 7.5px; color: var(--dim); }
+  .exh-group-track { height: 7px; background: rgba(255, 255, 255, 0.05); overflow: hidden; }
+  .exh-group-track i { display: block; height: 100%; opacity: 0.78; }
+  .exh-group-row strong { text-align: right; font-family: var(--font-num); font-size: 17px; font-weight: 500; color: var(--text); }
+  .exh-group-row strong em { display: block; margin-top: 1px; font-style: normal; font-size: 7px; color: var(--dim); }
+
+  .exh-b .incident-main h3 { font-size: 19px; }
+  .exh-b .incident-main p { font-size: 9.5px; }
+  .exh-b .incident-badge b { font-size: 24px; }
+  .exh-b .impact-node .in-head b { font-size: 10.5px; }
+  .exh-b .impact-node.core .in-head b { font-size: 13px; }
+  .exh-b .impact-stat b { font-size: 15px; }
+  .exh-b .impact-row b { font-size: 10px; }
+
+  .exh-c .twin-layer { height: 94px; }
+  .exh-c .twin-stage { gap: 9px; }
+  .exh-c .twin-chip { height: 62px; padding: 8px 10px; }
+  .exh-c .twin-chip .tw-top b { font-size: 9.5px; }
+  .exh-c .twin-chip .tw-meta em { font-size: 10px; }
+  .exh-c .twin-kpi b { font-size: 24px; }
+  .exh-c .twin-layer-label b { font-size: 11px; }
+  .exh-c .twin-layer-label span { font-size: 7px; }
+  .exh-c .twin-summary { padding-top: 12px; }
+
+</style>
+</head>
+<body>
+<div class="proto-viewport">
+  <div class="proto-stage-wrap">
+    <div class="proto-stage" id="protoStage">
+      <iframe id="cockpitFrame" src="../index.html?still=1" title="驾驶舱底图" tabindex="-1" aria-hidden="true"></iframe>
+      <div class="proto-center" id="protoCenter"></div>
+    </div>
+  </div>
+
+  <div class="proto-switch" role="group" aria-label="展会中间列方案切换">
+    <span>对比方案</span>
+    <button class="compare-tab active" type="button" data-variant="a"><b>A</b>任务流转</button>
+    <button class="compare-tab" type="button" data-variant="b"><b>B</b>超期处置</button>
+    <button class="compare-tab" type="button" data-variant="c"><b>C</b>专业组孪生</button>
+    <span class="compare-note">自动 10s · 点状态即暂停</span>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const frame = document.getElementById('cockpitFrame');
+  const stage = document.getElementById('protoStage');
+  const center = document.getElementById('protoCenter');
+  const tabs = Array.prototype.slice.call(document.querySelectorAll('.compare-tab'));
+  const params = new URLSearchParams(location.search);
+  const STILL = params.get('still') === '1';
+  if (STILL) document.documentElement.classList.add('still');
+
+  const STATES = [
+    {
+      id: 'daily', label: '日常', tone: 'ok',
+      active: 128, closed: 342, overdue: 7, sla: '96.2', ontime: '89.0',
+      groups: [42, 33, 29, 24], stages: [18, 12, 14, 84, 342], overdueGroups: [1, 2, 2, 2],
+      newToday: 24, closedToday: 21, highRisk: 2, step: 0,
+      title: '任务运行平稳', note: '7 项超期均在处置窗口 · 今日新增 24 · 今日闭环 21'
+    },
+    {
+      id: 'overdue', label: '超期', tone: 'crit',
+      active: 128, closed: 342, overdue: 7, sla: '96.2', ontime: '89.0',
+      groups: [42, 33, 29, 24], stages: [18, 12, 14, 84, 342], overdueGroups: [1, 2, 2, 2],
+      newToday: 24, closedToday: 21, highRisk: 2, step: 1,
+      title: '防火墙策略评审超期', note: 'T10023-01 · 通信组 · 高风险作业授权 · 已超期 2 小时 56 分'
+    },
+    {
+      id: 'handling', label: '处置', tone: 'warn',
+      active: 128, closed: 342, overdue: 7, sla: '95.9', ontime: '88.7',
+      groups: [42, 33, 29, 24], stages: [18, 11, 14, 85, 342], overdueGroups: [1, 2, 2, 2],
+      newToday: 24, closedToday: 21, highRisk: 1, step: 2,
+      title: '高风险审批升级处置', note: '已升级至王主管 · 高风险授权审批中 · 关联割接任务等待执行'
+    },
+    {
+      id: 'recovered', label: '闭环', tone: 'ok',
+      active: 127, closed: 343, overdue: 6, sla: '96.4', ontime: '89.1',
+      groups: [42, 32, 29, 24], stages: [18, 10, 14, 85, 343], overdueGroups: [1, 1, 2, 2],
+      newToday: 24, closedToday: 22, highRisk: 1, step: 4,
+      title: '授权通过，任务恢复', note: 'T10023-01 已闭环 · 割接进入执行 · 当前超期降至 6 项'
+    }
+  ];
+
+  let variant = 'a';
+  let stateIndex = 1;
+  let playing = !STILL;
+  let progress = 0;
+  let timer = null;
+
+  function esc(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function s() { return STATES[stateIndex]; }
+
+  function fitStage() {
+    const scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = 'scale(' + scale + ')';
+  }
+
+  function demoControls() {
+    const state = s();
+    return '<div class="demo-controls">' +
+      '<span class="demo-mode"><i class="' + (playing ? '' : 'paused') + '"></i>' + (playing ? '自动演示' : '已暂停') + '<em>' + (playing ? '10s' : '手动') + '</em></span>' +
+      '<span class="demo-progress"><i style="width:' + (progress * 10) + '%"></i></span>' +
+      '<button class="demo-btn" type="button" data-demo="prev" aria-label="上一步">‹</button>' +
+      '<button class="demo-btn" type="button" data-demo="play">' + (playing ? '暂停' : '播放') + '</button>' +
+      '<button class="demo-btn" type="button" data-demo="next" aria-label="下一步">›</button>' +
+      '<span class="demo-states">' + STATES.map(function (st, i) {
+        return '<button class="demo-state' + (i === stateIndex ? ' active' : '') + '" type="button" data-demo-state="' + i + '" data-tone="' + st.tone + '">' +
+          '<i></i>' + esc(st.label) + '</button>';
+      }).join('') + '</span>' +
+    '</div>';
+  }
+
+  function head(idx, title, en, right) {
+    return '<div class="panel-head">' +
+      '<div class="ph-left"><i class="ph-idx">' + idx + '</i><h2>' + title + '</h2><span class="ph-en">' + en + '</span></div>' +
+      (right || '<span class="head-tag">LIVE</span>') +
+    '</div>';
+  }
+
+  function panel(idx, title, en, body, right, cls) {
+    return '<section class="panel proto-panel ' + (cls || '') + '">' +
+      head(idx, title, en, right) +
+      '<div class="panel-body">' + body + '</div>' +
+    '</section>';
+  }
+
+  /* ── A · 任务全生命周期 ───────────────────── */
+  function summaryMetric(label, value, unit, sub, tone, bars) {
+    return '<div class="core-metric s-' + tone + '">' +
+      '<div class="cm-label">' + label + '</div>' +
+      '<div class="cm-value ' + (tone === 'crit' ? 'crit' : tone === 'warn' ? 'warn' : '') + '">' + value + (unit ? '<em>' + unit + '</em>' : '') + '</div>' +
+      '<div class="cm-sub">' + sub + '</div>' +
+      '<div class="spark-bars">' + bars.map(function (h) { return '<i style="height:' + h + 'px"></i>'; }).join('') + '</div>' +
+    '</div>';
+  }
+
+  /* ── A · 任务全生命周期 ───────────────────── */
+  function renderA() {
+    const st = s();
+    const approvalTone = st.id === 'overdue' ? 'crit' : st.id === 'handling' ? 'warn' : 'ok';
+    const execTone = st.id === 'handling' ? 'warn' : 'ok';
+    const stages = [
+      { name: '待派发', en: 'ASSIGN', count: st.stages[0], sub: '平均停留 1.8h · 超期 1', tone: 'ok' },
+      { name: '待审批', en: 'APPROVE', count: st.stages[1], sub: '高风险审批 3 · 超期 2', tone: approvalTone },
+      { name: '待接收', en: 'RECEIVE', count: st.stages[2], sub: '平均停留 3.2h · 超期 1', tone: 'ok' },
+      { name: '执行中', en: 'EXECUTE', count: st.stages[3], sub: '高风险作业 6 · 超期 3', tone: execTone },
+      { name: '已闭环', en: 'CLOSED', count: st.stages[4], sub: '近 30 天 · 按期率 89.0%', tone: 'ok' }
+    ];
+
+    const groups = [
+      { name: '应用组', manager: '王主管', value: st.groups[0], color: '#EB612A' },
+      { name: '通信组', manager: '赵主管', value: st.groups[1], color: '#0A72E8' },
+      { name: '在线组', manager: '李主管', value: st.groups[2], color: '#1FAE5C' },
+      { name: '基础设施组', manager: '刘主管', value: st.groups[3], color: '#E08A00' }
+    ];
+
+    const risks = [
+      { tone: 'crit', title: '防火墙策略评审超期', desc: 'T10023-01 · 通信组 · 高风险授权', meta: '超期 2h56' },
+      { tone: 'warn', title: '核心机房环境巡检超期', desc: 'T10027-01 · 基础设施组 · 执行中 75%', meta: '超期 21h' },
+      { tone: 'warn', title: '误报规则收敛超期', desc: 'T10024-02 · 在线组 · 执行中 45%', meta: '超期 1d' }
+    ];
+
+    const body = '<div class="proto-view proto-a-layout exh-a">' +
+      panel(4, '任务运营总览', 'TASK OPERATIONS',
+        '<div class="core-summary">' +
+          summaryMetric('在办任务', st.active, '件', '<span>较上月</span><b>+12%</b>', 'ok', [10, 12, 11, 13, 15, 14, 16]) +
+          summaryMetric('近 30 天闭环', st.closed, '件', '<span>按期率</span><b>' + st.ontime + '%</b>', 'ok', [11, 10, 12, 13, 14, 13, 15]) +
+          summaryMetric('超期任务', st.overdue, '件', '<span>高风险</span><b>' + st.highRisk + ' 项</b>', 'crit', [6, 7, 6, 8, 7, 9, 8]) +
+          summaryMetric('SLA 达成率', st.sla, '%', '<span>目标 95.0%</span><b>' + (Number(st.sla) >= 95 ? '达标' : '关注') + '</b>', 'ok', [9, 10, 11, 10, 12, 11, 13]) +
+        '</div>',
+        demoControls()
+      ) +
+      panel(5, '任务流转链路', 'TASK LIFECYCLE',
+        '<div class="chain-wrap"><div class="chain-line"></div><div class="chain">' +
+          stages.map(function (stage, index) {
+            return '<div class="chain-step s-' + stage.tone + '">' +
+              '<div class="chain-top"><i></i><span>' + stage.en + '</span></div>' +
+              '<div class="exh-stage-count">' + stage.count + '<em>项</em></div>' +
+              '<h3>' + stage.name + '</h3>' +
+              '<div class="chain-sub">' + stage.sub + '</div>' +
+              '<div class="chain-bar"><i style="width:' + (stage.tone === 'crit' ? 42 : stage.tone === 'warn' ? 68 : 88) + '%"></i></div>' +
+              '<span class="chain-state">' + (stage.tone === 'crit' ? '超期需升级' : stage.tone === 'warn' ? '处置中' : '流转正常') + '</span>' +
+            '</div>';
+          }).join('') +
+        '</div></div>' +
+        '<div class="chain-foot">' +
+          '<div><span>今日新增</span><b>' + st.newToday + ' 项</b></div>' +
+          '<div><span>今日闭环</span><b>' + st.closedToday + ' 项</b></div>' +
+          '<div><span>平均闭环</span><b>6.2h</b></div>' +
+          '<div><span>按期闭环率</span><b>' + st.ontime + '%</b></div>' +
+        '</div>',
+        '<span class="head-tag">4 GROUPS</span>'
+      ) +
+      '<div class="proto-bottom proto-a-bottom">' +
+        panel(6, '专业组在办', 'GROUP LOAD',
+          '<div class="exh-group-bars">' + groups.map(function (g) {
+            const pct = Math.round(g.value / 128 * 100);
+            return '<div class="exh-group-row"><i style="background:' + g.color + '"></i><div><b>' + g.name + '</b><span>' + g.manager + '</span></div><div class="exh-group-track"><i style="width:' + pct + '%;background:' + g.color + '"></i></div><strong>' + g.value + '<em>' + pct + '%</em></strong></div>';
+          }).join('') + '</div>',
+          '<span class="head-tag">' + st.active + ' ACTIVE</span>'
+        ) +
+        panel(7, '重点超期任务', 'OVERDUE TASKS',
+          '<div class="risk-list">' + risks.map(function (r) {
+            return '<div class="risk-row s-' + r.tone + '"><i></i><div><b>' + r.title + '</b><span>' + r.desc + '</span></div><em>' + r.meta + '</em></div>';
+          }).join('') + '</div>' +
+          '<div class="risk-foot"><span>共 <b>' + st.overdue + '</b> 项超期任务</span><b>' + (st.id === 'recovered' ? '1 项已闭环' : '2 项高风险') + '</b></div>',
+          '<span class="head-tag">' + st.overdue + ' OVERDUE</span>'
+        ) +
+      '</div>' +
+    '</div>';
+
+    center.innerHTML = body;
+    updateProgressUI();
+  }
+
+  /* ── B · 超期任务处置 ─────────────────────── */
+  function taskTone(st, key) {
+    if (st.id === 'daily' || st.id === 'recovered') return 'ok';
+    if (key === 'auth') return st.id === 'overdue' ? 'crit' : 'warn';
+    if (key === 'work' || key === 'cut') return 'warn';
+    return 'ok';
+  }
+
+  function renderB() {
+    const st = s();
+    const active = st.id === 'overdue' || st.id === 'handling';
+
+    const banner = st.id === 'daily' ? {
+      badge: '7', badgeSub: 'OVERDUE', title: st.title, note: st.note,
+      metrics: [['今日新增', '24', ''], ['今日闭环', '21', ''], ['高风险', '2', 'warn']]
+    } : st.id === 'recovered' ? {
+      badge: 'OK', badgeSub: 'CLOSED', title: st.title, note: st.note,
+      metrics: [['总耗时', '3h42', ''], ['已闭环', '343', ''], ['剩余超期', '6', '']]
+    } : st.id === 'handling' ? {
+      badge: '60%', badgeSub: 'HANDLING', title: st.title, note: st.note,
+      metrics: [['处置时长', '1h12', 'warn'], ['关联任务', '3', ''], ['处置进度', '60%', 'warn']]
+    } : {
+      badge: '2h56', badgeSub: 'OVERDUE', title: st.title, note: st.note,
+      metrics: [['超期时长', '2h56', 'crit'], ['关联任务', '3', ''], ['SLA 风险', '1', 'warn']]
+    };
+
+    const nodes = [
+      { key: 'apply', name: '变更申请', meta: 'T10023 · 已完成', pos: 'pos-portal' },
+      { key: 'risk', name: '风险评估', meta: '已完成 · 高风险', pos: 'pos-ticket' },
+      { key: 'work', name: '工作票', meta: st.id === 'recovered' || st.id === 'handling' ? '已签发' : '待签发', pos: 'pos-knowledge' },
+      { key: 'cut', name: '割接实施', meta: st.id === 'recovered' ? '执行中' : '待执行', pos: 'pos-report' },
+      { key: 'auth', name: '高风险授权', meta: st.id === 'overdue' ? '待审批 · 超时' : st.id === 'handling' ? '审批中' : st.id === 'recovered' ? '已通过' : '待审批', pos: 'pos-cmdb' },
+      { key: 'rollback', name: '回退验证', meta: st.id === 'recovered' ? '待验证' : '待执行', pos: 'pos-auto' }
+    ];
+
+    const centerTone = st.id === 'overdue' ? 'crit' : st.id === 'handling' ? 'warn' : 'ok';
+    const sideRows = [
+      { name: '变更申请', desc: '变更单与影响分析', meta: '完成', tone: 'ok' },
+      { name: '风险评估', desc: '高风险作业识别', meta: '完成', tone: 'ok' },
+      { name: '高风险授权', desc: st.id === 'overdue' ? '审批超时 · 等待升级' : st.id === 'handling' ? '王主管审批中' : st.id === 'recovered' ? '授权通过' : '待审批', meta: st.id === 'recovered' ? '通过' : '待办', tone: st.id === 'overdue' ? 'crit' : st.id === 'handling' ? 'warn' : 'ok' },
+      { name: '工作票', desc: '高风险作业工作票', meta: st.id === 'recovered' || st.id === 'handling' ? '已签发' : '待签发', tone: taskTone(st, 'work') },
+      { name: '割接实施', desc: '通信网络割接窗口', meta: st.id === 'recovered' ? '执行中' : '待执行', tone: taskTone(st, 'cut') },
+      { name: '回退验证', desc: '割接后回退校验', meta: st.id === 'recovered' ? '待验证' : '待执行', tone: 'ok' }
+    ];
+
+    const timeline = [
+      { time: '18:00', title: '超期发现', desc: '策略评审超过截止时间' },
+      { time: '19:10', title: '升级主管', desc: '高风险审批升级至王主管' },
+      { time: '20:30', title: '授权通过', desc: '高风险作业授权完成' },
+      { time: '21:00', title: '割接执行', desc: '割接进入执行与回退验证' }
+    ];
+    const timelineDone = st.id === 'recovered' ? 4 : st.step;
+
+    const body = '<div class="proto-view proto-b-layout exh-b">' +
+      panel(4, '超期任务处置', 'OVERDUE TASK DRILL',
+        '<div class="incident s-' + (st.id === 'overdue' ? 'crit' : st.id === 'handling' ? 'warn' : 'ok') + '">' +
+          '<div class="incident-badge"><b>' + banner.badge + '</b><span>' + banner.badgeSub + '</span></div>' +
+          '<div class="incident-main"><h3>' + banner.title + '</h3><p>' + banner.note + '</p></div>' +
+          '<div class="incident-stats">' + banner.metrics.map(function (m) {
+            return '<div class="incident-stat"><span>' + m[0] + '</span><b class="' + (m[2] || '') + '">' + m[1] + '</b></div>';
+          }).join('') + '</div>' +
+        '</div>',
+        demoControls()
+      ) +
+      panel(5, '任务影响面', 'TASK BLAST RADIUS',
+        '<div class="impact-layout">' +
+          '<div class="impact-map">' +
+            '<svg class="impact-svg" viewBox="0 0 700 380" preserveAspectRatio="none" aria-hidden="true">' +
+              '<ellipse class="impact-ring" cx="350" cy="190" rx="90" ry="62"/>' +
+              '<ellipse class="impact-ring r2" cx="350" cy="190" rx="170" ry="112"/>' +
+              '<ellipse class="impact-ring" cx="350" cy="190" rx="250" ry="160"/>' +
+              '<path class="impact-link ' + (st.id === 'overdue' ? 'crit' : active ? 'warn' : '') + '" d="M350 190 L126 76"/>' +
+              '<path class="impact-link ' + (active ? 'warn' : '') + '" d="M350 190 L126 304"/>' +
+              '<path class="impact-link ' + (active ? 'warn' : '') + '" d="M350 190 L574 76"/>' +
+              '<path class="impact-link ' + (active ? 'warn' : '') + '" d="M350 190 L574 304"/>' +
+              '<path class="impact-link ' + (st.id === 'overdue' ? 'crit' : active ? 'warn' : '') + '" d="M350 190 L350 38"/>' +
+              '<path class="impact-link" d="M350 190 L350 342"/>' +
+            '</svg>' +
+            '<div class="impact-stat stat-tl"><span>关联任务</span><b class="' + (active ? 'warn' : '') + '">' + (active ? '3' : '0') + '</b></div>' +
+            '<div class="impact-stat stat-tr"><span>待审批</span><b class="' + (st.id === 'overdue' ? 'crit' : active ? 'warn' : '') + '">' + (st.id === 'recovered' ? '0' : '1') + '</b></div>' +
+            '<div class="impact-stat stat-bl"><span>影响变更</span><b class="' + (active ? 'warn' : '') + '">' + (active ? '2' : '0') + '</b></div>' +
+            '<div class="impact-stat stat-br"><span>超期时长</span><b class="' + (active ? 'crit' : '') + '">' + (active ? (st.id === 'handling' ? '1h12' : '2h56') : '0') + '</b></div>' +
+            nodes.map(function (n) {
+              const tone = taskTone(st, n.key);
+              return '<div class="impact-node status-' + tone + ' s-' + tone + ' ' + n.pos + '"><div class="in-head"><i></i><b>' + n.name + '</b></div><div class="in-meta">' + n.meta + '</div></div>';
+            }).join('') +
+            '<div class="impact-node core pos-core s-' + centerTone + '"><div class="in-head"><i></i><b>防火墙策略变更</b></div><div class="in-meta">T10023 · 通信组 · 高风险</div></div>' +
+          '</div>' +
+          '<aside class="impact-side s-' + (st.id === 'overdue' ? 'crit' : active ? 'warn' : 'ok') + '">' +
+            '<div class="impact-side-head"><b>关联环节</b><span>' + (active ? '3' : '6') + '</span></div>' +
+            '<div class="impact-rows">' + sideRows.map(function (r) {
+              return '<div class="impact-row s-' + r.tone + '"><i></i><div><b>' + r.name + '</b><span>' + r.desc + '</span></div><em>' + r.meta + '</em></div>';
+            }).join('') + '</div>' +
+            '<div class="impact-side-foot"><span>责任专业组</span><b>通信组</b></div>' +
+          '</aside>' +
+        '</div>',
+        '<span class="head-tag">' + (active ? 'IMPACTED' : 'STANDBY') + '</span>'
+      ) +
+      '<div class="proto-bottom proto-b-bottom">' +
+        panel(6, '处置时间线', 'RESPONSE TIMELINE',
+          '<div class="vtimeline s-' + (st.id === 'overdue' ? 'crit' : st.id === 'handling' ? 'warn' : 'ok') + '">' +
+            timeline.map(function (t, i) {
+              const done = st.id === 'recovered' ? true : i < timelineDone - 1;
+              const current = st.id !== 'recovered' && i === timelineDone - 1;
+              return '<div class="vt-step' + (done ? ' done' : '') + (current ? ' active' : '') + '"><i></i><div><b>' + t.time + ' ' + t.title + '</b><span>' + t.desc + '</span></div><em>' + (done ? 'DONE' : current ? 'NOW' : 'WAIT') + '</em></div>';
+            }).join('') +
+            '<div class="vt-foot"><span>当前状态 <b>' + (st.id === 'daily' ? '监控中' : st.id === 'recovered' ? '已闭环' : '处置中') + '</b></span><span>升级规则 15 / 30min</span></div>' +
+          '</div>',
+          '<span class="head-tag">' + (st.id === 'daily' ? 'WATCH' : 'LIVE') + '</span>'
+        ) +
+        panel(7, '处置指标', 'RESPONSE METRICS',
+          '<div class="impact-metrics">' +
+            '<div class="impact-metric"><span>超期时长</span><b class="' + (active ? 'crit' : '') + '">' + (active ? (st.id === 'handling' ? '1h12' : '2h56') : '0') + '<em>h</em></b><small>' + (st.id === 'recovered' ? '已闭环' : '当前任务') + '</small></div>' +
+            '<div class="impact-metric"><span>关联任务</span><b>' + (active ? '3' : '0') + '<em>项</em></b><small>含上下游依赖</small></div>' +
+            '<div class="impact-metric"><span>影响变更</span><b class="' + (active ? 'warn' : '') + '">' + (active ? '2' : '0') + '<em>项</em></b><small>防火墙 / 割接</small></div>' +
+            '<div class="impact-metric"><span>处置进度</span><b>' + (st.id === 'daily' ? '0' : st.id === 'overdue' ? '15' : st.id === 'handling' ? '60' : '100') + '<em>%</em></b><small>' + (st.id === 'recovered' ? '已验证' : '推进中') + '</small></div>' +
+          '</div>',
+          '<span class="head-tag">' + (st.overdue + ' OVERDUE') + '</span>'
+        ) +
+      '</div>' +
+    '</div>';
+
+    center.innerHTML = body;
+    updateProgressUI();
+  }
+
+  /* ── C · 专业组数字孪生 ───────────────────── */
+  function groupTone(st, name) {
+    if (st.id !== 'overdue' && st.id !== 'handling') return 'ok';
+    return name === '通信组' ? (st.id === 'overdue' ? 'crit' : 'warn') : 'ok';
+  }
+
+  function renderC() {
+    const st = s();
+    const active = st.id === 'overdue' || st.id === 'handling';
+    const groups = [
+      { name: '应用组', en: 'APP', manager: '王主管', active: st.groups[0], members: 2, overdue: st.overdueGroups[0], tone: groupTone(st, '应用组') },
+      { name: '通信组', en: 'COMM', manager: '赵主管', active: st.groups[1], members: 2, overdue: st.overdueGroups[1], tone: groupTone(st, '通信组') },
+      { name: '在线组', en: 'ONLINE', manager: '李主管', active: st.groups[2], members: 2, overdue: st.overdueGroups[2], tone: groupTone(st, '在线组') },
+      { name: '基础设施组', en: 'INFRA', manager: '刘主管', active: st.groups[3], members: 2, overdue: st.overdueGroups[3], tone: groupTone(st, '基础设施组') }
+    ];
+
+    const layerHtml = groups.map(function (g, i) {
+      const chips = [
+        { name: '在办任务', value: g.active, meta: '项', tone: g.tone },
+        { name: '成员', value: g.members, meta: '人', tone: 'ok' },
+        { name: '超期', value: g.overdue, meta: '项', tone: g.overdue ? 'warn' : 'ok' }
+      ].map(function (c) {
+        return '<div class="twin-chip s-' + c.tone + '"><div class="tw-top"><i></i><b>' + c.name + '</b></div><div class="tw-meta"><span>' + g.manager + '</span><em>' + c.value + ' ' + c.meta + '</em></div><div class="tw-meter"><i style="width:' + (c.name === '在办任务' ? Math.round(c.value / 45 * 100) : c.name === '超期' ? (c.value ? 68 : 8) : 80) + '%"></i></div></div>';
+      }).join('');
+      return '<div class="twin-layer l' + (i + 1) + ' s-' + g.tone + '"><div class="twin-layer-label"><b>' + g.name + '</b><span>' + g.en + ' · ' + g.manager + '</span></div><div class="twin-items">' + chips + '</div></div>';
+    }).join('');
+
+    const loadRows = groups.map(function (g) {
+      return '<div class="capacity-row s-' + g.tone + '"><span>' + g.name + '</span><div class="capacity-bar"><i style="width:' + Math.round(g.active / 45 * 100) + '%"></i></div><b>' + g.active + '</b></div>';
+    }).join('');
+
+    const overdueRows = groups.map(function (g) {
+      return '<div class="twin-risk-row s-' + (g.overdue ? 'warn' : 'ok') + '"><i></i><b>' + g.name + '</b><em>' + g.overdue + ' 项</em></div>';
+    }).join('');
+
+    const body = '<div class="proto-view proto-c-layout exh-c">' +
+      panel(4, '专业组运行总览', 'GROUP TELEMETRY',
+        '<div class="twin-summary">' +
+          '<div class="twin-kpi"><span>专业组</span><b>4<em>个</em></b><small>4 个组 · 8 名成员</small></div>' +
+          '<div class="twin-kpi"><span>在办任务</span><b>' + st.active + '<em>件</em></b><small>合计 ' + st.groups.join(' + ') + '</small></div>' +
+          '<div class="twin-kpi"><span>超期任务</span><b class="' + (st.overdue ? 'crit' : '') + '">' + st.overdue + '<em>项</em></b><small>高风险 ' + st.highRisk + ' 项</small></div>' +
+          '<div class="twin-kpi"><span>SLA 达成率</span><b>' + st.sla + '<em>%</em></b><small>目标 95.0%</small></div>' +
+        '</div>',
+        demoControls()
+      ) +
+      panel(5, '专业组数字孪生', 'GROUP DIGITAL TWIN',
+        '<div class="twin-stage">' + layerHtml + '</div>',
+        '<span class="head-tag">' + st.active + ' ACTIVE</span>'
+      ) +
+      '<div class="proto-bottom proto-c-bottom">' +
+        panel(6, '专业组负荷', 'GROUP LOAD',
+          '<div class="twin-bottom-panel">' + loadRows + '<div class="capacity-foot"><span>平均负荷 ' + (st.active / 4).toFixed(1) + ' 项 / 组</span><b>通信组最高 33</b></div></div>',
+          '<span class="head-tag">4 GROUPS</span>'
+        ) +
+        panel(7, '超期分布', 'OVERDUE',
+          '<div class="twin-bottom-panel twin-risk">' + overdueRows + '<div class="capacity-foot"><span>超期合计</span><b>' + st.overdue + ' 项</b></div></div>',
+          '<span class="head-tag">' + st.overdue + ' OVERDUE</span>'
+        ) +
+        panel(8, '值班与授权', 'DUTY & AUTH',
+          '<div class="twin-bottom-panel twin-risk">' +
+            '<div class="twin-risk-row s-ok"><i></i><b>值班主管</b><em>王主管</em></div>' +
+            '<div class="twin-risk-row s-ok"><i></i><b>白班</b><em>李工 / 陈工</em></div>' +
+            '<div class="twin-risk-row s-ok"><i></i><b>夜班</b><em>赵工</em></div>' +
+            '<div class="twin-risk-row s-ok"><i></i><b>授权覆盖</b><em>6 / 8</em></div>' +
+            '<div class="capacity-foot"><span>今日交接 08:00</span><b>5 人在岗</b></div>' +
+          '</div>',
+          '<span class="head-tag">ON DUTY</span>'
+        ) +
+      '</div>' +
+    '</div>';
+
+    center.innerHTML = body;
+    updateProgressUI();
+  }
+
+
+
+
+  function render() {
+    if (variant === 'b') renderB();
+    else if (variant === 'c') renderC();
+    else renderA();
+  }
+
+  function updateProgressUI() {
+    const bar = center.querySelector('.demo-progress i');
+    if (bar) bar.style.width = (progress * 10) + '%';
+  }
+
+  function updateDemoUI() {
+    const mode = center.querySelector('.demo-mode');
+    if (mode) {
+      mode.innerHTML = '<i class="' + (playing ? '' : 'paused') + '"></i>' + (playing ? '自动演示' : '已暂停') + '<em>' + (playing ? '10s' : '手动') + '</em>';
+    }
+    const play = center.querySelector('[data-demo="play"]');
+    if (play) play.textContent = playing ? '暂停' : '播放';
+    Array.prototype.forEach.call(center.querySelectorAll('[data-demo-state]'), function (button) {
+      button.classList.toggle('active', Number(button.getAttribute('data-demo-state')) === stateIndex);
+    });
+    updateProgressUI();
+  }
+
+  function setState(index, manual) {
+    stateIndex = (index + STATES.length) % STATES.length;
+    progress = 0;
+    if (manual) playing = false;
+    render();
+  }
+
+  function togglePlay() {
+    playing = !playing;
+    if (playing && progress >= 10) progress = 0;
+    render();
+  }
+
+  function nextState(step, manual) {
+    setState(stateIndex + step, manual);
+  }
+
+  function setVariant(next) {
+    variant = next;
+    tabs.forEach(function (tab) {
+      tab.classList.toggle('active', tab.getAttribute('data-variant') === next);
+    });
+    history.replaceState(null, '', '#' + next);
+    render();
+  }
+
+  /* ── 事件绑定 ─────────────────────────────── */
+  center.addEventListener('click', function (e) {
+    const stateBtn = e.target.closest('[data-demo-state]');
+    if (stateBtn) {
+      setState(Number(stateBtn.getAttribute('data-demo-state')), true);
+      return;
+    }
+    const demoBtn = e.target.closest('[data-demo]');
+    if (!demoBtn) return;
+    const action = demoBtn.getAttribute('data-demo');
+    if (action === 'play') togglePlay();
+    if (action === 'prev') nextState(-1, true);
+    if (action === 'next') nextState(1, true);
+  });
+
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      setVariant(tab.getAttribute('data-variant'));
+    });
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === '1') setVariant('a');
+    if (e.key === '2') setVariant('b');
+    if (e.key === '3') setVariant('c');
+    if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+    if (e.key === 'ArrowLeft') nextState(-1, true);
+    if (e.key === 'ArrowRight') nextState(1, true);
+  });
+
+  window.addEventListener('resize', fitStage);
+  fitStage();
+
+  /* 自动轮播 */
+  timer = setInterval(function () {
+    if (!playing) return;
+    progress += 0.1;
+    if (progress >= 10) {
+      progress = 0;
+      stateIndex = (stateIndex + 1) % STATES.length;
+      render();
+    } else {
+      updateProgressUI();
+    }
+  }, 100);
+
+  /* 隐藏原始中间列，保留左右列与底图 */
+  function init() {
+    try {
+      const doc = frame.contentDocument;
+      const col = doc && doc.querySelector('.col-center');
+      if (col) col.style.visibility = 'hidden';
+      const initial = (location.hash || '').replace('#', '');
+      if (initial === 'b' || initial === 'c') setVariant(initial);
+      else render();
+    } catch (e) {
+      center.innerHTML = '<div class="proto-fallback"><b>无法读取驾驶舱底图</b><span>请通过本地静态服务打开，例如在项目根目录运行 <code>python -m http.server 4173</code>，再访问 <code>/prototypes/center-full-options.html</code>。</span></div>';
+    }
+  }
+
+  if (frame.contentDocument && frame.contentDocument.readyState === 'complete') {
+    setTimeout(init, 160);
+  } else {
+    frame.addEventListener('load', function () { setTimeout(init, 160); });
+  }
+})();
+</script>
+</body>
+</html>

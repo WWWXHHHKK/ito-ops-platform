@@ -19,20 +19,15 @@
   ];
 
   const PERMS = [
-    { key: 'dashboard', name: '运维驾驶舱', desc: '全局指标、趋势与实时动态', icon: 'dashboard' },
-    { key: 'task', name: '任务中心', desc: '任务创建、派发、审批与闭环', icon: 'task' },
+    { key: 'task', name: '任务中心', desc: '任务创建、派发、审批与闭环；员工层仅本人任务', icon: 'task' },
     { key: 'inspect', name: '巡检管理', desc: '计划、执行记录与异常整改', icon: 'clipboard' },
     { key: 'duty', name: '值班管理', desc: '排班、交接与升级路径', icon: 'calendar' },
     { key: 'maintain', name: '维保管理', desc: '厂商计划、记录与周期顺延', icon: 'wrench' },
-    { key: 'group', name: '专业组', desc: '组织成员、负荷与档案', icon: 'users' },
-    { key: 'auth', name: '作业授权', desc: '授权台账、续期与撤销', icon: 'shield' },
-    { key: 'message', name: '消息中心', desc: '审批、超期与值班通知', icon: 'message' },
-    { key: 'config', name: '平台配置', desc: '预警规则、角色权限与标签', icon: 'alert' }
+    { key: 'group', name: '组织架构', desc: '组织成员、负荷与档案', icon: 'users' },
+    { key: 'auth', name: '作业授权', desc: '授权台账；员工层仅本人只读', icon: 'shield' },
+    { key: 'message', name: '站内消息', desc: '审批、超期与值班通知', icon: 'message' },
+    { key: 'config', name: '配置中心', desc: '预警规则、角色权限与系统配置', icon: 'alert' }
   ];
-
-  function configTabs(active) {
-    return ITO.configTabs ? ITO.configTabs(active) : '';
-  }
 
   function permCount(role) {
     return PERMS.filter(function (p) { return S().permissions[role][p.key]; }).length;
@@ -53,7 +48,7 @@
       const rows = PERMS.map(function (p) {
         const cells = ROLES.map(function (r) {
           const on = !!st.permissions[r.key][p.key];
-          const locked = r.key === 'admin' || p.key === 'dashboard';
+          const locked = r.key === 'admin' || (r.key === 'leader' && p.key === 'config');
           return '<td><button class="check' + (on ? ' on' : '') + '" data-role="' + r.key + '" data-perm="' + p.key + '" type="button"' +
             (locked ? ' disabled title="系统保护项，不可修改"' : ' aria-pressed="' + on + '"') + '>' +
             U().icon('check') + '</button></td>';
@@ -62,17 +57,16 @@
       }).join('');
 
       return U().pageHead({
-        title: '平台配置',
+        title: '角色权限',
         sub: '角色权限矩阵 · 调整后立即影响对应角色的菜单与操作范围',
         actions:
           '<button class="btn btn-ghost" id="permResetBtn" type="button">' + U().icon('refresh') + '恢复默认</button>' +
           '<span class="badge green" style="height:32px">系统管理员列受保护</span>'
       }) +
-      configTabs('roles') +
       '<div class="role-summary-grid">' + roleCards + '</div>' +
 
       '<section class="card table-card">' +
-        '<div class="table-head"><div><h3>权限矩阵</h3><p class="table-note">勾选代表允许访问；驾驶舱与系统管理员列不可关闭</p></div>' +
+        '<div class="table-head"><div><h3>权限矩阵</h3><p class="table-note">勾选代表允许访问；系统管理员列与平台配置受保护</p></div>' +
           '<span class="table-note">共 ' + PERMS.length + ' 个模块</span></div>' +
         '<div class="table-wrap"><table class="data-table perm-table"><thead><tr><th>模块</th>' +
           ROLES.map(function (r) { return '<th>' + r.name + '</th>'; }).join('') +
@@ -80,8 +74,8 @@
       '</section>' +
 
       '<div class="duty-notes">' +
-        '<div class="card duty-note"><b>最小权限</b><span>员工层默认不可见巡检、维保与专业组，避免跨组数据暴露。</span></div>' +
-        '<div class="card duty-note"><b>职责分离</b><span>任务审批与平台配置分离；系统管理员不参与任务派发与审批。</span></div>' +
+        '<div class="card duty-note"><b>最小权限</b><span>员工层默认不可见巡检、维保与专业组，避免跨组数据暴露；个人统计仅可见本人数据。</span></div>' +
+        '<div class="card duty-note"><b>职责分离</b><span>任务审批与平台配置分离；系统管理员不参与任务派发与审批，也不展示个人统计。</span></div>' +
         '<div class="card duty-note"><b>变更留痕</b><span>每次权限调整记录操作人、角色与模块，可在操作日志中追溯。</span></div>' +
       '</div>';
     },
@@ -128,43 +122,279 @@
   /* ── achievement tags ────────────────────── */
   const TAG = {};
 
-  TAG.edit = function (name) {
+  const WALL_PALETTE = [
+    { solid: '#EB612A', soft: '#FFF0E8' },
+    { solid: '#1976E8', soft: '#EAF3FF' },
+    { solid: '#23A55A', soft: '#E9F8EF' },
+    { solid: '#E9A400', soft: '#FFF7DE' },
+    { solid: '#E5484D', soft: '#FFECEE' },
+    { solid: '#5B54D9', soft: '#EEEDFF' },
+    { solid: '#B43BD6', soft: '#FAEDFF' },
+    { solid: '#29B6D8', soft: '#E8FAFE' },
+    { solid: '#7CB305', soft: '#F3FBE4' },
+    { solid: '#F0C400', soft: '#FFFAE0' },
+    { solid: '#4F63E8', soft: '#EDF0FF' },
+    { solid: '#12A594', soft: '#E7FAF7' }
+  ];
+
+  function wallColor(name) {
+    let n = 0;
+    String(name || '').split('').forEach(function (ch) { n += ch.charCodeAt(0); });
+    return WALL_PALETTE[n % WALL_PALETTE.length];
+  }
+
+  function softOf(hex) {
+    const m = String(hex || '').replace('#', '').match(/^([0-9a-f]{6})$/i);
+    if (!m) return 'rgba(235, 97, 42, 0.12)';
+    const n = parseInt(m[1], 16);
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',0.13)';
+  }
+
+  function tagSolid(tag) {
+    return (tag && tag.color) || wallColor(tag && tag.name).solid;
+  }
+
+  function wallAbbr(name) {
+    const text = String(name || '');
+    if (/^DT/.test(text)) return 'DT';
+    if (/^[A-Za-z]/.test(text)) return text.slice(0, 2).toUpperCase();
+    return text.slice(0, 2);
+  }
+
+  function wallStars(count) {
+    const n = Math.max(1, Math.min(3, Number(count) || 1));
+    return '★'.repeat(n) + '<span class="wall-star-off">' + '★'.repeat(3 - n) + '</span>';
+  }
+
+  function findWallTag(name, type) {
+    return S().wallTags.find(function (t) {
+      return t.name === name && (!type || t.type === type);
+    });
+  }
+
+  function replaceTagInList(list, oldName, newName) {
+    if (!Array.isArray(list) || list.indexOf(oldName) === -1) return list;
+    const out = [];
+    list.forEach(function (name) {
+      const next = name === oldName ? newName : name;
+      if (out.indexOf(next) === -1) out.push(next);
+    });
+    return out;
+  }
+
+  function renameTagReferences(oldName, type, newName) {
     const st = S();
-    const tag = name ? st.achievements.find(function (a) { return a.name === name; }) : null;
+    const isTask = type === '任务标签';
+    if (isTask) {
+      (st.tasks || []).forEach(function (task) {
+        task.tags = replaceTagInList(task.tags, oldName, newName);
+        (task.subs || []).forEach(function (sub) {
+          sub.tags = replaceTagInList(sub.tags, oldName, newName);
+        });
+      });
+      if (Array.isArray(D.taskTags)) D.taskTags = replaceTagInList(D.taskTags, oldName, newName);
+      if (Array.isArray(D.taskTagMeta)) {
+        D.taskTagMeta.forEach(function (meta) {
+          if (meta.name === oldName) meta.name = newName;
+        });
+      }
+    }
+    (st.personAchievements || []).forEach(function (item) {
+      if (item.name === oldName && item.type === type) item.name = newName;
+    });
+  }
+
+  function removeTagReferences(name, type) {
+    const st = S();
+    const isTask = type === '任务标签';
+    if (isTask) {
+      (st.tasks || []).forEach(function (task) {
+        task.tags = (task.tags || []).filter(function (tag) { return tag !== name; });
+        (task.subs || []).forEach(function (sub) {
+          sub.tags = (sub.tags || []).filter(function (tag) { return tag !== name; });
+        });
+      });
+      if (Array.isArray(D.taskTags)) D.taskTags = D.taskTags.filter(function (tag) { return tag !== name; });
+      if (Array.isArray(D.taskTagMeta)) D.taskTagMeta = D.taskTagMeta.filter(function (meta) { return meta.name !== name; });
+    }
+    st.personAchievements = (st.personAchievements || []).filter(function (item) {
+      return !(item.name === name && item.type === type);
+    });
+  }
+
+  TAG.detail = function (tag) {
+    if (!tag) return;
+    const isPerson = tag.type === '人员标签';
+    const rows = [
+      ['标签名称', U().esc(tag.name)],
+      ['标签类型', U().esc(tag.type)],
+      ['解锁条件', U().esc(tag.unlock || (isPerson ? '完成对应标签任务并累计提升星级' : '完成对应任务'))],
+      ['创建', U().esc((tag.createdAt || '—') + ' · ' + (tag.createdBy || '—'))],
+      ['最近更新', U().esc((tag.updatedAt || '—') + ' · ' + (tag.updatedBy || '—'))]
+    ];
+    if (isPerson && tag.source === '授权') {
+      rows.push(['勋章规则', '取得授权即默认 3 星，不计取得次数']);
+      rows.push(['标签星级', '<span class="wall-stars">' + wallStars(3) + '</span>']);
+    } else if (isPerson) {
+      rows.push(['标签星级', '<span class="wall-stars">' + wallStars(3) + '</span>']);
+      rows.push(['升星规则', (tag.star2 || 5) + ' 次升 2 星 · ' + (tag.star3 || 10) + ' 次升 3 星']);
+    }
+    const canEdit = S().role !== 'employee';
+    U().detailModal({
+      title: '标签详情',
+      body: '<div class="tag-detail-list">' + rows.map(function (row) {
+        return '<div class="tag-detail-row"><span>' + row[0] + '</span><div>' + row[1] + '</div></div>';
+      }).join('') + '</div>' +
+        ((tag.audit || []).length ? '<div class="detail-section"><h4>操作记录</h4><div class="timeline">' +
+          tag.audit.slice().reverse().map(function (a) {
+            return '<div class="timeline-item"><b>' + U().esc(a.action) + ' · ' + U().esc(a.actor) + '</b><span>' + U().esc(a.time) + '</span></div>';
+          }).join('') + '</div></div>' : ''),
+      foot: (canEdit
+        ? '<button class="btn btn-soft" data-tag-edit type="button">编辑标签</button>' +
+          '<button class="btn btn-danger" data-tag-remove type="button">删除标签</button>'
+        : '') +
+        '<span class="spacer"></span><button class="btn btn-ghost" data-tag-close type="button">关闭</button>',
+      onMount: function (close, root) {
+        root.querySelector('[data-tag-close]').addEventListener('click', close);
+        const edit = root.querySelector('[data-tag-edit]');
+        if (edit) edit.addEventListener('click', function () { close(); TAG.edit(tag.name, tag.type); });
+        const remove = root.querySelector('[data-tag-remove]');
+        if (remove) remove.addEventListener('click', function () { close(); TAG.remove(tag.name, tag.type); });
+      }
+    });
+  };
+
+  TAG.edit = function (name, type) {
+    const st = S();
+    const tag = name ? findWallTag(name, type) : null;
     const editing = !!tag;
+    const currentType = tag ? tag.type : '';
+    const currentColor = tag ? tagSolid(tag) : '';
+    const swatches = WALL_PALETTE.map(function (c) {
+      const selected = !!currentColor && c.solid.toLowerCase() === currentColor.toLowerCase();
+      return '<button class="tag-color-swatch' + (selected ? ' selected' : '') + '" type="button" data-color="' + c.solid + '" style="background:' + c.solid + '" aria-label="选择颜色 ' + c.solid + '"></button>';
+    }).join('');
+    const star2 = tag && tag.star2 ? tag.star2 : '';
+    const star3 = tag && tag.star3 ? tag.star3 : '';
 
     U().modal({
-      title: editing ? '编辑成就标签' : '新增成就标签',
-      sub: editing ? tag.name : '标签用于任务归档与个人成就展示',
+      title: editing ? '编辑标签' : '新增标签',
+      sub: editing ? tag.name + ' · ' + tag.type : '任务标签与人员标签配置',
+      wide: true,
       body:
         '<div class="form-grid">' +
-          U().formRow({ label: '标签名称', required: true, control: '<input id="tgName" type="text" maxlength="8" value="' + U().esc(tag ? tag.name : '') + '" placeholder="例如：核心岗">' }) +
-          U().formRow({ label: '所属专业组', control: '<select id="tgGroup">' + U().groupOptions(tag ? tag.group : 'app') + '</select>' }) +
-          U().formRow({ label: '星级', control: '<select id="tgStars">' + U().statusOptions(['1', '2', '3'], tag ? String(tag.stars) : '1') + '</select>' }) +
-          U().formRow({ label: '累计次数', control: '<input id="tgCount" type="number" min="0" max="999" value="' + (tag ? tag.count : 1) + '">' }) +
-          U().formRow({ label: '标签说明', full: true, control: '<textarea id="tgDesc" placeholder="说明该标签代表的贡献场景">' + U().esc(tag ? tag.desc : '') + '</textarea>' }) +
+          U().formRow({ label: '标签名称', required: true, control: '<input id="tgName" type="text" maxlength="12" value="' + U().esc(tag ? tag.name : '') + '" placeholder="请输入标签名称">' }) +
+          U().formRow({ label: '标签类型', required: true, control: '<select id="tgType"' + (editing ? ' disabled' : '') + '><option value="">请选择标签类型</option>' + U().statusOptions(['任务标签', '人员标签'], currentType) + '</select>' }) +
+          U().formRow({ label: '标签颜色', required: true, full: true, control:
+            '<div class="tag-color-field">' +
+              '<input id="tgColor" type="hidden" value="' + U().esc(currentColor) + '">' +
+              '<div class="tag-color-grid">' + swatches + '</div>' +
+              '<label class="tag-color-custom">自定义<input id="tgColorPicker" type="color" value="' + U().esc(currentColor) + '"></label>' +
+            '</div>' }) +
+          U().formRow({ label: '解锁条件', required: true, full: true, control: '<input id="tgUnlock" type="text" maxlength="60" value="' + U().esc(tag ? (tag.unlock || '') : '') + '" placeholder="请输入解锁条件">' }) +
+          '<div class="star-rule-fields" id="tgStarRules"' + (currentType === '人员标签' ? '' : ' hidden') + '>' +
+            '<div class="form-field"><label>2 星门槛 <em>*</em></label><input id="tgStar2" type="number" min="2" max="999" value="' + star2 + '" placeholder="如 5"><span class="form-hint">完成多少次后升到 2 星</span></div>' +
+            '<div class="form-field"><label>3 星门槛 <em>*</em></label><input id="tgStar3" type="number" min="3" max="999" value="' + star3 + '" placeholder="如 10"><span class="form-hint">完成多少次后升到 3 星</span></div>' +
+          '</div>' +
+          U().formRow({ label: '标签说明', required: true, full: true, control: '<textarea id="tgDesc" placeholder="请输入标签说明">' + U().esc(tag ? tag.desc : '') + '</textarea>' }) +
         '</div>',
       foot: '<button class="btn btn-ghost" data-cancel type="button">取消</button><button class="btn btn-primary" data-save type="button">' + (editing ? '保存修改' : '创建标签') + '</button>',
       onMount: function (close, root) {
+        const typeSel = root.querySelector('#tgType');
+        const starRules = root.querySelector('#tgStarRules');
+        const colorValue = root.querySelector('#tgColor');
+        const picker = root.querySelector('#tgColorPicker');
+        function syncType() {
+          starRules.hidden = typeSel.value !== '人员标签';
+        }
+        function selectColor(value) {
+          if (!value) return;
+          colorValue.value = value;
+          picker.value = value;
+          U().clearFieldError(colorValue);
+          U().$$('.tag-color-swatch', root).forEach(function (btn) {
+            btn.classList.toggle('selected', btn.dataset.color.toLowerCase() === String(value).toLowerCase());
+          });
+        }
+        typeSel.addEventListener('change', function () { U().clearFieldError(typeSel); syncType(); });
+        syncType();
+        U().$$('.tag-color-swatch', root).forEach(function (btn) {
+          btn.addEventListener('click', function () { selectColor(btn.dataset.color); });
+        });
+        picker.addEventListener('input', function () { selectColor(picker.value); });
+        U().bindFieldClear(root);
         root.querySelector('[data-cancel]').addEventListener('click', close);
         root.querySelector('[data-save]').addEventListener('click', function () {
-          const nameVal = root.querySelector('#tgName').value.trim();
-          if (!nameVal) { U().toast('请填写标签名称', 'warn'); return; }
+          const nameEl = root.querySelector('#tgName');
+          const typeEl = root.querySelector('#tgType');
+          const unlockEl = root.querySelector('#tgUnlock');
+          const descEl = root.querySelector('#tgDesc');
+          const s2El = root.querySelector('#tgStar2');
+          const s3El = root.querySelector('#tgStar3');
+          const person = typeEl.value === '人员标签';
+          const valid = U().validateRequired([
+            [nameEl, '请输入标签名称'],
+            [typeEl, '请选择标签类型'],
+            [unlockEl, '请输入解锁条件'],
+            [descEl, '请输入标签说明']
+          ]);
+          if (!colorValue.value) {
+            U().showFieldError(colorValue, '请选择标签颜色');
+            return;
+          }
+          if (!valid) return;
+          const nameVal = nameEl.value.trim();
+          const typeVal = typeEl.value;
+          if (st.wallTags.some(function (item) { return item !== tag && item.type === typeVal && item.name === nameVal; })) {
+            U().showFieldError(nameEl, '同类型标签名称已存在');
+            return;
+          }
+          const s2 = person ? Math.max(2, Number(s2El.value) || 0) : 0;
+          const s3 = person ? Math.max(3, Number(s3El.value) || 0) : 0;
+          if (person && (!s2El.value || !s3El.value)) {
+            U().showFieldError(!s2El.value ? s2El : s3El, '请填写星级门槛');
+            return;
+          }
+          if (person && s3 <= s2) {
+            U().showFieldError(s3El, '3 星门槛必须大于 2 星门槛');
+            return;
+          }
+          const count = tag ? (tag.count || 0) : 0;
           const data = {
             name: nameVal,
-            group: root.querySelector('#tgGroup').value,
-            stars: Number(root.querySelector('#tgStars').value),
-            count: Math.max(0, Number(root.querySelector('#tgCount').value) || 0),
-            desc: root.querySelector('#tgDesc').value.trim() || '待补充标签说明'
+            type: typeVal,
+            color: colorValue.value,
+            unlock: unlockEl.value.trim(),
+            star2: person ? s2 : 0,
+            star3: person ? s3 : 0,
+            count: count,
+            stars: person ? U().starForCount(count, s2, s3) : 0,
+            firstClaimed: tag ? (tag.firstClaimed || '') : '',
+            desc: descEl.value.trim()
           };
           if (editing) {
-            Object.assign(tag, data);
-            ITO.log('编辑成就标签', tag.name, '配置');
-            U().toast('成就标签已更新');
+            const previousName = tag.name;
+            if (nameVal !== previousName) renameTagReferences(previousName, tag.type, nameVal);
+            Object.assign(tag, data, { updatedAt: D.meta.demoNow, updatedBy: st.user.name });
+            tag.audit = tag.audit || [];
+            tag.audit.push({ time: D.meta.demoNow, actor: st.user.name, action: '编辑标签' });
+            ITO.log('编辑标签', tag.name + ' · ' + tag.type, '配置');
+            U().toast('标签已更新');
           } else {
-            st.achievements.push(data);
-            ITO.log('新增成就标签', nameVal, '配置');
-            U().toast('成就标签已创建');
+            data.createdAt = D.meta.demoNow;
+            data.createdBy = st.user.name;
+            data.updatedAt = D.meta.demoNow;
+            data.updatedBy = st.user.name;
+            data.audit = [{ time: D.meta.demoNow, actor: st.user.name, action: '创建标签' }];
+            st.wallTags.unshift(data);
+            if (typeVal === '任务标签') {
+              if (Array.isArray(D.taskTags) && D.taskTags.indexOf(nameVal) === -1) D.taskTags.push(nameVal);
+              if (Array.isArray(D.taskTagMeta) && !D.taskTagMeta.some(function (meta) { return meta.name === nameVal; })) {
+                D.taskTagMeta.push({ name: nameVal, count: 0, firstClaimed: D.meta.today, desc: data.desc });
+              }
+            }
+            ITO.log('新增标签', nameVal + ' · ' + typeVal, '配置');
+            U().toast('标签已创建');
           }
           close();
           ITO.refresh();
@@ -173,75 +403,161 @@
     });
   };
 
-  TAG.remove = function (name) {
+  TAG.remove = function (name, type) {
     const st = S();
-    const tag = st.achievements.find(function (a) { return a.name === name; });
+    const tag = findWallTag(name, type);
     if (!tag) return;
     U().confirm({
-      title: '删除成就标签',
-      text: '确认删除「' + tag.name + '」？已归档任务上的展示会同步移除。',
+      title: '删除标签',
+      text: '确认删除「' + tag.name + '」？' +
+        (tag.type === '任务标签' ? '任务、子任务与人员成就上的引用会同步移除。' : '人员成就上的引用会同步移除。'),
       okText: '删除',
       danger: true
     }).then(function (ok) {
       if (!ok) return;
-      st.achievements = st.achievements.filter(function (a) { return a.name !== name; });
-      ITO.log('删除成就标签', tag.name, '配置');
+      removeTagReferences(name, type);
+      st.wallTags = st.wallTags.filter(function (t) { return !(t.name === name && t.type === type); });
+      ITO.log('删除标签', tag.name + ' · ' + tag.type, '配置');
       U().toast('标签已删除', 'warn');
       ITO.refresh();
     });
   };
 
+  TAG.personDetail = function (personName, tagName) {
+    const person = S().staff.find(function (p) { return p.name === personName; });
+    const rec = (S().personAchievements || []).find(function (a) {
+      return a.person === personName && a.name === tagName && a.type === '人员标签';
+    });
+    if (!person || !rec) return;
+    const group = ITO.getGroup(person.group) || {};
+    const canEdit = S().role !== 'employee';
+    const isAuth = rec.source === '授权';
+    U().detailModal({
+      title: personName + ' · ' + tagName,
+      sub: (group.name || '') + ' · ' + (person.title || ''),
+      body: '<div class="tag-detail-list">' +
+        '<div class="tag-detail-row"><span>人员</span><div>' + U().esc(personName) + '</div></div>' +
+        '<div class="tag-detail-row"><span>专业组</span><div>' + U().esc(group.name || '—') + '</div></div>' +
+        '<div class="tag-detail-row"><span>标签</span><div>' + U().esc(tagName) + '</div></div>' +
+        '<div class="tag-detail-row"><span>当前星级</span><div><span class="wall-stars">' + wallStars(isAuth ? 3 : (rec.stars || 1)) + '</span></div></div>' +
+        (isAuth ? '<div class="tag-detail-row"><span>勋章规则</span><div>取得授权即默认 3 星，不计取得次数</div></div>' : '<div class="tag-detail-row"><span>累计次数</span><div><b class="wall-count">' + (rec.count || 0) + '</b> 次</div></div>') +
+        '<div class="tag-detail-row"><span>' + (isAuth ? '授权取得' : '首次领取') + '</span><div>' + U().esc(rec.firstClaimed || '—') + '</div></div>' +
+        '<div class="tag-detail-row"><span>标签说明</span><div>' + U().esc(rec.desc || '—') + '</div></div>' +
+      '</div>',
+      foot: (canEdit ? '<button class="btn btn-soft" data-tag-edit type="button">编辑标签规则</button>' : '') +
+        '<span class="spacer"></span><button class="btn btn-ghost" data-tag-close type="button">关闭</button>',
+      onMount: function (close, root) {
+        root.querySelector('[data-tag-close]').addEventListener('click', close);
+        const edit = root.querySelector('[data-tag-edit]');
+        if (edit) edit.addEventListener('click', function () { close(); TAG.edit(tagName, '人员标签'); });
+      }
+    });
+  };
+
+  function personWallCard(person) {
+    const group = ITO.getGroup(person.group) || {};
+    const tags = (S().personAchievements || []).filter(function (a) {
+      return a.person === person.name && a.type === '人员标签';
+    });
+    const search = (person.name + ' ' + (group.name || '') + ' ' + tags.map(function (t) { return t.name; }).join(' ')).toLowerCase();
+    return '<article class="person-wall-card" data-search="' + U().esc(search) + '">' +
+      '<div class="pwc-head"><b>' + U().esc(person.name) + '</b><span>' + U().esc((group.name || '') + ' · ' + (person.title || '')) + '</span></div>' +
+      '<div class="pwc-tags">' +
+        (tags.length ? tags.map(function (t) {
+          const def = findWallTag(t.name, '人员标签');
+          const solid = def ? tagSolid(def) : wallColor(t.name).solid;
+          return '<button class="pwc-tag" type="button" data-person="' + U().esc(person.name) + '" data-tag="' + U().esc(t.name) + '">' +
+            '<i style="--c:' + solid + '"></i><b>' + U().esc(t.name) + '</b><em>' + wallStars(t.stars || 1) + '</em>' +
+          '</button>';
+        }).join('') : '<span class="pwc-empty">暂无人员标签</span>') +
+      '</div>' +
+    '</article>';
+  }
+
+  function personSection(people) {
+    return '<section class="wall-section wall-people" data-wall-section="人员标签" data-total="' + people.length + '" data-unit="人">' +
+      '<div class="wall-section-head"><h3>人员标签</h3><span>' + people.length + ' 人</span></div>' +
+      '<div class="person-wall-grid">' + people.map(personWallCard).join('') + '</div>' +
+    '</section>';
+  }
+
+  function wallCard(tag) {
+    const solid = tagSolid(tag);
+    const soft = softOf(solid);
+    const isPerson = tag.type === '人员标签';
+    return '<button class="wall-card" type="button" data-wall-name="' + U().esc(tag.name) + '" data-wall-type="' + U().esc(tag.type) + '" data-search="' + U().esc((tag.name + ' ' + tag.type + ' ' + (tag.desc || '')).toLowerCase()) + '">' +
+      '<span class="wall-icon" style="--tag-color:' + solid + ';--tag-soft:' + soft + '"><span>' + U().esc(wallAbbr(tag.name)) + '</span></span>' +
+      '<b>' + U().esc(tag.name) + '</b>' +
+      (isPerson ? '<span class="wall-card-stars">' + wallStars(3) + '</span>' : '') +
+      '<small>' + U().esc(tag.type) + '</small>' +
+    '</button>';
+  }
+
+  function wallSection(label, list) {
+    return '<section class="wall-section" data-wall-section="' + label + '" data-total="' + list.length + '" data-unit="个">' +
+      '<div class="wall-section-head"><h3>' + label + '</h3><span>' + list.length + ' 个</span></div>' +
+      '<div class="wall-grid">' + (list.length ? list.map(wallCard).join('') : U().emptyState('暂无标签', '点击右上角新增标签', 'award')) + '</div>' +
+    '</section>';
+  }
+
+  /* ── achievement wall ───────────────────── */
   P.tags = {
     render: function () {
+      if (window.ITO_ENSURE_AUTH_TAGS) window.ITO_ENSURE_AUTH_TAGS();
       const st = S();
-      const totalCount = st.achievements.reduce(function (n, a) { return n + a.count; }, 0);
-      const groups = new Set(st.achievements.map(function (a) { return a.group; })).size;
-
-      const cards = st.achievements.map(function (a) {
-        return '<article class="tag-card">' +
-          '<div class="tag-card-head"><div><b>' + U().esc(a.name) + '</b>' +
-            '<div class="stars">' + '★'.repeat(a.stars) + '<span class="star-off">' + '★'.repeat(3 - a.stars) + '</span></div></div>' +
-            U().groupPill(a.group) + '</div>' +
-          '<p>' + U().esc(a.desc) + '</p>' +
-          '<div class="tag-meta"><span>累计 <b>' + a.count + '</b> 次</span>' +
-            '<div class="row-actions">' +
-              '<button class="btn btn-ghost btn-sm" data-act="edit" data-name="' + U().esc(a.name) + '" type="button">编辑</button>' +
-              '<button class="btn btn-danger btn-sm" data-act="remove" data-name="' + U().esc(a.name) + '" type="button">删除</button>' +
-            '</div></div>' +
-        '</article>';
-      }).join('');
+      const personTags = st.wallTags.filter(function (t) { return t.type === '人员标签'; });
+      const taskTags = st.wallTags.filter(function (t) { return t.type === '任务标签'; });
+      const canEdit = st.role !== 'employee';
 
       return U().pageHead({
-        title: '平台配置',
-        sub: '成就标签用于沉淀专业能力与贡献场景 · 共 ' + st.achievements.length + ' 个标签',
-        actions: '<button class="btn btn-primary" id="tagNewBtn" type="button">' + U().icon('plus') + '新增标签</button>'
+        title: '属性勋章',
+        sub: '系统勋章字典 · 授权属性、人员标签与任务标签'
       }) +
-      configTabs('tags') +
-      '<div class="summary-grid">' +
-        '<div class="summary-chip"><span class="icon">' + U().icon('award') + '</span><div><b>' + st.achievements.length + '</b><span>标签总数</span></div></div>' +
-        '<div class="summary-chip"><span class="icon green">' + U().icon('chart') + '</span><div><b>' + totalCount + '</b><span>累计发放</span></div></div>' +
-        '<div class="summary-chip"><span class="icon blue">' + U().icon('users') + '</span><div><b>' + groups + '</b><span>覆盖专业组</span></div></div>' +
-        '<div class="summary-chip"><span class="icon yellow">' + U().icon('award') + '</span><div><b>' + st.achievements.filter(function (a) { return a.stars === 3; }).length + '</b><span>三星标签</span></div></div>' +
+      '<div class="wall-toolbar">' +
+        '<label class="search-field wall-search">' + U().icon('search') + '<input id="wallSearch" type="search" placeholder="搜索标签名称 / 类型..."></label>' +
+        '<span class="wall-total">' + personTags.length + ' 个人标签 · ' + taskTags.length + ' 个任务标签</span>' +
+        (canEdit ? '<button class="btn btn-primary" id="wallNewBtn" type="button">' + U().icon('plus') + '新增标签</button>' : '') +
       '</div>' +
-
-      '<div class="tag-grid">' + cards + '</div>' +
-
-      '<div class="duty-notes">' +
-        '<div class="card duty-note"><b>标签获取</b><span>任务验收通过后，由主管在归档时为参与人员发放对应能力标签。</span></div>' +
-        '<div class="card duty-note"><b>星级规则</b><span>一星为参与、二星为主导、三星为独立负责并形成可复用方案。</span></div>' +
-        '<div class="card duty-note"><b>展示范围</b><span>标签在个人任务页与专业组档案中展示，不纳入绩效强制排名。</span></div>' +
+      '<div class="wall-columns">' +
+        wallSection('人员标签', personTags) +
+        wallSection('任务标签', taskTags) +
       '</div>';
     },
 
     after: function () {
-      U().$$('[data-act]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          if (btn.dataset.act === 'edit') TAG.edit(btn.dataset.name);
-          if (btn.dataset.act === 'remove') TAG.remove(btn.dataset.name);
+      const search = document.getElementById('wallSearch');
+      if (search) {
+        search.addEventListener('input', function () {
+          const q = search.value.trim().toLowerCase();
+          U().$$('.wall-section').forEach(function (section) {
+            let visible = 0;
+            U().$$('.wall-card, .person-wall-card', section).forEach(function (card) {
+              const hit = !q || card.dataset.search.indexOf(q) > -1;
+              card.hidden = !hit;
+              if (hit) visible += 1;
+            });
+            section.hidden = visible === 0;
+            const unit = section.dataset.unit || '个';
+            const count = section.querySelector('.wall-section-head span');
+            if (count) count.textContent = q ? visible + ' / ' + section.dataset.total + ' ' + unit : section.dataset.total + ' ' + unit;
+          });
+        });
+      }
+
+      U().$$('.wall-card').forEach(function (card) {
+        card.addEventListener('click', function () {
+          TAG.detail(findWallTag(card.dataset.wallName, card.dataset.wallType));
         });
       });
-      const add = document.getElementById('tagNewBtn');
-      if (add) add.addEventListener('click', function () { TAG.edit(null); });
+
+      U().$$('.pwc-tag').forEach(function (chip) {
+        chip.addEventListener('click', function () {
+          TAG.personDetail(chip.dataset.person, chip.dataset.tag);
+        });
+      });
+
+      const add = document.getElementById('wallNewBtn');
+      if (add) add.addEventListener('click', function () { TAG.edit(null, null); });
     }
   };
 
@@ -253,7 +569,7 @@
   P.logs = {
     render: function () {
       const st = S();
-      const today = st.logs.filter(function (l) { return l.time.indexOf('2026-11-01') === 0; }).length;
+      const today = st.logs.filter(function (l) { return l.time.indexOf(D.meta.today) === 0; }).length;
       const system = st.logs.filter(function (l) { return l.actor === '系统'; }).length;
       const actors = new Set(st.logs.map(function (l) { return l.actor; })).size;
       const types = Array.from(new Set(st.logs.map(function (l) { return l.type; })));
@@ -261,8 +577,7 @@
       const rows = st.logs.map(function (l) {
         return '<tr data-type="' + U().esc(l.type) + '" data-search="' + U().esc((l.actor + ' ' + l.action + ' ' + l.target + ' ' + l.type).toLowerCase()) + '">' +
           '<td class="num muted" style="white-space:nowrap">' + l.time + '</td>' +
-          '<td><div class="person-cell">' + (l.actor === '系统' ? '<span class="avatar avatar-sm" style="background:#6E6E73">系</span>' : U().avatar(l.actor, true)) +
-            '<div><b>' + U().esc(l.actor) + '</b></div></div></td>' +
+          '<td><div class="person-cell"><div><b>' + U().esc(l.actor) + '</b></div></div></td>' +
           '<td><b class="strong">' + U().esc(l.action) + '</b></td>' +
           '<td class="muted">' + U().esc(l.target) + '</td>' +
           '<td>' + U().badge(l.type, logTone(l.type)) + '</td>' +
@@ -327,7 +642,7 @@
       exp.addEventListener('click', function () {
         const rows = [['时间', '操作人', '操作', '对象', '类型']];
         st.logs.forEach(function (l) { rows.push([l.time, l.actor, l.action, l.target, l.type]); });
-        U().download('ITO操作日志.csv', U().csv(rows));
+        U().exportPreview({ title: '操作日志导出预览', rows: rows, filename: 'ITO操作日志.csv' });
         ITO.log('导出操作日志', st.logs.length + ' 条', '系统');
         U().toast('操作日志已导出');
       });
