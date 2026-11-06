@@ -24,17 +24,16 @@
   }
 
   function effective(a) {
-    return a.status !== '已撤销' && daysLeft(a.validTo) >= 0;
+    return a.status !== '已撤销' && ITO.authStatus(a.validTo).status !== '已过期';
   }
 
   function expiring(a) {
-    const left = daysLeft(a.validTo);
-    return a.status !== '已撤销' && left >= 0 && left <= 30;
+    return a.status !== '已撤销' && ITO.authStatus(a.validTo).status === '临期';
   }
 
   function statusOf(a) {
     if (a.status === '已撤销') return '已撤销';
-    return daysLeft(a.validTo) < 0 ? '已过期' : '有效';
+    return ITO.authStatus(a.validTo).status;
   }
 
   function typeBadge(t) {
@@ -147,7 +146,6 @@
           a.renewals = a.renewals || [];
           a.renewals.push({ at: D.meta.today, from: old, to: val });
           a.validTo = val;
-          a.status = '有效';
           a.updatedAt = D.meta.demoNow;
           a.updatedBy = st.user.name;
           a.audit = a.audit || [];
@@ -187,7 +185,7 @@
     const st = S();
     const a = st.auths.find(function (x) { return x.id === id; });
     if (!a) return;
-    a.status = daysLeft(a.validTo) < 0 ? '已过期' : '有效';
+    a.status = '';
     a.updatedAt = D.meta.demoNow;
     a.updatedBy = st.user.name;
     a.audit = a.audit || [];
@@ -328,7 +326,7 @@
           '<td class="num" style="white-space:nowrap">' + a.validTo +
             ((a.renewals && a.renewals.length) ? '<small class="table-note" style="display:block">已续期 ' + a.renewals.length + ' 次</small>' : '') + '</td>' +
           '<td><div class="status-inline">' + U().badge(status) +
-            (status === '有效' && left <= 30 ? '<span class="text-yellow">' + left + ' 天后到期</span>' : '') + '</div>' +
+            (status === '临期' ? '<span class="text-yellow">剩余 ' + left + ' 天</span>' : '') + '</div>' +
             (a.updatedAt ? '<small class="table-note" style="display:block">' + U().esc(a.updatedAt + ' · ' + (a.updatedBy || '—')) + '</small>' : '') + '</td>' +
           '<td><div class="row-actions">' +
             '<button class="btn btn-ghost btn-sm" data-act="view" data-id="' + a.id + '" type="button">记录</button>' +
@@ -350,7 +348,7 @@
       }) +
       '<div class="summary-grid">' +
         '<div class="summary-chip"><span class="icon green">' + U().icon('check') + '</span><div><b>' + valid + '</b><span>有效授权</span></div></div>' +
-        '<div class="summary-chip"><span class="icon">' + U().icon('clock') + '</span><div><b>' + soon + '</b><span>30 天内到期</span></div></div>' +
+        '<div class="summary-chip"><span class="icon">' + U().icon('clock') + '</span><div><b>' + soon + '</b><span>60 天内到期</span></div></div>' +
         '<div class="summary-chip"><span class="icon red">' + U().icon('alert') + '</span><div><b>' + expired + '</b><span>已过期</span></div></div>' +
         '<div class="summary-chip"><span class="icon blue">' + U().icon('shield') + '</span><div><b>' + scopedAuths.length + '</b><span>授权总数</span></div></div>' +
       '</div>' +

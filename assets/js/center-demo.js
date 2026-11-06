@@ -62,7 +62,7 @@
   ];
   const authCover = AUTH_TYPES.map(item => {
     const list = D.auths.filter(a => a.type === item.type);
-    const ok = list.filter(a => a.status !== '已撤销' && parse(a.validTo) >= todayDate).length;
+    const ok = list.filter(a => a.status !== '已撤销' && ITO.authStatus(a.validTo).status !== '已过期').length;
     return { type: item.label, ok: ok, total: list.length };
   });
   const authOk = authCover.reduce((n, x) => n + x.ok, 0);

@@ -303,7 +303,7 @@
                 return '<div class="achievement-card"><div class="tag-name">' + U().esc(a.name) + '<span class="tag-kind">' + U().esc(a.type) + '</span></div>' +
                   (isPerson ? '<div class="stars">' + '★'.repeat(a.source === '授权' ? 3 : a.stars) + '<span class="star-off">' + '★'.repeat(3 - (a.source === '授权' ? 3 : a.stars)) + '</span></div>' : '') +
                   (a.source === '授权' ? '<div class="tag-count">授权属性勋章 · 默认 3 星</div>' : '<div class="tag-count">累计 ' + a.count + ' 次</div>') +
-                  (isPerson && a.firstClaimed ? '<div class="tag-first">' + (a.source === '授权' ? '授权取得 ' : '首次领取 ') + U().esc(a.firstClaimed) + '</div>' : '') +
+                  (isPerson && a.source !== '授权' && a.firstClaimed ? '<div class="tag-first">首次领取 ' + U().esc(a.firstClaimed) + '</div>' : '') +
                   '<div class="tag-desc">' + U().esc(a.desc) + '</div></div>';
               }).join('') : '<div class="mini-empty">暂无属性勋章</div>') +
             '</div>' +

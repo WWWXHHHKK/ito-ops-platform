@@ -73,7 +73,7 @@
   function activeAuthsOf(name) {
     return S().auths.filter(function (a) {
       if (a.person !== name || a.status === '已撤销') return false;
-      return a.validTo >= D.meta.today;
+      return ITO.authStatus(a.validTo).status !== '已过期';
     });
   }
   function remainText(target) {

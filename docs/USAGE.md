@@ -15,7 +15,7 @@
 | `index.html` | 可运行的深色驾驶舱页面 | 浏览器 / 开发者 |
 | `admin.html` | 可运行的浅色管理后台 | 浏览器 / 开发者 |
 | `assets/` | 两端的样式与交互逻辑 | 开发者 / agent |
-| `vendor/echarts.min.js` | 本地图表库，离线可用 | 开发者 |
+| `vendor/` | 本地依赖库：echarts、xlsx、jszip、docx/pptx 预览，离线可用 | 开发者 |
 | `preview.png` | 1920×1080 大屏视觉基准 | 所有人，尤其是设计/agent |
 | `admin-preview.png` | 管理后台视觉基准 | 所有人，尤其是设计/agent |
 | `AGENTS.md` | 项目级规则，agent 进入项目先读 | 其他 agent |
@@ -33,6 +33,9 @@
 - 后台演示可直接指定身份：`admin.html?role=leader`（领导层）、`manager`（主管层）、`employee`（员工层）、`admin`（系统管理员）。
 - 想强制回到身份选择页，用 `admin.html?login=1`；登录后也可点左下角「切换身份」。
 - 截图时加 `&still=1` 关闭入场与过渡动效。
+- 固定演示日期回归：加 `?demo=YYYY-MM-DD`（大屏后台通用）；任务等数据整体平移到该日，授权有效期锚定真实日历不平移，便于把演示日拨到未来测试授权到期。
+- 本地访问（localhost / 127.0.0.1 / ::1）右下角有 DEV 切换器，可直切五个身份并重置演示数据；`?dev=1` 可在其他环境强制显示。
+- 后台业务操作（新建任务、审批、交接记录、勋章累计等）保存在当前页面会话内存中，刷新后回到初始快照。
 
 ---
 
@@ -149,14 +152,19 @@ http://127.0.0.1:4173/?still=1
 
 | 要改的内容 | 位置 |
 | --- | --- |
+| 两端共享业务数据（任务、人员、授权、巡检、维保、值班、消息、规则、日志） | `assets/js/ito-data.js`（唯一演示数据源） |
 | 品牌名、顶栏文案 | `index.html` 顶栏 `.tp-box`、`.topbar-meta` |
 | 服务名、团队名、拓扑节点 | `index.html` 中 `.topo-nodes` 里的 `<g class="node">` |
 | 工单趋势数据 | `assets/js/app.js` 的 `TREND` |
 | 实时事件种子与事件池 | `assets/js/app.js` 的 `events`、`eventPool` |
 | 资源负载基值 | `assets/js/app.js` 的 `RES_BASE` |
+| 大屏左右列面板内容 | `assets/js/platform-panels.js` |
+| 大屏中心列任务流量沙盘 | `assets/js/center-demo.js` |
+| 后台页面交互与业务规则 | `assets/js/admin-pages-*.js` |
 | 任务类型、超期时长、值班人员 | `index.html` 对应面板的静态结构 |
-| 配色、字体、斜切角、间距 | `assets/css/style.css` 的 `:root` 和对应组件 |
+| 配色、字体、斜切角、间距 | `assets/css/style.css`（大屏）/ `assets/css/admin.css`（后台） |
 | 模块数量、栅格布局 | `assets/css/style.css` 的 `.grid`、`.col-*` |
+| 指标口径与公式 | `docs/METRICS.md` / `docs/metrics.csv`；标签口径见 `docs/TAGS.md` / `docs/tags.csv` |
 
 ### 4.2 改数据时守住三条
 

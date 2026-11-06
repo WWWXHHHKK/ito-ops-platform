@@ -88,7 +88,7 @@
       '<div class="personal-tag-top"><b>' + U().esc(tag.name) + '</b>' +
         '<span class="tag-kind">' + U().esc(tag.type) + '</span></div>' +
       (isPerson ? stars(tag.source === '授权' ? 3 : tag.stars) : '<span class="task-tag-count">完成 ' + tag.count + ' 次</span>') +
-      (isPerson ? '<span class="personal-tag-first">' + (tag.source === '授权' ? '授权取得 ' : '首次领取 ') + U().esc(tag.firstClaimed || '—') + '</span>' : '') +
+      (isPerson && tag.source !== '授权' ? '<span class="personal-tag-first">首次领取 ' + U().esc(tag.firstClaimed || '—') + '</span>' : '') +
       '<p>' + U().esc(tag.desc || '') + '</p>' +
     '</article>';
   }
@@ -286,7 +286,7 @@
     const tags = (personName ? (st.personAchievements || []).filter(function (a) {
       return a.person === personName && a.type === '人员标签';
     }) : []).map(function (a) {
-      return '<span class="tag"><b>' + E(a.name) + '</b>' + '★'.repeat(Math.max(1, Math.min(3, a.stars || 1))) + '<em>首次 ' + E(a.firstClaimed || '—') + '</em></span>';
+      return '<span class="tag"><b>' + E(a.name) + '</b>' + '★'.repeat(Math.max(1, Math.min(3, a.source === '授权' ? 3 : (a.stars || 1)))) + (a.source === '授权' ? '' : '<em>首次 ' + E(a.firstClaimed || '—') + '</em>') + '</span>';
     }).join('');
     const tableRows = m.items.map(function (x) {
       return '<tr><td>' + E(x.sub.name) + '</td><td>' + E(x.sub.id) + '</td><td>' + E(x.sub.owner) + '</td><td>' + E(x.sub.type || x.task.type) +

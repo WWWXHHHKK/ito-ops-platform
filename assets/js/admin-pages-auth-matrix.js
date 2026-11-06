@@ -122,10 +122,21 @@
         if (!exists) {
           st.personAchievements.push({
             person: row.person.name, name: item.type, type: '人员标签', stars: 3, count: 1, source: '授权',
-            firstClaimed: D.meta.today, desc: '取得' + item.type + '后自动关联'
+            firstClaimed: '', desc: '取得' + item.type + '后自动关联'
           });
         }
       });
+    });
+    const validAuthKeys = {};
+    rows.forEach(function (row) {
+      row.cells.forEach(function (item) {
+        if (item.cell.kind !== 'actual' || item.cell.status === '已过期') return;
+        validAuthKeys[row.person.name + '|' + item.type] = true;
+      });
+    });
+    st.personAchievements = (st.personAchievements || []).filter(function (tag) {
+      if (tag.type !== '人员标签' || COLUMNS.indexOf(tag.name) === -1) return true;
+      return !!validAuthKeys[tag.person + '|' + tag.name];
     });
     (st.wallTags || []).forEach(function (tag) {
       if (tag.type === '人员标签' && COLUMNS.indexOf(tag.name) > -1) {
@@ -138,6 +149,7 @@
         tag.stars = 3;
         tag.source = '授权';
         tag.count = tag.count || 1;
+        tag.firstClaimed = '';
       }
     });
   }

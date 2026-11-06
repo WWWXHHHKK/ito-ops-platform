@@ -441,7 +441,7 @@
         '<div class="tag-detail-row"><span>标签</span><div>' + U().esc(tagName) + '</div></div>' +
         '<div class="tag-detail-row"><span>当前星级</span><div><span class="wall-stars">' + wallStars(isAuth ? 3 : (rec.stars || 1)) + '</span></div></div>' +
         (isAuth ? '<div class="tag-detail-row"><span>勋章规则</span><div>取得授权即默认 3 星，不计取得次数</div></div>' : '<div class="tag-detail-row"><span>累计次数</span><div><b class="wall-count">' + (rec.count || 0) + '</b> 次</div></div>') +
-        '<div class="tag-detail-row"><span>' + (isAuth ? '授权取得' : '首次领取') + '</span><div>' + U().esc(rec.firstClaimed || '—') + '</div></div>' +
+        (isAuth ? '' : '<div class="tag-detail-row"><span>首次领取</span><div>' + U().esc(rec.firstClaimed || '—') + '</div></div>') +
         '<div class="tag-detail-row"><span>标签说明</span><div>' + U().esc(rec.desc || '—') + '</div></div>' +
       '</div>',
       foot: (canEdit ? '<button class="btn btn-soft" data-tag-edit type="button">编辑标签规则</button>' : '') +
