@@ -227,8 +227,7 @@
           '<td class="duty-open"><b>' + open + '</b> 项</td>' +
           '<td>' + U().badge(status.label, status.tone) + '</td>' +
           '<td><div class="row-actions">' +
-            '<button class="btn btn-ghost btn-sm" data-duty-detail="' + w.key + '" type="button">详情</button>' +
-            (canEdit && !isPast ? '<button class="btn btn-soft btn-sm" data-duty-edit="' + w.key + '" type="button">调整</button>' : '') +
+            (canEdit && !isPast ? '<button class="btn btn-soft btn-sm" data-duty-edit="' + w.key + '" type="button">调整</button>' : '<span class="muted">—</span>') +
           '</div></td></tr>';
       }).join('');
 

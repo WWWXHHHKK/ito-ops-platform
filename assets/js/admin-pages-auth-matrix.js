@@ -246,7 +246,7 @@
             '<div class="summary-chip"><span class="icon blue">' + U().icon('award') + '</span><div><b>' + employeeCan + ' 项</b><span>可拿未拿</span></div></div>' +
             '<div class="summary-chip"><span class="icon red">' + U().icon('clock') + '</span><div><b>' + expiring + ' 项</b><span>60 天内到期</span></div></div>' +
           '</div>'
-        : '<div class="summary-grid auth-summary">' +
+        : '<div class="summary-grid auth-summary auth-summary-6">' +
             '<div class="summary-chip"><span class="icon">' + U().icon('users') + '</span><div><b>50</b><span>满编</span></div></div>' +
             '<div class="summary-chip"><span class="icon">' + U().icon('users') + '</span><div><b>' + total + '</b><span>当前在册</span></div></div>' +
             '<div class="summary-chip"><span class="icon blue">' + U().icon('shield') + '</span><div><b>' + total + '</b><span>计划持证</span></div></div>' +

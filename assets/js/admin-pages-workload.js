@@ -168,70 +168,119 @@
     });
   };
 
+  function regularFiltered(st) {
+    const groupFilter = st.ui.regularGroup || '';
+    const sourceFilter = st.ui.regularSource || '';
+    const isRegularSource = function (task) { return ['巡检计划', '维保计划'].indexOf(task.source) > -1; };
+    const rows = (st.planTasks || []).filter(function (task) {
+      return isRegularSource(task) && (!groupFilter || task.group === groupFilter) && (!sourceFilter || task.source === sourceFilter);
+    });
+    const dutyRows = dutyHandovers().filter(function (h) {
+      return (!sourceFilter || sourceFilter === '值班') && (!groupFilter || h.group === groupFilter);
+    });
+    return { rows: rows, dutyRows: dutyRows };
+  }
+
+  function regularTaskRow(task) {
+    return '<tr data-plan-task="' + U().esc(task.id) + '" style="cursor:pointer">' +
+      '<td><div class="cell-task"><b>' + U().esc(task.name) + '</b><small>' + U().esc(task.planId + ' · ' + task.source) + '</small></div></td>' +
+      '<td>' + U().groupPill(task.group) + '</td>' +
+      '<td>' + U().esc(task.executor || '—') + '</td>' +
+      '<td class="num">' + (task.hours || 0) + ' h</td>' +
+      '<td class="num" style="white-space:nowrap">' + U().shortDate(task.due) + '</td>' +
+      '<td>' + U().badge(task.status) + '</td>' +
+      '<td style="text-align:right"><a class="btn btn-ghost btn-sm" href="#/' + (task.planType === 'inspection' ? 'inspection' : 'maintenance') + '">查看来源</a></td>' +
+    '</tr>';
+  }
+
+  function regularDutyRow(h) {
+    return '<tr><td><details><summary>值班排班 · 第 ' + h.week.weekNo + ' 周</summary>' + handoverDetails(h) +
+      '</details></td><td>' + (h.group ? U().groupPill(h.group) : '—') + '</td><td>' + U().esc(h.person) +
+      '</td><td>—</td><td>' + U().esc(h.due) + '</td><td>' + U().badge(h.status) +
+      '</td><td style="text-align:right"><a class="btn btn-ghost btn-sm" href="#/duty">查看排班</a></td></tr>';
+  }
+
+  const REGULAR_PAGE_SIZE = 10;
+
   P.regular = {
-    render: function () {
+    render: function (embedded) {
       const st = S();
       st.ui = st.ui || {};
       const groupFilter = st.ui.regularGroup || '';
       const sourceFilter = st.ui.regularSource || '';
-      const isRegularSource = function (task) { return ['巡检计划', '维保计划'].indexOf(task.source) > -1; };
-      const rows = (st.planTasks || []).filter(function (task) {
-        return isRegularSource(task) && (!groupFilter || task.group === groupFilter) && (!sourceFilter || task.source === sourceFilter);
-      });
-      const dutyRows = dutyHandovers().filter(function (h) {
-        return (!sourceFilter || sourceFilter === '值班') && (!groupFilter || h.group === groupFilter);
-      });
+      const filtered = regularFiltered(st);
+      const rows = filtered.rows;
+      const dutyRows = filtered.dutyRows;
       const sourceOptions = ['巡检计划', '维保计划', '值班'].map(function (x) {
         return '<option value="' + x + '"' + (sourceFilter === x ? ' selected' : '') + '>' + x + '</option>';
       }).join('');
-      const body = rows.map(function (task) {
-        return '<tr data-plan-task="' + U().esc(task.id) + '" style="cursor:pointer">' +
-          '<td><div class="cell-task"><b>' + U().esc(task.name) + '</b><small>' + U().esc(task.planId + ' · ' + task.source) + '</small></div></td>' +
-          '<td>' + U().groupPill(task.group) + '</td>' +
-          '<td>' + U().esc(task.executor || '—') + '</td>' +
-          '<td class="num">' + (task.hours || 0) + ' h</td>' +
-          '<td class="num" style="white-space:nowrap">' + U().shortDate(task.due) + '</td>' +
-          '<td>' + U().badge(task.status) + '</td>' +
-          '<td style="text-align:right"><a class="btn btn-ghost btn-sm" href="#/' + (task.planType === 'inspection' ? 'inspection' : 'maintenance') + '">查看来源</a></td>' +
-        '</tr>';
-      }).join('') + dutyRows.map(function (h) {
-        return '<tr><td><details><summary>值班排班 · 第 ' + h.week.weekNo + ' 周</summary>' + handoverDetails(h) +
-          '</details></td><td>' + (h.group ? U().groupPill(h.group) : '—') + '</td><td>' + U().esc(h.person) +
-          '</td><td>—</td><td>' + U().esc(h.due) + '</td><td>' + U().badge(h.status) +
-          '</td><td style="text-align:right"><a class="btn btn-ghost btn-sm" href="#/duty">查看排班</a></td></tr>';
-      }).join('');
+      const all = rows.map(regularTaskRow).concat(dutyRows.map(regularDutyRow));
+      const pages = Math.max(1, Math.ceil(all.length / REGULAR_PAGE_SIZE));
+      const page = Math.min(Math.max(1, st.ui.regularPage || 1), pages);
+      st.ui.regularPage = page;
+      const body = all.slice((page - 1) * REGULAR_PAGE_SIZE, page * REGULAR_PAGE_SIZE).join('');
+      const doneCount = rows.filter(function (t) { return t.status === '已完成'; }).length + dutyRows.filter(function (h) { return h.status === '已完成'; }).length;
+      const table =
+        '<section class="card table-card" id="regularCard">' +
+          '<div class="table-head"><div><h3>常规任务</h3><p class="table-note">巡检 / 维保计划与值班排班 · 共 ' + all.length + ' 项 · 已完成 ' + doneCount + '</p></div>' +
+            '<button class="btn btn-ghost btn-sm" id="regularExportBtn" type="button">' + U().icon('download') + '导出常规任务</button></div>' +
+          '<div class="toolbar" style="margin:0 20px 12px"><div class="filters">' +
+            '<select class="select" id="regularGroup"><option value="">全部专业组</option>' + U().groupOptions(groupFilter) + '</select>' +
+            '<select class="select" id="regularSource"><option value="">全部来源</option>' + sourceOptions + '</select>' +
+          '</div></div>' +
+          '<div class="table-wrap"><table class="data-table"><thead><tr><th>任务</th><th>专业组</th><th>执行人</th><th>标准工时</th><th>截止时间</th><th>状态</th><th style="text-align:right">操作</th></tr></thead>' +
+            '<tbody id="regularTbody">' + (body || '<tr><td colspan="7">' + U().emptyState('暂无常规任务', '启用巡检 / 维保计划后会自动生成', 'clipboard') + '</td></tr>') + '</tbody></table></div>' +
+          (all.length ? '<div id="regularLedgerPager">' + ITO.pager('regularLedger', all.length, page, REGULAR_PAGE_SIZE) + '</div>' : '') +
+        '</section>';
 
-      return '<section id="regular-ledger" style="margin-top:16px">' + U().pageHead({
+      if (embedded) return table;
+
+      return '<section id="regular-ledger">' + U().pageHead({
         title: '常规任务',
         sub: '巡检、维保及值班排班与交接记录',
         actions: '<button class="btn btn-ghost" id="regularExportBtn" type="button">' + U().icon('download') + '导出常规任务</button>'
       }) +
       summary([
-        { icon: 'clipboard', value: rows.length + dutyRows.length, label: '常规任务' },
-        { icon: 'check', value: rows.filter(function (t) { return t.status === '已完成'; }).length + dutyRows.filter(function (h) { return h.status === '已完成'; }).length, label: '已完成', tone: 'green' },
-        { icon: 'clock', value: rows.filter(function (t) { return t.status !== '已完成'; }).length + dutyRows.filter(function (h) { return h.status !== '已完成'; }).length, label: '待处理', tone: 'yellow' }
+        { icon: 'clipboard', value: all.length, label: '常规任务' },
+        { icon: 'check', value: doneCount, label: '已完成', tone: 'green' },
+        { icon: 'clock', value: all.length - doneCount, label: '待处理', tone: 'yellow' }
       ]) +
-      '<div class="toolbar" style="margin-bottom:12px"><div class="filters">' +
-        '<select class="select" id="regularGroup"><option value="">全部专业组</option>' + U().groupOptions(groupFilter) + '</select>' +
-        '<select class="select" id="regularSource"><option value="">全部来源</option>' + sourceOptions + '</select>' +
-      '</div></div>' +
-      '<section class="card table-card"><div class="table-wrap"><table class="data-table"><thead><tr><th>任务</th><th>专业组</th><th>执行人</th><th>标准工时</th><th>截止时间</th><th>状态</th><th style="text-align:right">操作</th></tr></thead>' +
-        '<tbody>' + (body || '<tr><td colspan="7">' + U().emptyState('暂无常规任务', '启用巡检 / 维保计划后会自动生成', 'clipboard') + '</td></tr>') + '</tbody></table></div></section></section>';
+      table + '</section>';
     },
 
     after: function () {
       const st = S();
+      function applyRegularFilter() {
+        const filtered = regularFiltered(st);
+        const all = filtered.rows.map(regularTaskRow).concat(filtered.dutyRows.map(regularDutyRow));
+        const pages = Math.max(1, Math.ceil(all.length / REGULAR_PAGE_SIZE));
+        const page = Math.min(Math.max(1, st.ui.regularPage || 1), pages);
+        st.ui.regularPage = page;
+        const body = document.getElementById('regularTbody');
+        if (body) body.innerHTML = all.slice((page - 1) * REGULAR_PAGE_SIZE, page * REGULAR_PAGE_SIZE).join('') ||
+          '<tr><td colspan="7">' + U().emptyState('暂无常规任务', '启用巡检 / 维保计划后会自动生成', 'clipboard') + '</td></tr>';
+        const box = document.getElementById('regularLedgerPager');
+        if (box) box.innerHTML = ITO.pager('regularLedger', all.length, page, REGULAR_PAGE_SIZE);
+      }
       const group = document.getElementById('regularGroup');
       const source = document.getElementById('regularSource');
-      if (group) group.addEventListener('change', function () { st.ui.regularGroup = group.value; ITO.refresh(); });
-      if (source) source.addEventListener('change', function () { st.ui.regularSource = source.value; ITO.refresh(); });
-      U().$$('[data-plan-task]').forEach(function (row) {
-        row.addEventListener('click', function (e) {
-          if (e.target.closest('a, button')) return;
-          const task = (st.planTasks || []).find(function (x) { return x.id === row.dataset.planTask; });
-          if (task) planDetail(task);
+      if (group) group.addEventListener('change', function () { st.ui.regularGroup = group.value; st.ui.regularPage = 1; applyRegularFilter(); });
+      if (source) source.addEventListener('change', function () { st.ui.regularSource = source.value; st.ui.regularPage = 1; applyRegularFilter(); });
+      const ledger = document.getElementById('regularCard');
+      if (ledger) {
+        ledger.addEventListener('click', function (e) {
+          const pagerBtn = e.target.closest('[data-pager]');
+          if (pagerBtn) {
+            if (!pagerBtn.disabled) { st.ui.regularPage = Number(pagerBtn.dataset.page); applyRegularFilter(); }
+            return;
+          }
+          const row = e.target.closest('[data-plan-task]');
+          if (row && !e.target.closest('a, button')) {
+            const task = (st.planTasks || []).find(function (x) { return x.id === row.dataset.planTask; });
+            if (task) planDetail(task);
+          }
         });
-      });
+      }
       const exp = document.getElementById('regularExportBtn');
       if (exp) exp.addEventListener('click', function () {
         const rows = [['来源', '计划编号', '任务', '专业组', '执行人', '标准工时', '截止时间', '状态']];

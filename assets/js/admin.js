@@ -855,6 +855,7 @@
 
     state.route = route;
     disposeCharts();
+    ITO.pagerState = {};
     closeOverlays();
     renderShell();
 
@@ -1260,6 +1261,28 @@
       return '<a class="tab' + (item.id === active ? ' active' : '') + '" href="' + item.href + '">' + item.name + '</a>';
     }).join('') + '</div>';
   }
+
+  /* ── pager：列表分页（页面 render 时由 render() 重置 pagerState） ── */
+  ITO.pagerState = {};
+  ITO.pager = function (id, total, page, pageSize) {
+    const pages = Math.max(1, Math.ceil(total / pageSize));
+    const cur = Math.min(Math.max(1, page), pages);
+    if (!total) return '';
+    const nums = [];
+    let prev = 0;
+    for (let p = 1; p <= pages; p += 1) {
+      if (p !== 1 && p !== pages && Math.abs(p - cur) > 1) continue;
+      if (p - prev > 1) nums.push('<span class="pager-dots">…</span>');
+      nums.push('<button type="button" class="pager-num' + (p === cur ? ' active' : '') + '" data-pager="' + id + '" data-page="' + p + '">' + p + '</button>');
+      prev = p;
+    }
+    return '<div class="pager"><span class="pager-info">共 ' + total + ' 条 · 第 ' + cur + ' / ' + pages + ' 页</span>' +
+      '<span class="pager-nums">' +
+      '<button type="button" class="pager-nav" data-pager="' + id + '" data-page="' + (cur - 1) + '"' + (cur <= 1 ? ' disabled' : '') + ' aria-label="上一页">‹</button>' +
+      nums.join('') +
+      '<button type="button" class="pager-nav" data-pager="' + id + '" data-page="' + (cur + 1) + '"' + (cur >= pages ? ' disabled' : '') + ' aria-label="下一页">›</button>' +
+      '</span></div>';
+  };
 
   /* ── public API ──────────────────────────── */
   ITO.ui = {

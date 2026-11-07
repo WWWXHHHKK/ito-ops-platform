@@ -274,10 +274,8 @@
 
   function subActions(task, sub) {
     const st = S();
-    if (task.draft || task.canceled) {
-      return '<button class="btn btn-ghost btn-sm" data-act="detail-sub" data-task="' + task.id + '" data-sub="' + sub.id + '" type="button">详情</button>';
-    }
-    let out = '<button class="btn btn-ghost btn-sm" data-act="detail-sub" data-task="' + task.id + '" data-sub="' + sub.id + '" type="button">详情</button>';
+    if (task.draft || task.canceled) return '<span class="muted">—</span>';
+    let out = '';
     if ((sub.owner === st.user.name || ITO.isSuper()) && sub.status === '执行中') {
       out += '<button class="btn btn-primary btn-sm" data-act="submit" data-task="' + task.id + '" data-sub="' + sub.id + '" type="button">提交成果</button>';
     }
@@ -288,7 +286,7 @@
       out += '<button class="btn btn-ghost btn-sm" data-act="reassign" data-task="' + task.id + '" data-sub="' + sub.id + '" type="button">改派</button>';
     }
     out += subDeliverableAction(task, sub);
-    return out;
+    return out || '<span class="muted">—</span>';
   }
 
   function rowActions(task) {
@@ -317,8 +315,7 @@
     return '<button class="btn btn-ghost btn-sm" data-act="deliverables" data-task="' + task.id + '" type="button">查看成果物</button>';
   }
 
-  function rowsHtml() {
-    const list = visibleTasks();
+  function rowsHtml(list) {
     const st = S();
     if (!list.length) {
       return '<tr><td colspan="10">' + U().emptyState('没有匹配的任务', '调整筛选条件，或新建一个任务', 'task') + '</td></tr>';
@@ -351,7 +348,7 @@
       const subRow = expandable
         ? '<tr class="task-subrow" data-sub="' + t.id + '"' + (expanded ? '' : ' hidden') + '><td colspan="10"><div class="sub-list">' +
             subs.map(function (s) {
-              return '<div class="sub-item' + (U().isOverdue(s) ? ' is-over' : '') + '">' +
+              return '<div class="sub-item' + (U().isOverdue(s) ? ' is-over' : '') + '" data-sub-detail="' + t.id + '|' + s.id + '">' +
                 '<span class="sid">' + s.id + '</span>' +
                 '<span class="sname" title="' + U().esc(s.name) + '">' + U().esc(s.name) + '</span>' +
                 '<span class="sowner">' + U().roleChip(s.owner, 'executor') + '</span>' +
@@ -367,20 +364,20 @@
     }).join('');
   }
 
-  function statsHtml(list) {
+  function statsChipsHtml(list) {
     const s = stats(list);
     const parts = [
-      '<span>主任务 <b>' + s.main + '</b></span>',
-      '<span>子任务 <b>' + s.subs + '</b></span>',
-      '<span>审批中 <b>' + s.approval + '</b></span>',
-      '<span>已挂起 <b class="' + (s.hung ? 'text-red' : '') + '">' + s.hung + '</b></span>',
-      '<span title="含未完成超期与已完成但晚于截止的子任务">超期 <b class="' + (s.allOverdue ? 'text-red' : '') + '">' + s.allOverdue + '</b></span>',
-      '<span>已完成 <b>' + s.completed + '</b></span>'
+      '<span class="stat-chip">主任务 <b>' + s.main + '</b></span>',
+      '<span class="stat-chip">子任务 <b>' + s.subs + '</b></span>',
+      '<span class="stat-chip">审批中 <b>' + s.approval + '</b></span>',
+      '<span class="stat-chip' + (s.hung ? ' warn' : '') + '">已挂起 <b>' + s.hung + '</b></span>',
+      '<span class="stat-chip' + (s.allOverdue ? ' warn' : '') + '" title="含未完成超期与已完成但晚于截止的子任务">超期 <b>' + s.allOverdue + '</b></span>',
+      '<span class="stat-chip good">已完成 <b>' + s.completed + '</b></span>'
     ];
-    if (s.drafts) parts.push('<span>草稿 <b>' + s.drafts + '</b></span>');
-    if (s.canceled) parts.push('<span>已取消 <b>' + s.canceled + '</b></span>');
-    return '<div class="task-stats">' + parts.join('<i></i>') +
-      '<span class="stats-spacer"></span><span class="stats-hint">' + (S().role === 'employee' ? '仅显示与我相关的任务' : '按当前筛选统计') + '</span></div>';
+    parts.push('<span class="stat-chip">草稿 <b>' + s.drafts + '</b></span>');
+    parts.push('<span class="stat-chip">已取消 <b>' + s.canceled + '</b></span>');
+    parts.push('<span class="stat-chip hint">' + (S().role === 'employee' ? '仅显示与我相关的任务' : '按当前筛选统计') + '</span>');
+    return parts.join('');
   }
 
   /* ── approval metrics ───────────────────── */
@@ -2000,6 +1997,8 @@
   };
 
   /* ── page ────────────────────────────────── */
+  let ledgerPage = 1;
+  const LEDGER_PAGE_SIZE = 10;
   P.tasks = {
     render: function () {
       const st = S();
@@ -2020,7 +2019,8 @@
       if (st.pendingQuery != null) { f.q = st.pendingQuery; st.pendingQuery = null; }
 
       const list = visibleTasks();
-      const s = stats(list);
+      ledgerPage = Math.min(Math.max(1, ledgerPage), Math.max(1, Math.ceil(list.length / LEDGER_PAGE_SIZE)));
+      const listPage = list.slice((ledgerPage - 1) * LEDGER_PAGE_SIZE, ledgerPage * LEDGER_PAGE_SIZE);
       const flowStatuses = ['草稿', '待分发', '执行中', '审批中', '已挂起', '待汇总', '审批驳回', '已完成', '已取消'];
       const statusLabels = {
         '': '全部状态', '草稿': '草稿', '待分发': '待分发', '执行中': '执行中',
@@ -2034,11 +2034,14 @@
       return U().pageHead({
         title: '任务管理',
         sub: '专项与常规任务台账 · 覆盖 4 个专业组',
-        actions:
-          '<button class="btn btn-ghost" id="taskExportBtn" type="button">' + U().icon('download') + '导出清单</button>'
+        actions: ''
       }) +
       U().taskTabs('ledger') +
-      statsHtml(list) +
+      '<div class="jump-float" id="tasksJumpBar">' +
+        '<button type="button" data-jump="ledgerCard" class="active">专项任务</button>' +
+        '<span class="jump-dot">·</span>' +
+        '<button type="button" data-jump="regularCard">常规任务</button>' +
+      '</div>' +
       '<div class="toolbar">' +
         '<div class="filters">' +
           '<label class="search-field">' + U().icon('search') + '<input id="taskSearch" type="search" placeholder="搜索任务、人员或编号" value="' + U().esc(f.q) + '"></label>' +
@@ -2060,14 +2063,15 @@
           '<button class="btn btn-ghost btn-sm" id="clearFilters" type="button">' + U().icon('refresh') + '重置</button>' +
         '</div>' +
       '</div>' +
-      '<section class="card table-card">' +
+      '<section class="card table-card" id="ledgerCard">' +
         '<div class="table-head"><div><h3>专项任务</h3><p class="table-note">手工新建任务 · <a href="#/overhaul">大修管理</a> · 点击行查看详情，展开可查看子任务；审批中的任务不可编辑</p></div>' +
-          '<span class="table-note" id="resultCount">' + s.main + ' 个主任务 / ' + s.subs + ' 个子任务</span></div>' +
+          '<div class="ledger-meta"><span id="ledgerStats">' + statsChipsHtml(list) + '</span><button class="btn btn-ghost btn-sm" id="taskExportBtn" type="button">' + U().icon('download') + '导出清单</button></div></div>' +
         '<div class="table-wrap"><table class="data-table task-table">' +
           '<thead><tr><th>任务</th><th>专业组</th><th>发起人</th><th>负责人</th><th>授权</th><th>标签</th><th>优先级</th><th>截止时间</th><th>状态</th><th>操作</th></tr></thead>' +
-          '<tbody id="taskTbody">' + rowsHtml() + '</tbody>' +
+          '<tbody id="taskTbody">' + rowsHtml(listPage) + '</tbody>' +
         '</table></div>' +
-      '</section>' + P.regular.render();
+        (list.length ? '<div id="ledgerPager">' + ITO.pager('ledger', list.length, ledgerPage, LEDGER_PAGE_SIZE) + '</div>' : '') +
+      '</section>' + P.regular.render(true);
     },
 
     after: function () {
@@ -2076,26 +2080,27 @@
 
       function updateRows() {
         const list = visibleTasks();
-        document.getElementById('taskTbody').innerHTML = rowsHtml();
-        const s = stats(list);
-        const statsBox = document.querySelector('.task-stats');
-        if (statsBox) statsBox.outerHTML = statsHtml(list);
-        const count = document.getElementById('resultCount');
-        if (count) count.textContent = s.main + ' 个主任务 / ' + s.subs + ' 个子任务';
+        ledgerPage = Math.min(Math.max(1, ledgerPage), Math.max(1, Math.ceil(list.length / LEDGER_PAGE_SIZE)));
+        document.getElementById('taskTbody').innerHTML = rowsHtml(list.slice((ledgerPage - 1) * LEDGER_PAGE_SIZE, ledgerPage * LEDGER_PAGE_SIZE));
+        const pagerBox = document.getElementById('ledgerPager');
+        if (pagerBox) pagerBox.innerHTML = ITO.pager('ledger', list.length, ledgerPage, LEDGER_PAGE_SIZE);
+        const statsBox = document.getElementById('ledgerStats');
+        if (statsBox) statsBox.innerHTML = statsChipsHtml(list);
       }
+      function applyFilter() { ledgerPage = 1; updateRows(); }
 
       const search = document.getElementById('taskSearch');
-      if (search) search.addEventListener('input', function () { f.q = search.value.trim(); updateRows(); });
+      if (search) search.addEventListener('input', function () { f.q = search.value.trim(); applyFilter(); });
       const fg = document.getElementById('fGroup');
-      if (fg) fg.addEventListener('change', function () { f.group = fg.value; updateRows(); });
+      if (fg) fg.addEventListener('change', function () { f.group = fg.value; applyFilter(); });
       const fs = document.getElementById('fStatus');
-      if (fs) fs.addEventListener('change', function () { f.status = fs.value; updateRows(); });
+      if (fs) fs.addEventListener('change', function () { f.status = fs.value; applyFilter(); });
       const fl = document.getElementById('fLevel');
-      if (fl) fl.addEventListener('change', function () { f.level = fl.value; updateRows(); });
+      if (fl) fl.addEventListener('change', function () { f.level = fl.value; applyFilter(); });
       const ft = document.getElementById('fType');
-      if (ft) ft.addEventListener('change', function () { f.type = ft.value; updateRows(); });
+      if (ft) ft.addEventListener('change', function () { f.type = ft.value; applyFilter(); });
       const fa = document.getElementById('fAge');
-      if (fa) fa.addEventListener('change', function () { f.age = fa.value; updateRows(); });
+      if (fa) fa.addEventListener('change', function () { f.age = fa.value; applyFilter(); });
       const clear = document.getElementById('clearFilters');
       if (clear) clear.addEventListener('click', function () {
         f.q = ''; f.group = ''; f.status = ''; f.level = ''; f.type = ''; f.age = '';
@@ -2105,8 +2110,44 @@
         if (fl) fl.value = '';
         if (ft) ft.value = '';
         if (fa) fa.value = '';
-        updateRows();
+        applyFilter();
       });
+      const ledgerCard = document.getElementById('ledgerCard');
+      if (ledgerCard) ledgerCard.addEventListener('click', function (e) {
+        const pagerBtn = e.target.closest('[data-pager]');
+        if (pagerBtn && !pagerBtn.disabled) { ledgerPage = Number(pagerBtn.dataset.page); updateRows(); }
+      });
+
+      const jumpBar = document.getElementById('tasksJumpBar');
+      if (jumpBar) {
+        jumpBar.addEventListener('click', function (e) {
+          const btn = e.target.closest('[data-jump]');
+          if (!btn) return;
+          const target = document.getElementById(btn.dataset.jump);
+          if (!target) return;
+          const y = target.getBoundingClientRect().top + (window.scrollY || 0) - 150;
+          window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+        });
+        const spy = function () {
+          const bar = document.getElementById('tasksJumpBar');
+          if (!bar) return;
+          const ledgerEl = document.getElementById('ledgerCard');
+          const regularEl = document.getElementById('regularCard');
+          const inList = ledgerEl && ledgerEl.getBoundingClientRect().top <= 160;
+          bar.classList.toggle('is-visible', !!inList);
+          let current = 'ledgerCard';
+          if (regularEl && regularEl.getBoundingClientRect().top <= 180) current = 'regularCard';
+          Array.prototype.forEach.call(bar.querySelectorAll('[data-jump]'), function (b) {
+            b.classList.toggle('active', b.dataset.jump === current);
+          });
+        };
+        if (!window.__tasksSpyBound) {
+          window.addEventListener('scroll', function () { if (window.__tasksSpyFn) window.__tasksSpyFn(); }, { passive: true });
+          window.__tasksSpyBound = true;
+        }
+        window.__tasksSpyFn = spy;
+        spy();
+      }
 
       const tbody = document.getElementById('taskTbody');
       if (tbody) {
@@ -2125,6 +2166,12 @@
               return;
             }
             ACT.run(btn.dataset.act, btn.dataset.task, btn.dataset.sub);
+            return;
+          }
+          const subItem = e.target.closest('.sub-item[data-sub-detail]');
+          if (subItem) {
+            const parts = subItem.dataset.subDetail.split('|');
+            ACT.run('detail-sub', parts[0], parts[1]);
             return;
           }
           const row = e.target.closest('tr.task-main-row');

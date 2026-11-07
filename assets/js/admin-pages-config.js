@@ -236,7 +236,7 @@
       rows.push(['勋章规则', '取得授权即默认 3 星，不计取得次数']);
       rows.push(['标签星级', '<span class="wall-stars">' + wallStars(3) + '</span>']);
     } else if (isPerson) {
-      rows.push(['标签星级', '<span class="wall-stars">' + wallStars(3) + '</span>']);
+      rows.push(['标签星级', '<span class="wall-star-range">1–3 星</span>']);
       rows.push(['升星规则', (tag.star2 || 5) + ' 次升 2 星 · ' + (tag.star3 || 10) + ' 次升 3 星']);
     }
     const canEdit = S().role !== 'employee';
@@ -488,7 +488,7 @@
     return '<button class="wall-card" type="button" data-wall-name="' + U().esc(tag.name) + '" data-wall-type="' + U().esc(tag.type) + '" data-search="' + U().esc((tag.name + ' ' + tag.type + ' ' + (tag.desc || '')).toLowerCase()) + '">' +
       '<span class="wall-icon" style="--tag-color:' + solid + ';--tag-soft:' + soft + '"><span>' + U().esc(wallAbbr(tag.name)) + '</span></span>' +
       '<b>' + U().esc(tag.name) + '</b>' +
-      (isPerson ? '<span class="wall-card-stars">' + wallStars(3) + '</span>' : '') +
+      (isPerson ? '<span class="wall-card-stars"' + (tag.source === '授权' ? ' title="取得授权即默认 3 星"' : '') + '>' + (tag.source === '授权' ? wallStars(3) : '<span class="wall-star-range">1–3 星</span>') + '</span>' : '') +
       '<small>' + U().esc(tag.type) + '</small>' +
     '</button>';
   }

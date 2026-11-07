@@ -520,8 +520,6 @@ window.ITO_DATA = (() => {
     { person: '李工', name: '机房', type: '任务标签', stars: 0, count: 8,  firstClaimed: '2025-09-06', desc: '核心机房巡检与动力环境保障' },
     { person: '李工', name: 'DTT',  type: '任务标签', stars: 0, count: 2,  firstClaimed: '2026-02-11', desc: '监测数据质量专项' },
     { person: '王主管', name: 'KCC', type: '人员标签', stars: 2, count: 9,  firstClaimed: '2025-09-02', desc: '核心业务系统变更与发布' },
-    { person: '王主管', name: '版本发布', type: '任务标签', stars: 0, count: 6, firstClaimed: '2025-07-14', desc: '应用版本上线与回归' },
-    { person: '王主管', name: '容量', type: '任务标签', stars: 0, count: 3, firstClaimed: '2026-01-09', desc: '数据库与资源容量评估' },
     { person: '张总', name: 'KCC', type: '人员标签', stars: 1, count: 3, firstClaimed: '2025-10-21', desc: '核心业务系统变更与发布' },
     { person: '张总', name: '巡检', type: '任务标签', stars: 0, count: 5, firstClaimed: '2025-11-27', desc: '季度巡检与整改闭环' },
     { person: '张总', name: '变更', type: '任务标签', stars: 0, count: 4, firstClaimed: '2026-02-03', desc: '高风险变更与割接审批' },
