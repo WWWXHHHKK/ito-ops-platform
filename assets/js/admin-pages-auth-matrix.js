@@ -11,7 +11,20 @@
   function S() { return ITO.state; }
   function U() { return ITO.ui; }
 
-  const BASE_TYPES = ['值班授权', '入厂授权', '基本安全培训'];
+  const BASE_TYPES = ['入厂授权', '基本安全培训', '值班授权'];
+
+  // 基础资格只读查询（我的任务·授权详情弹窗复用作业授权页口径）
+  ITO.baseQualifications = function (personName) {
+    const staff = S().staff || [];
+    const idx = staff.findIndex(function (p) { return p.name === personName; });
+    if (idx < 0) return [];
+    return BASE_TYPES.map(function (type) {
+      const fact = baseFact(staff[idx], type, idx);
+      if (!fact) return { type: type, held: false };
+      const stt = ITO.authStatus(fact.validTo);
+      return { type: type, held: true, validTo: fact.validTo, status: stt.status, left: stt.left };
+    });
+  };
   const WORK_TYPES = [
     '工作负责人授权', '准备工程师授权', '高风险作业授权',
     'RP1 授权', 'RP2 授权', '登高车作业授权',
@@ -26,10 +39,16 @@
   };
 
   function baseFact(person, type, index) {
-    const ok = type === '值班授权' ? index % 4 === 0 : index % 6 !== 0;
-    if (!ok) return null;
-    let validTo = type === '入厂授权' ? '2027-10-28' : type === '基本安全培训' ? '2027-06-30' : '2026-12-31';
-    if (index % 10 === 1 && type !== '入厂授权') validTo = '2026-12-31';
+    if (type === '值班授权') {
+      // 值班授权按值班轮换名单发放；应用组不需要值班授权
+      const rotation = (D.duty && D.duty.rotation) || [];
+      if (person.group === 'app' || rotation.indexOf(person.name) === -1) return null;
+      return { validTo: '2026-12-31', base: true, source: '基础资格' };
+    }
+    // 入厂授权 / 基本安全培训：准入基础，全员持有；少数已过期 / 临期用于演示补办提醒
+    let validTo = type === '入厂授权' ? '2027-10-28' : '2027-06-30';
+    if (index % 14 === 2) validTo = type === '入厂授权' ? '2026-10-15' : '2026-09-30';
+    if (index % 11 === 3) validTo = '2026-12-20';
     return { validTo: validTo, base: true, source: '基础资格' };
   }
 
@@ -101,12 +120,12 @@
     const st = S();
     const rows = buildRows();
     const types = {};
-    COLUMNS.forEach(function (type) { types[type] = true; });
+    WORK_TYPES.forEach(function (type) { types[type] = true; });
     Object.keys(types).forEach(function (type) {
       if (!(st.wallTags || []).some(function (tag) { return tag.name === type && tag.type === '人员标签'; })) {
         st.wallTags.push({
           name: type, type: '人员标签', count: 0, stars: 3, star2: 5, star3: 10, source: '授权',
-          firstClaimed: '', desc: '取得' + type + '后自动关联', unlock: '取得对应授权即默认 3 星',
+          firstClaimed: '', desc: '取得' + type + '后自动关联', unlock: '取得对应授权后自动获得该标签',
           color: '#EB612A', createdAt: D.meta.demoNow, createdBy: '系统',
           updatedAt: D.meta.demoNow, updatedBy: '系统',
           audit: [{ time: D.meta.demoNow, actor: '系统', action: '创建授权属性勋章' }]
@@ -116,6 +135,7 @@
     rows.forEach(function (row) {
       row.cells.forEach(function (item) {
         if (item.cell.kind !== 'actual' || item.cell.status === '已过期') return;
+        if (BASE_TYPES.indexOf(item.type) > -1) return;
         const exists = (st.personAchievements || []).some(function (a) {
           return a.person === row.person.name && a.name === item.type && a.type === '人员标签';
         });
@@ -137,6 +157,13 @@
     st.personAchievements = (st.personAchievements || []).filter(function (tag) {
       if (tag.type !== '人员标签' || COLUMNS.indexOf(tag.name) === -1) return true;
       return !!validAuthKeys[tag.person + '|' + tag.name];
+    });
+    // 基础资格（值班 / 入厂 / 安全培训）不生成属性勋章：清理历史定义与人员勋章
+    st.wallTags = (st.wallTags || []).filter(function (tag) {
+      return !(tag.type === '人员标签' && BASE_TYPES.indexOf(tag.name) > -1);
+    });
+    st.personAchievements = (st.personAchievements || []).filter(function (tag) {
+      return !(tag.type === '人员标签' && BASE_TYPES.indexOf(tag.name) > -1);
     });
     (st.wallTags || []).forEach(function (tag) {
       if (tag.type === '人员标签' && COLUMNS.indexOf(tag.name) > -1) {
@@ -217,6 +244,9 @@
       const expiring = summaryRows.reduce(function (n, row) {
         return n + row.cells.filter(function (x) { return x.cell.status === '临期'; }).length;
       }, 0);
+      const expiredCells = summaryRows.reduce(function (n, row) {
+        return n + row.cells.filter(function (x) { return x.cell.kind === 'actual' && x.cell.status === '已过期'; }).length;
+      }, 0);
       const actualByType = {};
       COLUMNS.forEach(function (type) {
         actualByType[type] = summaryRows.reduce(function (n, row) {
@@ -229,11 +259,14 @@
         return x.cell.kind === 'actual' && x.cell.status !== '已过期';
       }).length;
       const employeeCan = employeeCells.filter(function (x) { return x.cell.kind === 'can'; }).length;
+      const employeeExpired = employeeCells.filter(function (x) {
+        return x.cell.kind === 'actual' && x.cell.status === '已过期';
+      }).length;
       const body = scoped.map(function (row) {
         return '<tr data-auth-person="' + U().esc(row.person.name) + '" data-auth-group="' + U().esc(row.person.group) + '" style="cursor:pointer">' +
           '<td class="auth-person-cell"><b>' + U().esc(row.person.name) + '</b></td>' +
           '<td class="auth-uid-cell mono">' + U().esc(row.person.uid) + '</td>' +
-          '<td class="auth-group-cell">' + U().esc((ITO.getGroup(row.person.group) || {}).name || '') + '</td>' +
+          '<td class="auth-group-cell">' + U().groupPill(row.person.group) + '</td>' +
           row.cells.map(function (item) {
             return '<td class="auth-status-cell ' + cellTone(item.cell) + '">' + cellHtml(item.cell) + '</td>';
           }).join('') +
@@ -245,6 +278,7 @@
             '<div class="summary-chip"><span class="icon green">' + U().icon('check') + '</span><div><b>' + employeeActual + ' 项</b><span>持证</span></div></div>' +
             '<div class="summary-chip"><span class="icon blue">' + U().icon('award') + '</span><div><b>' + employeeCan + ' 项</b><span>可拿未拿</span></div></div>' +
             '<div class="summary-chip"><span class="icon red">' + U().icon('clock') + '</span><div><b>' + expiring + ' 项</b><span>60 天内到期</span></div></div>' +
+            '<div class="summary-chip"><span class="icon red">' + U().icon('alert') + '</span><div><b>' + employeeExpired + ' 项</b><span>已过期</span></div></div>' +
           '</div>'
         : '<div class="summary-grid auth-summary auth-summary-6">' +
             '<div class="summary-chip"><span class="icon">' + U().icon('users') + '</span><div><b>50</b><span>满编</span></div></div>' +
@@ -253,6 +287,7 @@
             '<div class="summary-chip"><span class="icon green">' + U().icon('check') + '</span><div><b>' + allActual + '</b><span>实际持证</span></div></div>' +
             '<div class="summary-chip"><span class="icon">' + U().icon('award') + '</span><div><b>' + allCan + '</b><span>可拿未拿</span></div></div>' +
             '<div class="summary-chip"><span class="icon red">' + U().icon('clock') + '</span><div><b>' + expiring + '</b><span>60 天内到期</span></div></div>' +
+            '<div class="summary-chip"><span class="icon red">' + U().icon('alert') + '</span><div><b>' + expiredCells + '</b><span>已过期</span></div></div>' +
           '</div>';
       return U().pageHead({
         title: isEmployee ? '我的授权' : '作业授权',

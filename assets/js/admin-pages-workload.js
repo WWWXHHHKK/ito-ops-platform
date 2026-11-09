@@ -35,55 +35,210 @@
     return key.slice(0, 7) === period.month;
   }
 
+  function workLogsOf(sub) {
+    return Array.isArray(sub && sub.workLogs) ? sub.workLogs : [];
+  }
+
+  function actualHoursOf(sub) {
+    const logged = workLogsOf(sub).reduce(function (n, log) { return n + (Number(log.hours) || 0); }, 0);
+    if (logged > 0) return logged;
+    return Number(sub && sub.actualHours) || 0;
+  }
+
+  function remainingHoursOf(sub) {
+    const budget = Number(sub && sub.hours) || 0;
+    return Math.max(0, budget - actualHoursOf(sub));
+  }
+
+  function addWorkLog(sub, hours, date, source) {
+    const value = Math.round((Number(hours) || 0) * 10) / 10;
+    if (!sub || value <= 0) return 0;
+    if (!Array.isArray(sub.workLogs)) sub.workLogs = [];
+    sub.workLogs.push({
+      date: String(date || D.meta.today).slice(0, 10),
+      hours: value,
+      source: source || 'manual'
+    });
+    sub.actualHours = Math.round(sub.workLogs.reduce(function (n, log) {
+      return n + (Number(log.hours) || 0);
+    }, 0) * 10) / 10;
+    return value;
+  }
+
+  /* 闭环时为已提交任务补记到预算的 90%，已有足额流水时不重复写入。 */
+  function ensureCompletionHours(sub, date) {
+    if (!sub || sub.status !== '已完成') return 0;
+    const budget = Number(sub.hours) || 0;
+    if (!budget) return 0;
+    const actual = actualHoursOf(sub);
+    const target = Math.round(budget * 0.9 * 10) / 10;
+    if (actual >= target - 0.05) return 0;
+    const hours = Math.round((target - actual) * 10) / 10;
+    if (hours < 0.1) return 0;
+    return addWorkLog(sub, hours, date, 'closure');
+  }
+
   function loadModel() {
     const st = S();
     const period = periods();
     const rows = st.staff.map(function (person) {
       let week = 0;
       let month = 0;
-      let weekTasks = 0;
-      let monthTasks = 0;
+      let weekActual = 0;
+      let monthActual = 0;
+      let weekRemaining = 0;
+      let monthRemaining = 0;
+      let weekDuty = 0;
+      let monthDuty = 0;
+      const weekIds = {};
+      const monthIds = {};
 
       st.tasks.forEach(function (task) {
         if (task.canceled || task.draft) return;
         (task.subs || []).forEach(function (sub) {
-          if (sub.owner !== person.name) return;
-          if (sub.status === '已完成' || sub.status === '已取消') return;
-          const hours = Math.max(0, (Number(sub.hours) || 0) * (1 - Math.min(100, Math.max(0, Number(sub.progress) || 0)) / 100));
-          if (hours <= 0) return;
-          if (inPeriod(sub.due, period, 'week')) { week += hours; weekTasks += 1; }
-          if (inPeriod(sub.due, period, 'month')) { month += hours; monthTasks += 1; }
+          if (sub.owner !== person.name || sub.status === '已取消') return;
+          workLogsOf(sub).forEach(function (log) {
+            if (inPeriod(log.date, period, 'week')) {
+              week += Number(log.hours) || 0;
+              weekActual += Number(log.hours) || 0;
+              weekIds[sub.id] = true;
+            }
+            if (inPeriod(log.date, period, 'month')) {
+              month += Number(log.hours) || 0;
+              monthActual += Number(log.hours) || 0;
+              monthIds[sub.id] = true;
+            }
+          });
+          if (sub.status === '已完成') return;
+          const remaining = remainingHoursOf(sub);
+          if (remaining <= 0) return;
+          if (inPeriod(sub.due, period, 'week')) {
+            week += remaining;
+            weekRemaining += remaining;
+            weekIds[sub.id] = true;
+          }
+          if (inPeriod(sub.due, period, 'month')) {
+            month += remaining;
+            monthRemaining += remaining;
+            monthIds[sub.id] = true;
+          }
         });
       });
 
       (st.planTasks || []).forEach(function (task) {
         if (task.executor !== person.name) return;
-        const hours = task.status === '已完成' ? (Number(task.actualHours) || 0) : (Number(task.hours) || 0);
-        if (inPeriod(task.due, period, 'week')) { week += hours; weekTasks += 1; }
-        if (inPeriod(task.due, period, 'month')) { month += hours; monthTasks += 1; }
+        const done = task.status === '已完成';
+        const hours = done ? (Number(task.actualHours) || Number(task.hours) || 0) : (Number(task.hours) || 0);
+        if (inPeriod(task.due, period, 'week')) {
+          week += hours;
+          if (done) weekActual += hours; else weekRemaining += hours;
+          weekIds[task.id] = true;
+        }
+        if (inPeriod(task.due, period, 'month')) {
+          month += hours;
+          if (done) monthActual += hours; else monthRemaining += hours;
+          monthIds[task.id] = true;
+        }
       });
 
       // 值班按 8h/天，每周模拟 1 个值班日；仅当前周 / 当月排班计入。
       (st.duty.weeks || []).forEach(function (weekRow) {
         if (weekRow.person !== person.name) return;
         const dutyHours = 8;
-        if (inPeriod(weekRow.start, period, 'week')) { week += dutyHours; weekTasks += 1; }
-        if (inPeriod(weekRow.start, period, 'month')) { month += dutyHours; monthTasks += 1; }
+        if (inPeriod(weekRow.start, period, 'week')) { week += dutyHours; weekDuty += dutyHours; weekIds['duty-' + weekRow.key] = true; }
+        if (inPeriod(weekRow.start, period, 'month')) { month += dutyHours; monthDuty += dutyHours; monthIds['duty-' + weekRow.key] = true; }
       });
 
+      const round1 = function (n) { return Math.round(n * 10) / 10; };
       return {
         person: person,
         group: person.group,
-        week: Math.round(week * 10) / 10,
-        month: Math.round(month * 10) / 10,
-        weekTasks: weekTasks,
-        monthTasks: monthTasks,
+        week: round1(week),
+        month: round1(month),
+        weekActual: round1(weekActual),
+        monthActual: round1(monthActual),
+        weekRemaining: round1(weekRemaining),
+        monthRemaining: round1(monthRemaining),
+        weekDuty: round1(weekDuty),
+        monthDuty: round1(monthDuty),
+        weekTasks: Object.keys(weekIds).length,
+        monthTasks: Object.keys(monthIds).length,
         weekRate: Math.round(week / 40 * 100),
         monthRate: Math.round(month / 160 * 100)
       };
     });
     return { period: period, rows: rows };
   }
+
+  function hasAuth(name, authType) {
+    if (!authType || authType === '无需授权' || authType === '—' || authType === '-') return true;
+    return (S().auths || []).some(function (a) {
+      if (a.person !== name || a.status === '已撤销') return false;
+      if (a.type !== authType) return false;
+      return ITO.authStatus(a.validTo).status !== '已过期';
+    });
+  }
+
+  function assigneeInfo(name, authType, hours, due) {
+    const model = loadModel();
+    const row = model.rows.find(function (r) { return r.person.name === name; });
+    const add = Math.max(0, Number(hours) || 0);
+    if (!row) return { name: name, weekRate: 0, monthRate: 0, weekRemain: 40, monthRemain: 160, weekAfter: 0, monthAfter: 0, authOk: hasAuth(name, authType) };
+    const inWeek = due ? inPeriod(due, model.period, 'week') : true;
+    const inMonth = due ? inPeriod(due, model.period, 'month') : true;
+    return {
+      name: name,
+      weekRate: row.weekRate,
+      monthRate: row.monthRate,
+      weekRemain: Math.max(0, Math.round((40 - row.week) * 10) / 10),
+      monthRemain: Math.max(0, Math.round((160 - row.month) * 10) / 10),
+      weekAfter: Math.round((row.week + (inWeek ? add : 0)) / 40 * 100),
+      monthAfter: Math.round((row.month + (inMonth ? add : 0)) / 160 * 100),
+      authOk: hasAuth(name, authType),
+      authType: authType || ''
+    };
+  }
+
+  function guardAssignment(options, next) {
+    const info = assigneeInfo(options.name, options.auth, options.hours, options.due);
+    const overload = info.weekAfter > 100 || info.monthAfter > 100;
+    const authBad = !info.authOk;
+    if (!overload && !authBad) { next(); return; }
+    const reasons = [];
+    if (overload) reasons.push('承接后本周负荷 ' + info.weekAfter + '% / 本月 ' + info.monthAfter + '%，将超过容量上限 100%；');
+    if (authBad) reasons.push(info.name + ' 当前不具备「' + (options.auth || '所需') + '」，需主管确认风险；');
+    U().modal({
+      title: '派发风险确认',
+      sub: '负荷与授权匹配校验',
+      body: '<div class="detail-section"><p style="margin:0 0 10px">' + U().esc(reasons.join(' ')) + '</p>' +
+        '<div class="detail-grid">' +
+          '<div class="detail-field"><label>本周负荷</label><div>' + info.weekRate + '% → <b>' + info.weekAfter + '%</b></div></div>' +
+          '<div class="detail-field"><label>本月负荷</label><div>' + info.monthRate + '% → <b>' + info.monthAfter + '%</b></div></div>' +
+          '<div class="detail-field"><label>本周剩余</label><div>' + info.weekRemain + ' h</div></div>' +
+          '<div class="detail-field"><label>授权匹配</label><div>' + (info.authOk ? '已具备' : '<span class="text-red">缺少授权</span>') + '</div></div>' +
+        '</div></div>',
+      foot: '<button class="btn btn-ghost" data-close type="button">取消</button>' +
+        '<button class="btn btn-primary" data-guard-ok type="button">确认继续</button>',
+      onMount: function (close, root) {
+        root.querySelector('[data-close]').addEventListener('click', close);
+        root.querySelector('[data-guard-ok]').addEventListener('click', function () {
+          close();
+          next();
+        });
+      }
+    });
+  }
+
+  ITO.workloadModel = loadModel;
+  ITO.workloadPeriods = periods;
+  ITO.workLogsOf = workLogsOf;
+  ITO.actualHoursOf = actualHoursOf;
+  ITO.remainingHoursOf = remainingHoursOf;
+  ITO.addWorkLog = addWorkLog;
+  ITO.ensureCompletionHours = ensureCompletionHours;
+  ITO.hasAuth = hasAuth;
+  ITO.assigneeInfo = assigneeInfo;
+  ITO.guardAssignment = guardAssignment;
 
   function loadState(rate) {
     if (rate >= 100) return { label: '超载', tone: 'red' };
@@ -105,6 +260,7 @@
       sub: task.source + ' · ' + task.planId,
       body:
         '<div class="detail-grid">' +
+          '<div class="detail-field"><label>计划编号</label><div class="mono">' + U().esc(task.planId) + '</div></div>' +
           '<div class="detail-field"><label>专业组</label><div>' + U().esc(group.name || '') + '</div></div>' +
           '<div class="detail-field"><label>负责人</label><div>' + U().esc(task.owner || '') + '</div></div>' +
           '<div class="detail-field"><label>执行人</label><div>' + U().esc(task.executor || '') + '</div></div>' +
@@ -128,7 +284,7 @@
       const member = st.staff.find(function (p) { return p.name === week.person; });
       return Object.assign({
         week, person: week.person, incoming: next.person, group: member && member.group,
-        due: next.start + ' ' + st.duty.handover, status: '待提交'
+        due: next.start + ' ' + st.duty.handover, status: '待交接'
       }, saved);
     });
   }
@@ -140,12 +296,16 @@
   }
 
   ITO.dutyHandovers = dutyHandovers;
+  ITO.openPlanDetail = function (taskId) {
+    const task = (S().planTasks || []).find(function (x) { return x.id === taskId; });
+    if (task) planDetail(task);
+  };
   ITO.handoverDetails = handoverDetails;
   ITO.openHandover = function (key) {
     const st = S();
     const h = dutyHandovers().find(function (item) { return item.week.key === key; });
     if (!h) return;
-    const submitting = h.person === st.user.name && h.status === '待提交';
+    const submitting = h.person === st.user.name && h.status === '待交接';
     const confirming = h.incoming === st.user.name && h.status === '待接班确认';
     if (!submitting && !confirming) return;
     U().modal({
@@ -171,12 +331,16 @@
   function regularFiltered(st) {
     const groupFilter = st.ui.regularGroup || '';
     const sourceFilter = st.ui.regularSource || '';
+    const q = (st.ui.regularSearch || '').trim().toLowerCase();
+    const hit = function (hay) { return !q || String(hay).toLowerCase().indexOf(q) > -1; };
     const isRegularSource = function (task) { return ['巡检计划', '维保计划'].indexOf(task.source) > -1; };
     const rows = (st.planTasks || []).filter(function (task) {
-      return isRegularSource(task) && (!groupFilter || task.group === groupFilter) && (!sourceFilter || task.source === sourceFilter);
+      return isRegularSource(task) && (!groupFilter || task.group === groupFilter) && (!sourceFilter || task.source === sourceFilter) &&
+        hit([task.name, task.planId, task.source, task.executor].join(' '));
     });
     const dutyRows = dutyHandovers().filter(function (h) {
-      return (!sourceFilter || sourceFilter === '值班') && (!groupFilter || h.group === groupFilter);
+      return (!sourceFilter || sourceFilter === '值班') && (!groupFilter || h.group === groupFilter) &&
+        hit(['值班交接', '第 ' + h.week.weekNo + ' 周', h.week.start, h.week.end, h.person, h.incoming].join(' '));
     });
     return { rows: rows, dutyRows: dutyRows };
   }
@@ -194,8 +358,9 @@
   }
 
   function regularDutyRow(h) {
-    return '<tr><td><details><summary>值班排班 · 第 ' + h.week.weekNo + ' 周</summary>' + handoverDetails(h) +
-      '</details></td><td>' + (h.group ? U().groupPill(h.group) : '—') + '</td><td>' + U().esc(h.person) +
+    return '<tr data-duty-week="' + U().esc(h.week.key) + '">' +
+      '<td><div class="cell-task"><b>值班交接 · 第 ' + h.week.weekNo + ' 周</b><small>' + U().esc(h.week.start + ' ~ ' + h.week.end) + ' · 交接给 ' + U().esc(h.incoming) + (h.record ? ' · 已有交接记录' : '') + '</small></div></td>' +
+      '<td>' + (h.group ? U().groupPill(h.group) : '—') + '</td><td>' + U().esc(h.person) +
       '</td><td>—</td><td>' + U().esc(h.due) + '</td><td>' + U().badge(h.status) +
       '</td><td style="text-align:right"><a class="btn btn-ghost btn-sm" href="#/duty">查看排班</a></td></tr>';
   }
@@ -222,12 +387,13 @@
       const doneCount = rows.filter(function (t) { return t.status === '已完成'; }).length + dutyRows.filter(function (h) { return h.status === '已完成'; }).length;
       const table =
         '<section class="card table-card" id="regularCard">' +
-          '<div class="table-head"><div><h3>常规任务</h3><p class="table-note">巡检 / 维保计划与值班排班 · 共 ' + all.length + ' 项 · 已完成 ' + doneCount + '</p></div>' +
+          '<div class="table-head"><div class="report-head-left">' +
+            '<h3>常规任务</h3><p class="table-note">巡检 / 维保计划与值班排班 · 共 ' + all.length + ' 项 · 已完成 ' + doneCount + '</p>' +
+            '<input class="oh-search" id="regularSearch" type="search" placeholder="搜索任务 / 编号 / 执行人…" value="' + U().esc(st.ui.regularSearch || '') + '">' +
+            '<select class="select" id="regularGroup" aria-label="专业组"><option value="">全部专业组</option>' + U().groupOptions(groupFilter) + '</select>' +
+            '<select class="select" id="regularSource" aria-label="来源"><option value="">全部来源</option>' + sourceOptions + '</select>' +
+          '</div>' +
             '<button class="btn btn-ghost btn-sm" id="regularExportBtn" type="button">' + U().icon('download') + '导出常规任务</button></div>' +
-          '<div class="toolbar" style="margin:0 20px 12px"><div class="filters">' +
-            '<select class="select" id="regularGroup"><option value="">全部专业组</option>' + U().groupOptions(groupFilter) + '</select>' +
-            '<select class="select" id="regularSource"><option value="">全部来源</option>' + sourceOptions + '</select>' +
-          '</div></div>' +
           '<div class="table-wrap"><table class="data-table"><thead><tr><th>任务</th><th>专业组</th><th>执行人</th><th>标准工时</th><th>截止时间</th><th>状态</th><th style="text-align:right">操作</th></tr></thead>' +
             '<tbody id="regularTbody">' + (body || '<tr><td colspan="7">' + U().emptyState('暂无常规任务', '启用巡检 / 维保计划后会自动生成', 'clipboard') + '</td></tr>') + '</tbody></table></div>' +
           (all.length ? '<div id="regularLedgerPager">' + ITO.pager('regularLedger', all.length, page, REGULAR_PAGE_SIZE) + '</div>' : '') +
@@ -266,6 +432,8 @@
       const source = document.getElementById('regularSource');
       if (group) group.addEventListener('change', function () { st.ui.regularGroup = group.value; st.ui.regularPage = 1; applyRegularFilter(); });
       if (source) source.addEventListener('change', function () { st.ui.regularSource = source.value; st.ui.regularPage = 1; applyRegularFilter(); });
+      const searchBox = document.getElementById('regularSearch');
+      if (searchBox) searchBox.addEventListener('input', function () { st.ui.regularSearch = searchBox.value; st.ui.regularPage = 1; applyRegularFilter(); });
       const ledger = document.getElementById('regularCard');
       if (ledger) {
         ledger.addEventListener('click', function (e) {
@@ -278,7 +446,10 @@
           if (row && !e.target.closest('a, button')) {
             const task = (st.planTasks || []).find(function (x) { return x.id === row.dataset.planTask; });
             if (task) planDetail(task);
+            return;
           }
+          const dw = e.target.closest('[data-duty-week]');
+          if (dw && !e.target.closest('a, button') && ITO.openDutySheet) ITO.openDutySheet(dw.dataset.dutyWeek);
         });
       }
       const exp = document.getElementById('regularExportBtn');
@@ -310,16 +481,16 @@
           '<td><div class="person-cell"><div><b>' + U().esc(r.person.name) + '</b><small>' + U().esc(r.person.title || '') + '</small></div></div></td>' +
           '<td>' + U().groupPill(r.group) + '</td>' +
           '<td class="num">' + r.weekTasks + '</td>' +
-          '<td class="num">' + r.week + ' h</td>' +
+          '<td class="num">' + r.week + ' h<small class="load-sub">实际 ' + r.weekActual + ' · 剩余 ' + r.weekRemaining + '</small></td>' +
           '<td><div class="load-cell"><b>' + r.weekRate + '%</b><i style="--v:' + Math.min(100, r.weekRate) + '%"></i></div></td>' +
-          '<td class="num">' + r.month + ' h</td>' +
+          '<td class="num">' + r.month + ' h<small class="load-sub">实际 ' + r.monthActual + ' · 剩余 ' + r.monthRemaining + '</small></td>' +
           '<td><div class="load-cell"><b>' + r.monthRate + '%</b><i style="--v:' + Math.min(100, r.monthRate) + '%"></i></div></td>' +
           '<td>' + U().badge(state.label, state.tone) + '</td>' +
         '</tr>';
       }).join('');
       return U().pageHead({
         title: '工时负载',
-        sub: '当前周 ' + model.period.weekStart + ' 至 ' + model.period.weekEnd + ' · 周容量 40h / 月容量 160h · 值班按 8h/天、每周 1 天模拟',
+        sub: '当前周 ' + model.period.weekStart + ' 至 ' + model.period.weekEnd + ' · 周容量 40h / 月容量 160h · 负荷 = 已记录工时 + 剩余计划工时 + 值班工时（8h/天）',
         actions: ''
       }) +
       U().taskTabs('workload') +
@@ -327,7 +498,7 @@
         { icon: 'users', value: rows.length, label: '统计人员' },
         { icon: 'chart', value: avgWeek + '%', label: '平均周负载', tone: 'blue' },
         { icon: 'alert', value: overloaded, label: '超载人员', tone: overloaded ? 'red' : 'green' },
-        { icon: 'clock', value: rows.reduce(function (n, r) { return n + r.month; }, 0) + ' h', label: '本月已排工时' }
+        { icon: 'clock', value: rows.reduce(function (n, r) { return n + r.month; }, 0) + ' h', label: '本月负载工时' }
       ]) +
       '<div class="toolbar" style="margin-bottom:12px"><div class="filters">' +
         '<select class="select" id="workloadGroup"><option value="">全部专业组</option>' + U().groupOptions(groupFilter) + '</select>' +

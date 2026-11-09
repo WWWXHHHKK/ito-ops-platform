@@ -20,12 +20,14 @@
 
   const PERMS = [
     { key: 'task', name: '任务中心', desc: '任务创建、派发、审批与闭环；员工层仅本人任务', icon: 'task' },
+    { key: 'overhaul', name: '大修管理', desc: '大修行动、物资与人员矩阵', icon: 'wrench' },
     { key: 'inspect', name: '巡检管理', desc: '计划、执行记录与异常整改', icon: 'clipboard' },
     { key: 'duty', name: '值班管理', desc: '排班、交接与升级路径', icon: 'calendar' },
     { key: 'maintain', name: '维保管理', desc: '厂商计划、记录与周期顺延', icon: 'wrench' },
     { key: 'group', name: '组织架构', desc: '组织成员、负荷与档案', icon: 'users' },
     { key: 'auth', name: '作业授权', desc: '授权台账；员工层仅本人只读', icon: 'shield' },
     { key: 'message', name: '站内消息', desc: '审批、超期与值班通知', icon: 'message' },
+    { key: 'dictionary', name: '字典配置', desc: '字典项与自定义字段定义', icon: 'book' },
     { key: 'config', name: '配置中心', desc: '预警规则、角色权限与系统配置', icon: 'alert' }
   ];
 
@@ -233,8 +235,8 @@
       ['最近更新', U().esc((tag.updatedAt || '—') + ' · ' + (tag.updatedBy || '—'))]
     ];
     if (isPerson && tag.source === '授权') {
-      rows.push(['勋章规则', '取得授权即默认 3 星，不计取得次数']);
-      rows.push(['标签星级', '<span class="wall-stars">' + wallStars(3) + '</span>']);
+      rows.push(['勋章规则', '取得授权后自动获得，不计次数与首次领取时间']);
+      rows.push(['标签标识', '<span class="auth-mark">授权</span>']);
     } else if (isPerson) {
       rows.push(['标签星级', '<span class="wall-star-range">1–3 星</span>']);
       rows.push(['升星规则', (tag.star2 || 5) + ' 次升 2 星 · ' + (tag.star3 || 10) + ' 次升 3 星']);
@@ -410,7 +412,7 @@
     U().confirm({
       title: '删除标签',
       text: '确认删除「' + tag.name + '」？' +
-        (tag.type === '任务标签' ? '任务、子任务与人员成就上的引用会同步移除。' : '人员成就上的引用会同步移除。'),
+        (tag.type === '任务标签' ? '任务与人员成就上的引用会同步移除。' : '人员成就上的引用会同步移除。'),
       okText: '删除',
       danger: true
     }).then(function (ok) {
@@ -439,8 +441,8 @@
         '<div class="tag-detail-row"><span>人员</span><div>' + U().esc(personName) + '</div></div>' +
         '<div class="tag-detail-row"><span>专业组</span><div>' + U().esc(group.name || '—') + '</div></div>' +
         '<div class="tag-detail-row"><span>标签</span><div>' + U().esc(tagName) + '</div></div>' +
-        '<div class="tag-detail-row"><span>当前星级</span><div><span class="wall-stars">' + wallStars(isAuth ? 3 : (rec.stars || 1)) + '</span></div></div>' +
-        (isAuth ? '<div class="tag-detail-row"><span>勋章规则</span><div>取得授权即默认 3 星，不计取得次数</div></div>' : '<div class="tag-detail-row"><span>累计次数</span><div><b class="wall-count">' + (rec.count || 0) + '</b> 次</div></div>') +
+        '<div class="tag-detail-row"><span>' + (isAuth ? '标签标识' : '当前星级') + '</span><div>' + (isAuth ? '<span class="auth-mark">授权</span>' : '<span class="wall-stars">' + wallStars(rec.stars || 1) + '</span>') + '</div></div>' +
+        (isAuth ? '<div class="tag-detail-row"><span>勋章规则</span><div>取得授权后自动获得，不计次数与首次领取时间</div></div>' : '<div class="tag-detail-row"><span>累计次数</span><div><b class="wall-count">' + (rec.count || 0) + '</b> 次</div></div>') +
         (isAuth ? '' : '<div class="tag-detail-row"><span>首次领取</span><div>' + U().esc(rec.firstClaimed || '—') + '</div></div>') +
         '<div class="tag-detail-row"><span>标签说明</span><div>' + U().esc(rec.desc || '—') + '</div></div>' +
       '</div>',
@@ -467,7 +469,7 @@
           const def = findWallTag(t.name, '人员标签');
           const solid = def ? tagSolid(def) : wallColor(t.name).solid;
           return '<button class="pwc-tag" type="button" data-person="' + U().esc(person.name) + '" data-tag="' + U().esc(t.name) + '">' +
-            '<i style="--c:' + solid + '"></i><b>' + U().esc(t.name) + '</b><em>' + wallStars(t.stars || 1) + '</em>' +
+            '<i style="--c:' + solid + '"></i><b>' + U().esc(t.name) + '</b>' + (t.source === '授权' ? '<span class="auth-mark">授权</span>' : '<em>' + wallStars(t.stars || 1) + '</em>') +
           '</button>';
         }).join('') : '<span class="pwc-empty">暂无人员标签</span>') +
       '</div>' +
@@ -488,7 +490,7 @@
     return '<button class="wall-card" type="button" data-wall-name="' + U().esc(tag.name) + '" data-wall-type="' + U().esc(tag.type) + '" data-search="' + U().esc((tag.name + ' ' + tag.type + ' ' + (tag.desc || '')).toLowerCase()) + '">' +
       '<span class="wall-icon" style="--tag-color:' + solid + ';--tag-soft:' + soft + '"><span>' + U().esc(wallAbbr(tag.name)) + '</span></span>' +
       '<b>' + U().esc(tag.name) + '</b>' +
-      (isPerson ? '<span class="wall-card-stars"' + (tag.source === '授权' ? ' title="取得授权即默认 3 星"' : '') + '>' + (tag.source === '授权' ? wallStars(3) : '<span class="wall-star-range">1–3 星</span>') + '</span>' : '') +
+      (isPerson ? '<span class="wall-card-stars">' + (tag.source === '授权' ? '<span class="auth-mark">授权</span>' : '<span class="wall-star-range">1–3 星</span>') + '</span>' : '') +
       '<small>' + U().esc(tag.type) + '</small>' +
     '</button>';
   }

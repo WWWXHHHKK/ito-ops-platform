@@ -8,6 +8,16 @@
 
   window.ITO = window.ITO || {};
   const D = window.ITO_DATA;
+  const BUILD_VERSION = '20261112n';
+  const DATA_SOURCE = window.ITO_DATA_SOURCE;
+  const PERSIST_KEYS = [
+    'tasks', 'personalArchive', 'messages', 'logs', 'staff', 'groups', 'auths',
+    'alertRules', 'achievements', 'personAchievements', 'wallTags',
+    'inspectionPlans', 'inspectionRecords', 'maintenancePlans', 'maintenanceRecords',
+    'planTasks', 'duty', 'permissions', 'metrics', 'trend', 'dictionaries',
+    'fieldDefs', 'overhaul'
+  ];
+  let persistTimer = null;
   let devMode = false;
   const state = {
     role: null,
@@ -52,6 +62,73 @@
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
   const clone = (v) => JSON.parse(JSON.stringify(v));
 
+  function snapshotData() {
+    const out = {};
+    PERSIST_KEYS.forEach(function (key) {
+      if (state[key] !== undefined) out[key] = state[key];
+    });
+    return out;
+  }
+
+  function restoreSnapshot(data) {
+    if (!data) return false;
+    PERSIST_KEYS.forEach(function (key) {
+      if (data[key] !== undefined && data[key] !== null) state[key] = data[key];
+    });
+    return true;
+  }
+
+  function persistState(immediate) {
+    if (!DATA_SOURCE || !DATA_SOURCE.save) return;
+    if (immediate) {
+      if (persistTimer) { clearTimeout(persistTimer); persistTimer = null; }
+      DATA_SOURCE.save(snapshotData(), {
+        version: BUILD_VERSION,
+        today: D.meta.today,
+        demoOverride: !!D.meta.demoOverride
+      });
+      return;
+    }
+    if (persistTimer) clearTimeout(persistTimer);
+    persistTimer = setTimeout(function () {
+      persistTimer = null;
+      DATA_SOURCE.save(snapshotData(), {
+        version: BUILD_VERSION,
+        today: D.meta.today,
+        demoOverride: !!D.meta.demoOverride
+      });
+    }, 180);
+  }
+
+  function loadSnapshot() {
+    if (!DATA_SOURCE || !DATA_SOURCE.load) return null;
+    try {
+      return DATA_SOURCE.load({
+        version: BUILD_VERSION,
+        today: D.meta.today,
+        demoOverride: !!D.meta.demoOverride
+      });
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function resetDemoData() {
+    if (DATA_SOURCE && DATA_SOURCE.clear) DATA_SOURCE.clear();
+    sessionStorage.removeItem('ito.admin.role');
+    try {
+      if (window.DeliverableStore && window.DeliverableStore.resetAll) {
+        await window.DeliverableStore.resetAll();
+      }
+    } catch (e) {
+      /* 清理失败也继续重置页面数据 */
+    }
+    const target = new URL(location.href);
+    target.search = '?login=1';
+    target.hash = '';
+    location.assign(target.href);
+  }
+
   const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ESC[c]);
 
@@ -63,6 +140,8 @@
     clipboard: '<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h4"/>',
     calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/>',
     wrench: '<path d="M15 3a5 5 0 0 0-5 8L3 18a2 2 0 0 0 3 3l7-7a5 5 0 0 0 5-8l-3 3-3-3 3-3z"/>',
+    gear: '<circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.7 9a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+    book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
     users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 5a3 3 0 0 1 0 6M18 20a6 6 0 0 0-2-4.5"/>',
     shield: '<path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6l-8-3z"/><path d="m9 12 2 2 4-4"/>',
     message: '<path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
@@ -161,7 +240,7 @@
     '审批中': 'purple', '待审批': 'yellow', '已挂起': 'red', '已取消': 'gray',
     '已完成': 'green', '完成': 'green', '正常': 'green', '启用': 'green', '有效': 'green',
     '超期': 'red', '异常': 'red', '已过期': 'red', '紧急': 'red', '高风险作业': 'red',
-    '重要': 'yellow', '一般': 'gray', '停用': 'gray', '已撤销': 'gray',
+    '临期': 'yellow', '重要': 'yellow', '一般': 'gray', '停用': 'gray', '已撤销': 'gray',
     '待处理': 'yellow', '计划中': 'gray', '草稿': 'gray',
     '待汇总': 'yellow', '已通过': 'green', '已驳回': 'red', '审批驳回': 'red'
   };
@@ -291,7 +370,7 @@
   function pageHead(o) {
     return '<div class="page-head">' +
       '<div><h1 class="page-title">' + o.title + '</h1>' +
-      '<p class="page-sub">' + o.sub + '</p></div>' +
+      (o.sub ? '<p class="page-sub">' + o.sub + '</p>' : '') + '</div>' +
       (o.actions ? '<div class="page-actions">' + o.actions + '</div>' : '') +
       '</div>';
   }
@@ -394,6 +473,7 @@
     if (!root) return;
     let active = Array.from(root.querySelectorAll('.notify-card:not(.leaving)'));
     while (active.length >= NOTIFY_MAX) {
+      if (active[0].__notifyCleanup) active[0].__notifyCleanup();
       active[0].remove();
       active = Array.from(root.querySelectorAll('.notify-card:not(.leaving)'));
     }
@@ -415,14 +495,27 @@
     root.appendChild(card);
 
     let remaining = NOTIFY_DURATION;
-    let started = Date.now();
+    let deadline = Date.now() + remaining;
     let timer = null;
+    let tick = null;
+    const timerEl = card.querySelector('.notify-timer');
+    const clearTimers = () => { clearTimeout(timer); clearInterval(tick); };
+    const paint = () => {
+      if (!timerEl) return;
+      const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      timerEl.textContent = left + ' 秒后收起';
+    };
     const schedule = (ms) => {
       clearTimeout(timer);
-      timer = setTimeout(() => dismissNotification(card), Math.max(600, ms));
-      state.notifyTimers.push(timer);
+      clearInterval(tick);
+      deadline = Date.now() + ms;
+      timer = setTimeout(() => { clearInterval(tick); dismissNotification(card); }, Math.max(600, ms));
+      tick = setInterval(paint, 250);
+      state.notifyTimers.push(timer, tick);
+      paint();
     };
-    const close = () => { clearTimeout(timer); dismissNotification(card); };
+    const close = () => { clearTimers(); dismissNotification(card); };
+    card.__notifyCleanup = clearTimers;
     card.querySelector('.notify-close').addEventListener('click', (e) => { e.stopPropagation(); close(); });
     card.addEventListener('click', (e) => {
       if (e.target.closest('.notify-close')) return;
@@ -432,12 +525,12 @@
       location.hash = n.link.replace(/^#/, '');
     });
     card.addEventListener('mouseenter', () => {
-      clearTimeout(timer);
-      remaining -= Date.now() - started;
+      clearTimers();
+      remaining = deadline - Date.now();
       card.classList.add('paused');
+      if (timerEl) timerEl.textContent = '已暂停';
     });
     card.addEventListener('mouseleave', () => {
-      started = Date.now();
       card.classList.remove('paused');
       schedule(remaining);
     });
@@ -501,14 +594,40 @@
 
   const modalStack = [];
 
+  function modalFocusables(root) {
+    if (!root) return [];
+    return Array.from(root.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )).filter(function (el) {
+      return el.offsetWidth > 0 || el.offsetHeight > 0 || el === document.activeElement;
+    });
+  }
+
   function onModalKey(e) {
-    if (e.key !== 'Escape' || !modalStack.length) return;
+    if (!modalStack.length) return;
     const top = modalStack[modalStack.length - 1];
-    if (top && top.close) top.close();
+    if (!top) return;
+    if (e.key === 'Escape') {
+      if (top.close) top.close();
+      return;
+    }
+    if (e.key !== 'Tab' || !top.backdrop) return;
+    const list = modalFocusables(top.backdrop);
+    if (!list.length) return;
+    const first = list[0];
+    const last = list[list.length - 1];
+    if (e.shiftKey && (document.activeElement === first || !top.backdrop.contains(document.activeElement))) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && (document.activeElement === last || !top.backdrop.contains(document.activeElement))) {
+      e.preventDefault();
+      first.focus();
+    }
   }
 
   function modal(o) {
     const root = $('#modalRoot');
+    const previouslyFocused = document.activeElement;
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
     backdrop.style.zIndex = String(200 + modalStack.length * 4);
@@ -524,10 +643,11 @@
     root.appendChild(backdrop);
 
     let closed = false;
-    const entry = { close: null };
+    const entry = { close: null, backdrop: backdrop };
     const close = () => {
       if (closed) return;
       closed = true;
+      if (window.ITO && ITO.cleanupCustomFieldUploads) ITO.cleanupCustomFieldUploads(backdrop);
       const idx = modalStack.indexOf(entry);
       if (idx > -1) modalStack.splice(idx, 1);
       backdrop.remove();
@@ -537,6 +657,9 @@
         document.removeEventListener('keydown', onModalKey);
       }
       if (typeof o.onClose === 'function') o.onClose();
+      if (!modalStack.length && previouslyFocused && previouslyFocused.focus && document.contains(previouslyFocused)) {
+        try { previouslyFocused.focus(); } catch (e) { /* noop */ }
+      }
     };
     entry.close = close;
     modalStack.push(entry);
@@ -546,8 +669,16 @@
     if (modalStack.length === 1) document.addEventListener('keydown', onModalKey);
     lockScroll(true);
     if (typeof o.onMount === 'function') o.onMount(close, backdrop);
+    if (window.ITO && ITO.mountCustomFields) ITO.mountCustomFields(backdrop);
     enhanceSelects(backdrop);
     enhanceFormDates(backdrop);
+    const focusTarget = backdrop.querySelector('.modal-body input:not([type="hidden"]), .modal-body select, .modal-body textarea, .modal-foot .btn-primary') ||
+      backdrop.querySelector('.modal-close');
+    if (focusTarget) {
+      setTimeout(function () {
+        try { focusTarget.focus(); } catch (e) { /* noop */ }
+      }, 0);
+    }
     return close;
   }
 
@@ -578,10 +709,14 @@
 
   function drawer(o) {
     const root = $('#drawerRoot');
+    const previouslyFocused = document.activeElement;
     const close = () => {
       root.innerHTML = '';
       lockScroll(false);
       document.removeEventListener('keydown', onKey);
+      if (previouslyFocused && previouslyFocused.focus && document.contains(previouslyFocused)) {
+        try { previouslyFocused.focus(); } catch (e) { /* noop */ }
+      }
     };
     const onKey = (e) => { if (e.key === 'Escape') close(); };
 
@@ -603,6 +738,8 @@
     document.addEventListener('keydown', onKey);
     lockScroll(true);
     if (typeof o.onMount === 'function') o.onMount(close, backdrop);
+    const focusTarget = backdrop.querySelector('.drawer-body input, .drawer-body select, .drawer-body textarea, .drawer-foot .btn-primary, .modal-close');
+    if (focusTarget) setTimeout(function () { try { focusTarget.focus(); } catch (e) { /* noop */ } }, 0);
     return close;
   }
 
@@ -660,10 +797,11 @@
     inspection: () => perm('inspect'),
     duty: () => perm('duty'),
     maintenance: () => perm('maintain'),
-    overhaul: () => perm('task'),
+    overhaul: () => perm('overhaul'),
     groups: () => perm('group'),
     auth: () => perm('auth'),
     messages: () => perm('message'),
+    dictionary: () => perm('dictionary'),
     alerts: () => perm('config'),
     roles: () => roleIs('admin'),
     tags: () => !!state.role,
@@ -676,7 +814,7 @@
     inspection: '巡检管理', duty: '值班管理', maintenance: '维保管理',
     overhaul: '大修管理',
     groups: '组织架构', auth: '作业授权', messages: '站内消息',
-    alerts: '预警规则', roles: '角色权限', tags: '属性勋章', logs: '操作日志'
+    dictionary: '字典配置', alerts: '预警规则', roles: '角色权限', tags: '属性勋章', logs: '操作日志'
   };
 
   function can(route) {
@@ -685,7 +823,7 @@
   }
 
   function defaultRoute() {
-    if (state.role === 'admin') return 'roles';
+    if (state.role === 'admin') return 'groups';
     return 'mine';
   }
 
@@ -703,7 +841,12 @@
     else location.hash = '#/' + route;
   }
 
-  function refresh() { normalizeApprovals(); render(); }
+  function refresh() {
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    normalizeApprovals();
+    persistState();
+    render({ preservePager: true, preserveScroll: true, scrollY: scrollY });
+  }
 
   function log(action, target, type) {
     state.logs.unshift({
@@ -713,47 +856,49 @@
       target: target,
       type: type || '操作'
     });
+    persistState();
   }
 
   /* ── nav ─────────────────────────────────── */
   const NAV = [
     {
-      label: '工作台', icon: 'dashboard', items: [
+      label: '工作台', items: [
         { id: 'mine', name: '我的任务', icon: 'user', count: () => myOpenSubs() },
         { id: 'tasks', name: '任务管理', icon: 'task' },
-        { id: 'personal', name: '个人统计', icon: 'award' }
+        { id: 'personal', name: '个人统计', icon: 'chart' }
       ]
     },
     {
-      label: '运维运营', icon: 'clipboard', items: [
+      label: '运维运营', items: [
         { id: 'inspection', name: '巡检管理', icon: 'clipboard' },
-        { id: 'maintenance', name: '维保管理', icon: 'wrench' },
+        { id: 'maintenance', name: '维保管理', icon: 'gear' },
         { id: 'duty', name: '值班管理', icon: 'calendar' }
       ]
     },
     {
       label: '', standalone: true, items: [
-        { id: 'overhaul', name: '大修管理', icon: 'wrench' }
+        { id: 'overhaul', name: '大修管理' }
       ]
     },
     {
-      label: '组织与授权', icon: 'users', items: [
+      label: '组织与授权', items: [
         { id: 'groups', name: '组织架构', icon: 'users' },
         { id: 'auth', name: '作业授权', icon: 'shield' }
       ]
     },
     {
       label: '', standalone: true, items: [
-        { id: 'messages', name: '站内消息', icon: 'message', count: () => unreadCount() }
+        { id: 'messages', name: '站内消息', count: () => unreadCount() }
       ]
     },
     {
       label: '', standalone: true, items: [
-        { id: 'tags', name: '属性勋章', icon: 'award' }
+        { id: 'tags', name: '属性勋章' }
       ]
     },
     {
-      label: '配置中心', icon: 'key', adminOnly: true, items: [
+      label: '配置中心', adminOnly: true, items: [
+        { id: 'dictionary', name: '字典配置', icon: 'book' },
         { id: 'alerts', name: '预警规则', icon: 'alert' },
         { id: 'roles', name: '角色权限', icon: 'key' },
         { id: 'logs', name: '操作日志', icon: 'history' }
@@ -763,28 +908,29 @@
 
   function navHtml() {
     return NAV.map((group) => {
-      if (group.adminOnly && !roleIs('admin')) return '';
       const items = group.items.filter((it) => can(it.id) && (!it.hide || !it.hide()));
       if (!items.length) return '';
       const label = group.label || '';
       const collapsed = label ? !!state.collapsed[label] : false;
+      const isActive = (it) => state.route === it.id ||
+        (it.id === 'tasks' && ['dispatch', 'regular', 'workload'].indexOf(state.route) > -1);
+      const hasActive = items.some(isActive);
       const head = label
-        ? '<div class="nav-label">' +
-            (group.icon ? icon(group.icon, 'nav-leading-icon') : '') +
+        ? '<div class="nav-label" role="button" tabindex="0" aria-expanded="' + (collapsed ? 'false' : 'true') + '">' +
             '<span class="nav-label-text">' + esc(label) + '</span>' +
             icon('chevron', 'nav-chevron') +
           '</div>'
         : '';
-      return '<div class="nav-group' + (group.standalone ? ' standalone' : '') + (collapsed ? ' collapsed' : '') + '" data-group="' + esc(label) + '">' +
+      return '<div class="nav-group' + (group.standalone ? ' standalone' : '') +
+        (hasActive ? ' has-active' : '') + (collapsed ? ' collapsed' : '') + '" data-group="' + esc(label) + '">' +
         head +
         '<div class="nav-items">' + items.map((it) => {
           const count = it.count ? it.count() : 0;
           const name = esc(it.id === 'auth' && state.role === 'employee' ? '我的授权' : it.name);
           const content = group.standalone
-            ? '<span class="nav-module-pill">' + icon(it.icon) + '<span>' + name + '</span></span>'
+            ? '<span>' + name + '</span>'
             : icon(it.icon) + '<span>' + name + '</span>';
-          const active = state.route === it.id || (it.id === 'tasks' && ['dispatch', 'regular', 'workload'].indexOf(state.route) > -1);
-          return '<a class="nav-item' + (active ? ' active' : '') + '" href="#/' + it.id + '" data-route="' + it.id + '">' +
+          return '<a class="nav-item' + (isActive(it) ? ' active' : '') + '" href="#/' + it.id + '" data-route="' + it.id + '">' +
             content +
             (count ? '<b class="nav-count">' + count + '</b>' : '') +
             '</a>';
@@ -840,8 +986,9 @@
   }
 
   /* ── routing ─────────────────────────────── */
-  function render() {
+  function render(options) {
     if (!state.role) return;
+    const opts = options || {};
     const route = parseHash();
     if (!can(route)) {
       const fallback = defaultRoute();
@@ -855,7 +1002,7 @@
 
     state.route = route;
     disposeCharts();
-    ITO.pagerState = {};
+    if (!opts.preservePager) ITO.pagerState = {};
     closeOverlays();
     renderShell();
 
@@ -873,7 +1020,15 @@
     enhanceSelects(root);
     enhanceFormDates(root);
 
-    window.scrollTo({ top: 0, behavior: 'auto' });
+    if (opts.preserveScroll) {
+      const y = Number(opts.scrollY) || 0;
+      requestAnimationFrame(function () {
+        window.scrollTo({ top: y, behavior: 'auto' });
+      });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+    persistState();
   }
 
   /* ── login ───────────────────────────────── */
@@ -1043,7 +1198,7 @@
         hours: Number(plan.hours) || 0,
         source: type === 'inspection' ? '巡检计划' : '维保计划',
         tags: [type === 'inspection' ? '巡检' : '维保', plan.name],
-        status: '待执行'
+        status: '计划中'
       };
       if (existing) Object.assign(existing, data);
       else st.planTasks.push(Object.assign({ id: planTaskId(plan, type), createdAt: D.meta.demoNow, createdBy: st.user ? st.user.name : '系统' }, data));
@@ -1073,6 +1228,7 @@
 
   function initState() {
     state.tasks = clone(D.tasks).map(migrateTask);
+    state.personalArchive = clone(D.personalArchive || []);
     state.messages = clone(D.messages);
     state.logs = clone(D.logs);
     state.staff = clone(D.staff);
@@ -1093,6 +1249,22 @@
     state.permissions = clone(D.permissions);
     state.metrics = clone(D.dashboard);
     state.trend = clone(D.trend);
+    state.dictionaries = clone(D.dictionaries || []);
+    state.fieldDefs = clone(D.fieldDefs || []);
+    state.overhaul = clone(D.overhaul || {});
+
+    /* 刷新恢复上一次本地快照；版本 / 演示日期变化时自动回到初始演示数据。 */
+    const restored = loadSnapshot();
+    state.__restoredSnapshot = !!restored;
+    if (restored) {
+      restoreSnapshot(restored);
+      syncPlanTasks();
+    }
+
+    /* 旧快照可能缺少新版权限键，按默认值补齐。 */
+    Object.keys(D.permissions || {}).forEach(function (role) {
+      state.permissions[role] = Object.assign({}, D.permissions[role], state.permissions[role] || {});
+    });
 
     /* 统一“新建内容置顶、历史内容倒序”的展示顺序 */
     state.tasks.sort(function (a, b) {
@@ -1158,9 +1330,16 @@
         const key = group.dataset.group;
         state.collapsed[key] = !state.collapsed[key];
         group.classList.toggle('collapsed', state.collapsed[key]);
+        label.setAttribute('aria-expanded', state.collapsed[key] ? 'false' : 'true');
         return;
       }
       if (e.target.closest('.nav-item')) closeMobileNav();
+    });
+    $('#sideNav').addEventListener('keydown', (e) => {
+      const label = e.target.closest('.nav-label');
+      if (!label || (e.key !== 'Enter' && e.key !== ' ')) return;
+      e.preventDefault();
+      label.click();
     });
 
     $('#bellBtn').addEventListener('click', () => go('messages'));
@@ -1175,21 +1354,25 @@
             text: '将清空成果物、审批流程与本地演示数据，恢复初始状态。当前角色保持不变。',
             okText: '重置并刷新',
             danger: true
-          }).then(async function (ok) {
-            if (!ok) return;
-            try {
-              if (window.DeliverableStore && window.DeliverableStore.resetAll) {
-                await window.DeliverableStore.resetAll();
-              }
-            } catch (err) {
-              // 即使清理失败也刷新，避免页面停在旧状态
-            }
-            location.reload();
+          }).then(function (ok) {
+            if (ok) resetDemoData();
           });
           return;
         }
         const btn = e.target.closest('[data-dev-role]');
         if (btn) switchRole(btn.dataset.devRole);
+      });
+    }
+
+    const loginReset = $('#loginReset');
+    if (loginReset) {
+      loginReset.addEventListener('click', function () {
+        confirmDialog({
+          title: '重置演示数据',
+          text: '将清空本地任务、自定义字段、附件与操作记录，恢复到初始演示状态。',
+          okText: '重置演示',
+          danger: true
+        }).then(function (ok) { if (ok) resetDemoData(); });
       });
     }
 
@@ -1208,8 +1391,17 @@
   }
 
   function boot() {
+    const bootUrl = new URL(location.href);
+    let resetRequested = false;
+    if (bootUrl.searchParams.get('reset') === '1') {
+      resetRequested = true;
+      if (DATA_SOURCE && DATA_SOURCE.clear) DATA_SOURCE.clear();
+      sessionStorage.removeItem('ito.admin.role');
+      bootUrl.searchParams.delete('reset');
+      history.replaceState(null, '', bootUrl.pathname + bootUrl.search + bootUrl.hash);
+    }
     initState();
-    if (window.DeliverableStore && window.DeliverableStore.applyWorkflow) {
+    if (!resetRequested && !state.__restoredSnapshot && window.DeliverableStore && window.DeliverableStore.applyWorkflow) {
       window.DeliverableStore.applyWorkflow();
     }
 
@@ -1228,11 +1420,19 @@
     updateDevDock();
 
     if (window.DeliverableStore && window.DeliverableStore.ready) {
-      window.DeliverableStore.ready.then(function () {
+      window.DeliverableStore.ready.then(async function () {
+        if (resetRequested && window.DeliverableStore.resetAll) {
+          try {
+            await window.DeliverableStore.resetAll();
+            if (window.DeliverableStore.seedSamples) await window.DeliverableStore.seedSamples();
+          } catch (e) { /* noop */ }
+        }
         if (window.DeliverableStore.error) {
           toast('成果物存储初始化失败：' + (window.DeliverableStore.error.message || '请刷新页面重试'), 'warn');
         }
-        if (window.DeliverableStore.applyWorkflow) window.DeliverableStore.applyWorkflow();
+        if (!resetRequested && !state.__restoredSnapshot && window.DeliverableStore.applyWorkflow) {
+          window.DeliverableStore.applyWorkflow();
+        }
         if (state.role) render();
       });
     }
@@ -1262,7 +1462,7 @@
     }).join('') + '</div>';
   }
 
-  /* ── pager：列表分页（页面 render 时由 render() 重置 pagerState） ── */
+  /* ── pager：列表分页（路由切换时重置；页面内 refresh 保留当前页） ── */
   ITO.pagerState = {};
   ITO.pager = function (id, total, page, pageSize) {
     const pages = Math.max(1, Math.ceil(total / pageSize));
@@ -1296,6 +1496,10 @@
   ITO.go = go;
   ITO.refresh = refresh;
   ITO.log = log;
+  ITO.persistState = persistState;
+  ITO.resetDemoData = resetDemoData;
+  ITO.dataSource = DATA_SOURCE;
+  ITO.buildVersion = BUILD_VERSION;
   ITO.notify = notify;
   ITO.can = can;
   ITO.isReadOnly = () => state.role === 'admin' && !isSuper();
@@ -1366,7 +1570,9 @@
     }).join('');
   }
 
-  function peopleOptions(groupId, selected) {
+  function peopleOptions(groupId, selected, options) {
+    const opts = options || {};
+    const showLoad = !!options;
     const group = state.groups.find((g) => g.id === groupId);
     const list = [];
     const seen = {};
@@ -1379,16 +1585,50 @@
       seen[s.name] = true;
       list.push(s);
     });
-    list.sort((a, b) => groupOrder(a.gid || a.group) - groupOrder(b.gid || b.group) || a.name.localeCompare(b.name, 'zh'));
+    const model = showLoad && ITO.workloadModel ? ITO.workloadModel() : null;
+    const loadMap = {};
+    (model ? model.rows : []).forEach((r) => { loadMap[r.person.name] = r; });
+    const infoOf = (name) => {
+      const row = loadMap[name];
+      const weekRate = row ? row.weekRate : 0;
+      const weekRemain = row ? Math.max(0, Math.round((40 - row.week) * 10) / 10) : 40;
+      const authOk = ITO.hasAuth ? ITO.hasAuth(name, opts.auth) : true;
+      const authMissing = !!opts.auth && opts.auth !== '无需授权' && opts.auth !== '—' && !authOk;
+      return { weekRate, weekRemain, authOk, authMissing };
+    };
+    list.sort((a, b) => {
+      const ga = groupOrder(a.gid || a.group) - groupOrder(b.gid || b.group);
+      if (ga) return ga;
+      if (showLoad && opts.auth) {
+        const aa = infoOf(a.name).authOk ? 0 : 1;
+        const ab = infoOf(b.name).authOk ? 0 : 1;
+        if (aa !== ab) return aa - ab;
+      }
+      if (showLoad) {
+        const la = infoOf(a.name).weekRate;
+        const lb = infoOf(b.name).weekRate;
+        if (la !== lb) return la - lb;
+      }
+      return a.name.localeCompare(b.name, 'zh');
+    });
     return list.map((p) => {
       const staff = state.staff.find((s) => s.name === p.name);
       const group = state.groups.find((g) => g.id === (staff ? staff.group : groupId)) || {};
       const role = group.manager === p.name ? '主管' : (group.leader === p.name ? '组长' : '');
+      const info = infoOf(p.name);
+      const metaBits = [p.title || ''];
+      if (showLoad) {
+        metaBits.push('本周 ' + info.weekRate + '% · 剩余 ' + info.weekRemain + 'h');
+        if (opts.auth && opts.auth !== '无需授权' && opts.auth !== '—') {
+          metaBits.push(info.authOk ? '具备' + opts.auth : '缺少' + opts.auth);
+        }
+      }
       return '<option value="' + esc(p.name) + '"' + (p.name === selected ? ' selected' : '') +
         ' data-label="' + esc(p.name) + '"' +
-        ' data-meta="' + esc(p.title || '') + '"' +
+        ' data-meta="' + esc(metaBits.filter(Boolean).join(' · ')) + '"' +
         ' data-group="' + esc(group.name || '') + '"' +
-        ' data-role="' + esc(role) + '">' +
+        ' data-role="' + esc(role) + '"' +
+        (showLoad ? ' data-load="' + info.weekRate + '" data-auth-ok="' + (info.authOk ? '1' : '0') + '"' : '') + '>' +
         esc(p.name) + ' · ' + esc(p.title) + '</option>';
     }).join('');
   }
@@ -1455,8 +1695,10 @@
     }
 
     function realOptions() {
+      // 筛选类下拉（工具栏 / 卡头筛选）保留占位选项（全部 XXX），便于单独清空
+      const isFilter = !!select.closest('.filters, .report-head-left, .toolbar');
       return Array.prototype.filter.call(select.options, function (o) {
-        return o.value !== '' && !o.disabled;
+        return !o.disabled && (isFilter || o.value !== '');
       });
     }
 
@@ -1547,7 +1789,7 @@
 
   function enhanceSelects(root) {
     if (!root) return;
-    Array.prototype.forEach.call(root.querySelectorAll('.form-field select, .cell-select, [data-picker]'), enhanceSelect);
+    Array.prototype.forEach.call(root.querySelectorAll('.form-field select, .cell-select, [data-picker], .filters select, .report-head-left select'), enhanceSelect);
   }
 
   function enhanceFormDates(root) {
@@ -1587,7 +1829,7 @@
   window.addEventListener('resize', closeAllSelects);
 
   function formRow(o) {
-    return '<div class="form-field' + (o.full ? ' full' : '') + '">' +
+    return '<div class="form-field' + (o.full ? ' full' : '') + (o.span2 ? ' span-2' : '') + '">' +
       '<label' + (o.required ? '' : '') + '>' + o.label + (o.required ? ' <em>*</em>' : '') + '</label>' +
       o.control + (o.hint ? '<span class="form-hint">' + esc(o.hint) + '</span>' : '') +
       '</div>';

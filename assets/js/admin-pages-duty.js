@@ -218,7 +218,7 @@
         const open = openTasksOf(w.person).length;
         const isCurrent = w.key === st.duty.currentKey;
         const isPast = w.key < st.duty.currentKey;
-        return '<tr class="duty-week-row' + (isCurrent ? ' is-current' : '') + (isPast ? ' is-past' : '') + '" data-week="' + w.key + '">' +
+        return '<tr class="duty-week-row' + (isCurrent ? ' is-current' : '') + (isPast ? ' is-past' : '') + '" data-week="' + w.key + '" tabindex="0" role="button" aria-label="查看第 ' + w.weekNo + ' 周值班表">' +
           '<td><div class="week-no"><b>第 ' + w.weekNo + ' 周</b><small>' + w.start.slice(0, 4) + '</small></div></td>' +
           '<td><div class="week-range"><b>' + weekRange(w) + '</b><small>' + (isCurrent ? '本周 · 周一 08:00 交接' : '周一 08:00 交接') + '</small></div></td>' +
           '<td><div class="duty-person-cell"><b>' + U().esc(w.person) + '</b></div></td>' +
@@ -273,6 +273,14 @@
           if (detail) { e.stopPropagation(); DUTY.detail(detail.dataset.dutyDetail); return; }
           const row = e.target.closest('tr[data-week]');
           if (row) DUTY.detail(row.dataset.week);
+        });
+        tbody.addEventListener('keydown', function (e) {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          if (e.target.closest('button, a, input, select, textarea')) return;
+          const row = e.target.closest('tr[data-week]');
+          if (!row) return;
+          e.preventDefault();
+          DUTY.detail(row.dataset.week);
         });
       }
 
@@ -343,7 +351,7 @@
       body:
         '<div class="form-grid">' +
           U().formRow({ label: '姓名', required: true, control: '<input id="gmName" type="text" maxlength="10" value="' + U().esc(member ? member.name : '') + '" placeholder="请输入姓名">' }) +
-          U().formRow({ label: '岗位', required: true, control: '<select id="gmTitle"><option value="">请选择岗位</option>' + U().statusOptions(['高级工程师', '工程师', '助理工程师'], member ? member.title : '') + '</select>' }) +
+          U().formRow({ label: '岗位', required: true, control: '<select id="gmTitle"><option value="">请选择岗位</option>' + U().statusOptions((ITO.dictValues ? ITO.dictValues('personTitle', true) : ['高级工程师', '工程师', '助理工程师']), member ? member.title : '') + '</select>' }) +
           U().formRow({ label: '专业组', required: true, control: '<select id="gmGroup"><option value="">请选择专业组</option>' + U().groupOptions(member ? member.group : '') + '</select>' }) +
           U().formRow({ label: '联系电话', required: true, control: '<input id="gmPhone" type="text" value="' + U().esc(member ? member.phone : '') + '" placeholder="请输入联系电话">' }) +
           U().formRow({ label: '能力标签', full: true, control: '<input id="gmTags" type="text" value="' + U().esc(member ? member.tags.join('、') : '') + '" placeholder="选填，例如：核心岗、KCC">' }) +
@@ -437,10 +445,11 @@
           ((st.personAchievements || []).filter(function (a) { return a.person === member.name && a.type === '人员标签'; }).map(function (a) {
             const def = (st.wallTags || []).find(function (t) { return t.name === a.name && t.type === '人员标签'; });
             const color = (def && def.color) || '#EB612A';
-            const stars = a.source === '授权' ? 3 : Math.max(1, Math.min(3, a.stars || 1));
+            const stars = Math.max(1, Math.min(3, a.stars || 1));
+            const mark = a.source === '授权' ? '<span class="auth-mark">授权</span>' : '<em>' + '★'.repeat(stars) + '</em>';
             return '<div class="member-medal-card">' +
               '<span class="member-medal-icon" style="background:' + U().esc(color) + '">' + U().esc(String(a.name || '').slice(0, 2)) + '</span>' +
-              '<div class="member-medal-main"><b>' + U().esc(a.name) + '</b><span>' + U().esc(a.type) + ' · <em>' + '★'.repeat(stars) + '</em></span></div>' +
+              '<div class="member-medal-main"><b>' + U().esc(a.name) + '</b><span>' + U().esc(a.type) + ' · ' + mark + '</span></div>' +
             '</div>';
           }).join('') || '<span class="muted">暂无属性勋章</span>') +
         '</div></div>' +
@@ -511,11 +520,11 @@
       const rows = staff.map(function (p) {
         const g = ITO.getGroup(p.group);
         const role = g && g.manager === p.name ? '主管' : (g && g.leader === p.name ? '组长' : '成员');
+        const roleCls = role === '主管' ? 'manager' : role === '组长' ? 'leader' : 'member';
         return '<tr data-member="' + p.uid + '" style="cursor:pointer">' +
           '<td><div class="person-cell"><div><b>' + U().esc(p.name) + '</b><small>' + p.uid + '</small></div></div></td>' +
           '<td>' + U().groupPill(p.group) + '</td>' +
-          '<td><span class="tag-inline">' + role + '</span></td>' +
-          '<td>' + U().esc(p.title) + '</td>' +
+          '<td><span class="role-chip ' + roleCls + '">' + role + '</span></td>' +
           '<td>' + p.tags.map(function (t) { return '<span class="tag-inline">' + U().esc(t) + '</span>'; }).join('') + '</td>' +
           '<td class="num">' + p.joined + '</td>' +
         '</tr>';
@@ -523,11 +532,14 @@
 
       const activeGroup = filter ? ITO.getGroup(filter) : null;
       const totalFull = st.groups.reduce(function (n, g) { return n + (g.fullStrength || 0); }, 0);
-      const fillPct = totalFull ? Math.round(st.staff.length / totalFull * 100) : 0;
+      const scopeNow = activeGroup ? staff.length : st.staff.length;
+      const scopeFull = activeGroup ? (activeGroup.fullStrength || scopeNow) : totalFull;
+      const scopePct = scopeFull ? Math.round(scopeNow / scopeFull * 100) : 0;
+      const scopeBar = Math.min(100, scopePct);
 
       return U().pageHead({
         title: '组织架构',
-        sub: activeGroup ? '当前筛选：' + activeGroup.name + ' · 主管 ' + activeGroup.manager + ' · 组长 ' + (activeGroup.leader || '—') : '4 个专业组 · 满配 ' + st.groups.reduce(function (n, g) { return n + (g.fullStrength || 0); }, 0) + ' / 目前 ' + st.staff.length + ' 人',
+        sub: '4 个专业组 · 满配 ' + st.groups.reduce(function (n, g) { return n + (g.fullStrength || 0); }, 0) + ' / 目前 ' + st.staff.length + ' 人',
         actions:
           (filter ? '<button class="btn btn-ghost" id="clearGroupBtn" type="button">' + U().icon('close') + '取消筛选</button>' : '') +
           (canEditGroup() ? '<button class="btn btn-primary" id="addMemberBtn" type="button">' + U().icon('plus') + '新增成员</button>' : '')
@@ -536,19 +548,19 @@
 
       '<div class="groups-layout">' +
         '<section class="card chart-card">' +
-          '<div class="chart-head"><div><h3 class="chart-title">' + (activeGroup ? activeGroup.name + '人员变动' : '人员变动情况') + '</h3><p class="chart-sub">近 6 个月' + (activeGroup ? activeGroup.name : '各组') + '人数变化 · 满配 ' + st.groups.reduce(function (n, g) { return n + (g.fullStrength || 0); }, 0) + ' / 目前 ' + st.staff.length + '</p></div>' +
+          '<div class="chart-head"><div><h3 class="chart-title">' + (activeGroup ? activeGroup.name + '人员变动' : '人员变动情况') + '</h3><p class="chart-sub">近 6 个月' + (activeGroup ? activeGroup.name : '各组') + '人数变化</p></div>' +
             '<span class="head-tag">HEADCOUNT</span></div>' +
           '<div class="chart-body" id="groupLoadChart"></div>' +
           '<div class="group-chart-foot">' +
-            '<span>当前 <b>' + st.staff.length + '</b> / 满配 <b>' + totalFull + '</b></span>' +
-            '<div class="group-chart-bar"><i style="width:' + fillPct + '%"></i></div>' +
-            '<b class="pct">' + fillPct + '%</b>' +
+            '<span>当前 <b>' + scopeNow + '</b> / 满配 <b>' + scopeFull + '</b></span>' +
+            '<div class="group-chart-bar"><i style="width:' + scopeBar + '%;background:' + (activeGroup ? activeGroup.color : 'linear-gradient(90deg, var(--brand), #F59A6B)') + '"></i></div>' +
+            '<b class="pct" style="color:' + (activeGroup ? activeGroup.color : 'var(--brand)') + '">' + scopePct + '%</b>' +
           '</div>' +
         '</section>' +
         '<section class="card staff-panel">' +
           '<div class="staff-head"><div class="staff-head-left"><h3>成员名录</h3><span class="count">' + staff.length + ' 人</span></div>' +
-            '<span class="table-note">' + (activeGroup ? '主管 ' + activeGroup.manager + ' · 组长 ' + (activeGroup.leader || '—') : '全部专业组') + '</span></div>' +
-          '<div class="table-wrap"><table class="data-table"><thead><tr><th>成员</th><th>专业组</th><th>角色</th><th>岗位</th><th>标签</th><th>入组</th></tr></thead>' +
+            '<span class="table-note">' + (activeGroup ? activeGroup.name : '全部专业组') + '</span></div>' +
+          '<div class="table-wrap"><table class="data-table"><thead><tr><th>成员</th><th>专业组</th><th>角色</th><th>标签</th><th>入组</th></tr></thead>' +
           '<tbody>' + rows + '</tbody></table></div>' +
         '</section>' +
       '</div>';
@@ -559,7 +571,19 @@
       const filter = st.ui.groupFilter || '';
 
       const hist = D.groupHistory || { months: [], app: [], comm: [], online: [], infra: [] };
-      const histValues = st.groups.reduce(function (list, g) { return list.concat(hist[g.id] || []); }, []);
+      // 当前月点位实时联动：成员数量变化后，折线末点跟随 st.staff 在册数（过去 5 个月保持快照）
+      const currentMonthKey = D.meta.today.slice(0, 7);
+      const isCurrentMonth = hist.months.length > 0 && hist.months[hist.months.length - 1] === currentMonthKey;
+      const liveCount = {};
+      st.groups.forEach(function (g) {
+        liveCount[g.id] = st.staff.filter(function (p) { return p.group === g.id; }).length;
+      });
+      const seriesData = function (gid) {
+        const base = (hist[gid] || []).slice();
+        if (isCurrentMonth && base.length) base[base.length - 1] = liveCount[gid];
+        return base;
+      };
+      const histValues = st.groups.reduce(function (list, g) { return list.concat(seriesData(g.id)); }, []);
       const histMax = Math.max(3, Math.max.apply(null, histValues.concat([0])));
       const seriesGroups = filter ? st.groups.filter(function (g) { return g.id === filter; }) : st.groups;
       U().chart('groupLoadChart', {
@@ -590,7 +614,7 @@
         series: seriesGroups.map(function (g) {
           return {
             name: g.name, type: 'line', smooth: 0.35, symbol: 'circle', symbolSize: 6,
-            data: hist[g.id] || [],
+            data: seriesData(g.id),
             lineStyle: { width: 2, color: g.color },
             itemStyle: { color: g.color, borderColor: '#fff', borderWidth: 1 },
             emphasis: { focus: 'series' }
@@ -793,14 +817,25 @@
     return '【值班】' + w.start.slice(0, 4) + ' 年第 ' + w.weekNo + ' 周（' + cnDate(w.start) + '-' + cnDate(w.end) + '）值班表';
   }
 
+  function dutyCustomHeaders(template) {
+    return template || !ITO.customFieldExportHeaders ? [] : ITO.customFieldExportHeaders('duty');
+  }
+
+  function dutyCustomValues(w, template) {
+    return template || !ITO.customFieldExport ? [] : ITO.customFieldExport('duty', w);
+  }
+
   function buildDutyAoa(w, roster, template) {
+    const customHeaders = dutyCustomHeaders(template);
+    const customValues = dutyCustomValues(w, template);
+    const width = 4 + customHeaders.length;
     const aoa = [
-      ['ITO 运维中心 值班表' + (template ? '（模板）' : ''), '', '', ''],
-      [template ? '请填写姓名与值班手机；外部人员代码留空' : dutySheetSubtitle(w), '', '', ''],
-      ['岗位', '代码', '姓名', '值班手机']
+      ['ITO 运维中心 值班表' + (template ? '（模板）' : '')].concat(new Array(width - 1).fill('')),
+      [template ? '请填写姓名与值班手机；外部人员代码留空' : dutySheetSubtitle(w)].concat(new Array(width - 1).fill('')),
+      ['岗位', '代码', '姓名', '值班手机'].concat(customHeaders)
     ];
-    roster.forEach(function (r) {
-      aoa.push([r.post || '', r.code || '', r.name || '', r.phone || '']);
+    roster.forEach(function (r, i) {
+      aoa.push([r.post || '', r.code || '', r.name || '', r.phone || ''].concat(i === 0 ? customValues : customHeaders.map(function () { return ''; })));
     });
     return aoa;
   }
@@ -808,19 +843,22 @@
   function downloadDutyXlsx(w, roster, template) {
     const aoa = buildDutyAoa(w, roster, template);
     const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const width = 4 + dutyCustomHeaders(template).length;
     ws['!merges'] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: 3 } }
+      { s: { r: 0, c: 0 }, e: { r: 0, c: width - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: width - 1 } }
     ];
-    ws['!cols'] = [{ wch: 30 }, { wch: 12 }, { wch: 14 }, { wch: 20 }];
+    ws['!cols'] = [{ wch: 30 }, { wch: 12 }, { wch: 14 }, { wch: 20 }].concat(new Array(width - 4).fill({ wch: 18 }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '第' + w.weekNo + '周');
     XLSX.writeFile(wb, (template ? 'ITO值班表模板-' : 'ITO值班表-') + w.weekNo + '周.xlsx');
   }
 
   function previewDutyExport(w, roster) {
-    const rows = [['岗位', '代码', '姓名', '值班手机']].concat(roster.map(function (r) {
-      return [r.post || '', r.code || '', r.name || '', r.phone || ''];
+    const customHeaders = dutyCustomHeaders(false);
+    const customValues = dutyCustomValues(w, false);
+    const rows = [['岗位', '代码', '姓名', '值班手机'].concat(customHeaders)].concat(roster.map(function (r, i) {
+      return [r.post || '', r.code || '', r.name || '', r.phone || ''].concat(i === 0 ? customValues : customHeaders.map(function () { return ''; }));
     }));
     U().exportPreview({
       title: '值班表导出预览',
@@ -1024,6 +1062,7 @@
     let status = w.dutyStatus || '正常';
     let detailBody = null;
     let detailSub = null;
+    let changed = false;
 
     function openEdit(initialRows) {
       const draft = (initialRows || roster).map(function (r) { return Object.assign({}, r); });
@@ -1038,6 +1077,7 @@
               '<option value="异常"' + (status === '异常' ? ' selected' : '') + '>异常</option>' +
             '</select></label>' +
           '</div>' +
+          (ITO.customFieldForm ? ITO.customFieldForm('duty', w) : '') +
           '<div class="table-wrap"><table class="duty-sheet-table"><thead><tr><th>岗位</th><th>代码</th><th>姓名</th><th>值班手机</th></tr></thead>' +
           '<tbody id="dutyEditBody">' + dutySheetRowsHtml(draft, true) + '</tbody></table></div>',
         foot: '<button class="btn btn-ghost" data-cancel type="button">取消</button>' +
@@ -1067,10 +1107,18 @@
               U().toast('请填写所有姓名与值班手机', 'warn');
               return;
             }
+            const cf = ITO.readCustomFields ? ITO.readCustomFields(root, 'duty', w.extra) : { values: {}, errors: [] };
+            if (cf.errors.length) { U().toast(cf.errors[0], 'warn'); return; }
             roster = next;
             status = statusSel.value;
+            changed = true;
             w.dutyRoster = roster;
             w.dutyStatus = status;
+            w.extra = cf.values;
+            const customDetail = document.getElementById('dutyCustomDetail');
+            if (customDetail) {
+              customDetail.innerHTML = '<h4>扩展信息</h4><div class="table-wrap"><table class="data-table"><tbody>' + ITO.customFieldRows('duty', w) + '</tbody></table></div>';
+            }
             ITO.log('保存值班表', '第 ' + w.weekNo + ' 周 · ' + roster.length + ' 行', '值班');
             if (detailBody) detailBody.innerHTML = dutySheetRowsHtml(roster, false);
             if (detailSub) detailSub.textContent = '第 ' + w.weekNo + ' 周 · ' + w.start + ' 至 ' + w.end + ' · ' + status;
@@ -1116,9 +1164,12 @@
           '</div>' +
           '<div class="table-wrap"><table class="duty-sheet-table"><thead><tr><th>岗位</th><th>代码</th><th>姓名</th><th>值班手机</th></tr></thead>' +
           '<tbody id="dutyDetailBody">' + dutySheetRowsHtml(roster, false) + '</tbody></table></div>' +
+          (ITO.fieldDefsFor && ITO.fieldDefsFor('duty').length
+            ? '<div class="detail-section" id="dutyCustomDetail"><h4>扩展信息</h4><div class="table-wrap"><table class="data-table"><tbody>' + ITO.customFieldRows('duty', w) + '</tbody></table></div></div>'
+            : '') +
         '</div>',
       foot: '<button class="btn btn-ghost" data-close type="button">关闭</button>',
-      onClose: function () { ITO.refresh(); },
+      onClose: function () { if (changed) ITO.refresh(); },
       onMount: function (closeDetail, root) {
         detailBody = root.querySelector('#dutyDetailBody');
         detailSub = root.querySelector('.modal-head p');
@@ -1164,13 +1215,15 @@
     });
   }
 
+  ITO.openDutySheet = openDutySheet;
+
   P.duty = {
     render: function () {
       const st = S();
       st.ui = st.ui || {};
       const weeks = st.duty.weeks;
       const ci = weeks.findIndex(function (w) { return w.key === st.duty.currentKey; });
-      const list = (ci >= 0 ? weeks.slice(ci, ci + 4) : weeks.slice(0, 4));
+      const list = weeks;
       const current = list[0];
       const base = D.dutyRoster || [];
 

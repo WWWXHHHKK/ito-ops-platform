@@ -98,6 +98,9 @@
         return visibleSubs(t).some(function (s) { return overdueBucket(s) === f.age; });
       });
     }
+    if (ITO.customFieldMatch && f.custom && Object.keys(f.custom).some(function (k) { return !!f.custom[k]; })) {
+      list = list.filter(function (t) { return ITO.customFieldMatch('task', t, f.custom); });
+    }
 
     if (f.q) {
       const q = f.q.toLowerCase();
@@ -183,7 +186,7 @@
 
   function modeLabel(t) {
     if (t.mode === 'single') return '未拆分';
-    return t.subs.length + ' 个子任务';
+    return t.subs.length + ' 个任务';
   }
 
   function canManage(task) {
@@ -197,6 +200,19 @@
     if (!st.user) return false;
     if (!ITO.roleIs('leader', 'manager')) return false;
     return U().isTaskEditable(task);
+  }
+
+  function canLogWork(task, sub) {
+    const st = S();
+    if (!st.user || !sub || task.draft || task.canceled) return false;
+    if (ITO.isSuper()) return true;
+    if (sub.owner === st.user.name) return true;
+    return ITO.roleIs('leader', 'manager');
+  }
+
+  function canDirectClose(task, sub) {
+    if (!sub || sub.status === '已完成' || sub.status === '已取消') return false;
+    return ITO.isSuper() || ITO.roleIs('leader', 'manager');
   }
 
   const DELIVERABLE_EDITABLE_STATUS = ['执行中', '审批中', '已挂起', '已完成'];
@@ -282,6 +298,18 @@
     if ((sub.owner === st.user.name || ITO.isSuper()) && sub.status === '已挂起') {
       out += '<button class="btn btn-soft btn-sm" data-act="resubmit" data-task="' + task.id + '" data-sub="' + sub.id + '" type="button">重新提交</button>';
     }
+    if (canLogWork(task, sub)) {
+      out += '<button class="btn btn-ghost btn-sm" data-act="log-hours" data-task="' + task.id + '" data-sub="' + sub.id + '" type="button">补录工时</button>';
+    }
+    if (canLogWork(task, sub) && ITO.fieldDefsFor && ITO.fieldDefsFor('task', 'sub').length) {
+      out += '<button class="btn btn-ghost btn-sm" data-act="edit-sub-fields" data-task="' + task.id + '" data-sub="' + sub.id + '" type="button">执行字段</button>';
+    }
+    if (canLogWork(task, sub) && ['待分发', '执行中', '已挂起'].indexOf(sub.status) > -1) {
+      out += '<button class="btn btn-ghost btn-sm" data-act="update-progress" data-task="' + task.id + '" data-sub="' + sub.id + '" type="button">更新进度</button>';
+    }
+    if (canDirectClose(task, sub)) {
+      out += '<button class="btn btn-soft btn-sm" data-act="close-sub" data-task="' + task.id + '" data-sub="' + sub.id + '" type="button">直接闭环</button>';
+    }
     if (canManage(task) && ['待分发', '执行中'].indexOf(sub.status) > -1) {
       out += '<button class="btn btn-ghost btn-sm" data-act="reassign" data-task="' + task.id + '" data-sub="' + sub.id + '" type="button">改派</button>';
     }
@@ -315,10 +343,39 @@
     return '<button class="btn btn-ghost btn-sm" data-act="deliverables" data-task="' + task.id + '" type="button">查看成果物</button>';
   }
 
+  function customFilterHtml(f, value) {
+    const vals = f.source === 'dict'
+      ? ITO.dictValues(f.dictId, true)
+      : ((f.type === 'select' || f.type === 'multiselect') ? String(f.options || '').split(/[\n,，、]/).map(function (s) { return s.trim(); }).filter(Boolean) : []);
+    if (vals.length && f.type === 'multiselect') {
+      const selected = (Array.isArray(value) ? value : String(value || '').split(/[,，]/)).map(function (v) { return String(v).trim(); }).filter(Boolean);
+      const label = '全部' + f.label;
+      return '<div class="cf-filter-multi" data-cf-filter-wrap="' + U().esc(f.key) + '">' +
+        '<button type="button" class="select cf-filter-toggle" data-cf-filter-label="' + U().esc(label) + '" aria-expanded="false">' +
+          U().esc(selected.length ? selected.join('、') : label) +
+        '</button>' +
+        '<div class="cf-filter-menu" hidden>' +
+          '<div class="cf-filter-options">' + vals.map(function (v) {
+            return '<label class="cf-filter-option"><input type="checkbox" data-cf-filter-opt="' + U().esc(v) + '"' + (selected.indexOf(v) > -1 ? ' checked' : '') + '><span>' + U().esc(v) + '</span></label>';
+          }).join('') + '</div>' +
+          '<div class="cf-filter-foot"><span>可多选</span><button type="button" class="link-btn" data-cf-filter-clear>清空</button></div>' +
+        '</div>' +
+        '<input type="hidden" data-task-cf="' + U().esc(f.key) + '" value="' + U().esc(selected.join(',')) + '">' +
+      '</div>';
+    }
+    if (vals.length) {
+      return '<select class="select" data-task-cf="' + U().esc(f.key) + '" aria-label="' + U().esc(f.label) + '"><option value="">全部' + U().esc(f.label) + '</option>' +
+        vals.map(function (v) { return '<option value="' + U().esc(v) + '"' + (value === v ? ' selected' : '') + '>' + U().esc(v) + '</option>'; }).join('') + '</select>';
+    }
+    return '<input class="oh-search" type="search" data-task-cf="' + U().esc(f.key) + '" value="' + U().esc(value || '') + '" placeholder="筛选' + U().esc(f.label) + '">';
+  }
+
   function rowsHtml(list) {
     const st = S();
+    const customHeaders = ITO.customFieldHeaders ? ITO.customFieldHeaders('task') : [];
+    const cols = 10 + customHeaders.length;
     if (!list.length) {
-      return '<tr><td colspan="10">' + U().emptyState('没有匹配的任务', '调整筛选条件，或新建一个任务', 'task') + '</td></tr>';
+      return '<tr><td colspan="' + cols + '">' + U().emptyState('没有匹配的任务', '调整筛选条件，或新建一个任务', 'task') + '</td></tr>';
     }
     return list.map(function (t) {
       const subs = visibleSubs(t);
@@ -328,10 +385,10 @@
       const expandable = t.mode !== 'single';
 
       const mainRow =
-        '<tr class="task-main-row" data-id="' + t.id + '">' +
+        '<tr class="task-main-row" data-id="' + t.id + '" tabindex="0" role="button" aria-label="查看任务 ' + U().esc(t.name) + '">' +
           '<td><div class="task-name">' +
             (expandable
-              ? '<button class="expand-btn' + (expanded ? ' open' : '') + '" data-act="expand" data-id="' + t.id + '" type="button" aria-label="展开子任务">' + caret + '</button>'
+              ? '<button class="expand-btn' + (expanded ? ' open' : '') + '" data-act="expand" data-id="' + t.id + '" type="button" aria-label="' + (expanded ? '收起任务' : '展开任务') + '" aria-expanded="' + (expanded ? 'true' : 'false') + '">' + caret + '</button>'
               : '<span class="expand-space"></span>') +
             '<div class="task-name-text"><b>' + U().esc(t.name) + '</b><small>' + t.id + ' · ' + modeLabel(t) + ' · ' + U().esc(t.type) + '</small></div></div></td>' +
           '<td>' + U().groupPill(t.group) + '</td>' +
@@ -342,13 +399,14 @@
           '<td>' + U().badge(t.level) + '</td>' +
           '<td>' + dueCell(t.due, status) + '</td>' +
           '<td><div class="status-cell">' + U().badge(status) + '</div></td>' +
+          (ITO.customFieldCells ? ITO.customFieldCells('task', t) : '') +
           '<td><div class="row-actions">' + rowActions(t) + '</div></td>' +
         '</tr>';
 
       const subRow = expandable
-        ? '<tr class="task-subrow" data-sub="' + t.id + '"' + (expanded ? '' : ' hidden') + '><td colspan="10"><div class="sub-list">' +
+        ? '<tr class="task-subrow" data-sub="' + t.id + '"' + (expanded ? '' : ' hidden') + '><td colspan="' + cols + '"><div class="sub-list">' +
             subs.map(function (s) {
-              return '<div class="sub-item' + (U().isOverdue(s) ? ' is-over' : '') + '" data-sub-detail="' + t.id + '|' + s.id + '">' +
+              return '<div class="sub-item' + (U().isOverdue(s) ? ' is-over' : '') + '" data-sub-detail="' + t.id + '|' + s.id + '" tabindex="0" role="button" aria-label="查看执行任务 ' + U().esc(s.name) + '">' +
                 '<span class="sid">' + s.id + '</span>' +
                 '<span class="sname" title="' + U().esc(s.name) + '">' + U().esc(s.name) + '</span>' +
                 '<span class="sowner">' + U().roleChip(s.owner, 'executor') + '</span>' +
@@ -368,10 +426,10 @@
     const s = stats(list);
     const parts = [
       '<span class="stat-chip">主任务 <b>' + s.main + '</b></span>',
-      '<span class="stat-chip">子任务 <b>' + s.subs + '</b></span>',
+      '<span class="stat-chip">任务 <b>' + s.subs + '</b></span>',
       '<span class="stat-chip">审批中 <b>' + s.approval + '</b></span>',
       '<span class="stat-chip' + (s.hung ? ' warn' : '') + '">已挂起 <b>' + s.hung + '</b></span>',
-      '<span class="stat-chip' + (s.allOverdue ? ' warn' : '') + '" title="含未完成超期与已完成但晚于截止的子任务">超期 <b>' + s.allOverdue + '</b></span>',
+      '<span class="stat-chip' + (s.allOverdue ? ' warn' : '') + '" title="含未完成超期与已完成但晚于截止的任务">超期 <b>' + s.allOverdue + '</b></span>',
       '<span class="stat-chip good">已完成 <b>' + s.completed + '</b></span>'
     ];
     parts.push('<span class="stat-chip">草稿 <b>' + s.drafts + '</b></span>');
@@ -518,10 +576,12 @@
       (t.desc ? '<p class="detail-desc">' + U().esc(t.desc) + '</p>' : '') +
       (t.canceled ? '<div class="cancel-note"><b>任务已取消</b><span>' + U().esc(t.canceled.reason) + ' · ' + U().esc(t.canceled.by) + ' · ' + U().esc(t.canceled.at) + '</span></div>' : '') +
       '<div class="detail-grid">' +
+        '<div class="detail-field"><label>任务编号</label><div class="mono">' + t.id + '</div></div>' +
+        (focus ? '<div class="detail-field"><label>执行任务编号</label><div class="mono">' + focus.id + '</div></div>' : '') +
         '<div class="detail-field"><label>专业组</label><div>' + U().esc((ITO.getGroup(t.group) || {}).name || '') + '</div></div>' +
         '<div class="detail-field"><label>负责人</label><div>' + U().esc(t.owner) + '</div></div>' +
         '<div class="detail-field"><label>发起人</label><div>' + U().esc(t.initiator || '—') + '</div></div>' +
-        '<div class="detail-field"><label>任务模式</label><div>' + U().esc(t.mode === 'single' ? '未拆分' : '拆分子任务') + '</div></div>' +
+        '<div class="detail-field"><label>任务模式</label><div>' + U().esc(t.mode === 'single' ? '未拆分' : '拆分任务') + '</div></div>' +
         '<div class="detail-field"><label>任务类型</label><div>' + U().esc(t.type) + '</div></div>' +
         '<div class="detail-field"><label>优先级</label><div>' + U().esc(t.level) + '</div></div>' +
         '<div class="detail-field"><label>截止时间</label><div>' + U().esc(t.due || '—') + '</div></div>' +
@@ -531,10 +591,12 @@
         '<div class="detail-field"><label>授权汇总</label><div>' + (auths.length ? auths.map(function (a) {
           return '<span class="tag-inline">' + U().esc(a) + '</span>';
         }).join('') : '<span class="muted">—</span>') + '</div></div>' +
-        '<div class="detail-field"><label>开票需求</label><div>' + (tickets ? tickets + ' 个子任务需开票' : '无需开票') + '</div></div>' +
+        '<div class="detail-field"><label>开票需求</label><div>' + (tickets ? tickets + ' 个任务需开票' : '无需开票') + '</div></div>' +
+        '<div class="detail-field"><label>实际工时</label><div>' + (ITO.actualHoursOf ? Math.round(t.subs.reduce(function (n, s) { return n + ITO.actualHoursOf(s); }, 0) * 10) / 10 : 0) + ' 小时</div></div>' +
         '<div class="detail-field"><label>创建</label><div>' + U().esc((t.createdAt || '—') + ' · ' + (t.createdBy || '—')) + '</div></div>' +
         '<div class="detail-field"><label>最近更新</label><div>' + U().esc((t.updatedAt || '—') + ' · ' + (t.updatedBy || '—')) + '</div></div>' +
       '</div>' +
+      (ITO.fieldDefsFor && ITO.fieldDefsFor('task').length ? '<div class="detail-section"><h4>扩展字段</h4><div class="table-wrap"><table class="data-table"><tbody>' + ITO.customFieldRows('task', t) + '</tbody></table></div></div>' : '') +
       (single ? '<div class="detail-section"><h4>执行信息</h4><div class="detail-grid">' +
         '<div class="detail-field"><label>执行人</label><div>' + U().esc(single.owner) + '</div></div>' +
         '<div class="detail-field"><label>预估工时</label><div>' + (single.hours || 0) + ' 小时</div></div>' +
@@ -544,11 +606,15 @@
         (singleApproval && singleApproval.comment ? '<div class="detail-field"><label>审批意见</label><div>' + U().esc(singleApproval.comment) + '</div></div>' : '') +
         (single.completedAt ? '<div class="detail-field"><label>完成时间</label><div>' + U().esc(single.completedAt) + '</div></div>' : '') +
       '</div></div>' : '') +
-      (focus ? '<div class="detail-section"><h4>当前关注子任务</h4><div class="focus-sub">' +
+      (focus ? '<div class="detail-section"><h4>当前关注任务</h4><div class="focus-sub">' +
         '<b>' + focus.id + ' · ' + U().esc(focus.name) + '</b><span>' + U().esc(focus.owner) + ' · ' + U().esc(focus.status) + '</span></div></div>' : '') +
+      (focus && ITO.fieldDefsFor && ITO.fieldDefsFor('task', 'sub').length
+        ? '<div class="detail-section"><h4>执行任务扩展字段</h4><div class="table-wrap"><table class="data-table"><tbody>' +
+            ITO.customFieldRows('task', focus, 'sub') + '</tbody></table></div></div>'
+        : '') +
       approvalBox +
       deliverableSection +
-      (t.mode !== 'single' ? '<div class="detail-section"><h4>子任务（' + t.subs.length + '）</h4>' +
+      (t.mode !== 'single' ? '<div class="detail-section"><h4>任务（' + t.subs.length + '）</h4>' +
         '<div class="table-wrap"><table class="sub-table task-detail-sub"><thead><tr><th>编号</th><th>名称</th><th>执行人</th><th>等级</th><th>授权</th><th>开票</th><th>标签</th><th>状态</th><th>截止</th><th>操作</th></tr></thead><tbody>' +
         subRows + '</tbody></table></div></div>' : '') +
       '<div class="detail-section"><h4>操作记录</h4><div class="timeline">' +
@@ -574,6 +640,18 @@
       if (t.mode === 'single' && single && (single.owner === st.user.name || ITO.isSuper())) {
         if (single.status === '执行中') foot += '<button class="btn btn-primary" data-submit-single type="button">提交成果</button>';
         if (single.status === '已挂起') foot += '<button class="btn btn-soft" data-resubmit-single type="button">重新提交</button>';
+      }
+      if (t.mode === 'single' && single && canLogWork(t, single)) {
+        foot += '<button class="btn btn-ghost" data-act="log-hours" data-task="' + t.id + '" data-sub="' + single.id + '" type="button">补录工时</button>';
+      }
+      if (t.mode === 'single' && single && canLogWork(t, single) && ITO.fieldDefsFor && ITO.fieldDefsFor('task', 'sub').length) {
+        foot += '<button class="btn btn-ghost" data-act="edit-sub-fields" data-task="' + t.id + '" data-sub="' + single.id + '" type="button">执行字段</button>';
+      }
+      if (t.mode === 'single' && single && canLogWork(t, single) && ['待分发', '执行中', '已挂起'].indexOf(single.status) > -1) {
+        foot += '<button class="btn btn-ghost" data-act="update-progress" data-task="' + t.id + '" data-sub="' + single.id + '" type="button">更新进度</button>';
+      }
+      if (t.mode === 'single' && single && canDirectClose(t, single)) {
+        foot += '<button class="btn btn-soft" data-act="close-sub" data-task="' + t.id + '" data-sub="' + single.id + '" type="button">直接闭环</button>';
       }
       if (U().isTaskCancelable(t) && isOwnerOrInitiator(t)) {
         foot += '<button class="btn btn-danger" data-cancel-task type="button">取消任务</button>';
@@ -748,7 +826,7 @@
           '<span class="task-source-label">任务模式</span>' +
           '<div class="seg-toggle" id="ntMode">' +
             '<button type="button" data-mode="single">不拆分 · 普通任务</button>' +
-            '<button type="button" data-mode="split">拆分子任务</button>' +
+            '<button type="button" data-mode="split">拆分任务</button>' +
           '</div>' +
           '<span class="task-source-hint" id="ntModeHint"></span>' +
         '</div>' +
@@ -767,12 +845,13 @@
           '<div class="form-field full"><label>任务描述</label>' +
             '<textarea id="ntDesc" placeholder="补充背景、交付物与验收标准">' + U().esc(editing ? (editing.desc || '') : '') + '</textarea></div>' +
         '</div>' +
+        (ITO.customFieldForm ? ITO.customFieldForm('task', editing) : '') +
         '<div class="single-fields" id="ntSingleFields">' +
           '<div class="subtask-head"><div><h4>执行信息</h4><span>普通任务只需填写一次执行信息，提交后进入审批</span></div></div>' +
           '<div class="form-grid cols-3">' +
             '<div class="form-field"><label>任务类型</label><select id="ntSingleType"><option value="">请选择类型</option>' + U().statusOptions(TASK_TYPES, singleType) + '</select></div>' +
             '<div class="form-field"><label>预估工时</label><input id="ntSingleHours" type="number" min="0.5" max="200" step="0.5" value="' + singleHours + '" placeholder="请输入工时"></div>' +
-            '<div class="form-field"><label>执行人 <em>*</em></label><select id="ntSingleOwner"><option value="">请选择执行人</option>' + U().peopleOptions(groupId, singleOwner) + '</select></div>' +
+            '<div class="form-field"><label>执行人 <em>*</em></label><select id="ntSingleOwner"><option value="">请选择执行人</option>' + U().peopleOptions(groupId, singleOwner, { auth: singleAuth, hours: singleHours }) + '</select></div>' +
             '<div class="form-field"><label>截止时间 <em>*</em></label><input id="ntSingleDue" type="datetime-local" value="' + singleDue + '"></div>' +
             '<div class="form-field"><label>开票</label><label class="ticket-check-line"><input id="ntSingleTicket" type="checkbox"' + (singleTicket ? ' checked' : '') + '><span>需要开票</span></label></div>' +
             '<div class="form-field"><label>授权</label><select id="ntSingleAuth"><option value="">请选择授权</option>' + U().statusOptions(AUTH_TYPES, singleAuth) + '</select></div>' +
@@ -780,13 +859,13 @@
         '</div>' +
         '<div class="split-fields" id="ntSplitFields">' +
           '<div class="subtask-head">' +
-            '<div><h4>任务拆分</h4><span>共 <b id="ntSubCount">' + rows.length + '</b> 个子任务 · 每个子任务独立设置执行人、授权、开票与标签</span></div>' +
-            (live ? '' : '<button class="btn btn-soft btn-sm" id="ntAddRow" type="button">' + U().icon('plus') + '添加子任务行</button>') +
+            '<div><h4>任务拆分</h4><span>共 <b id="ntSubCount">' + rows.length + '</b> 个任务 · 每个任务独立设置执行人、授权、开票与标签</span></div>' +
+            (live ? '' : '<button class="btn btn-soft btn-sm" id="ntAddRow" type="button">' + U().icon('plus') + '添加任务行</button>') +
           '</div>' +
           '<div class="subtask-errors" id="ntSubErrors" hidden></div>' +
           '<div class="subtask-wrap">' +
             '<table class="subtask-table">' +
-              '<thead><tr><th>子任务名称 <em>*</em></th><th>类型</th><th>等级</th><th>预估工时</th><th>执行人 <em>*</em></th><th>授权</th><th>开票</th><th>截止时间 <em>*</em></th><th>任务标签</th><th></th></tr></thead>' +
+              '<thead><tr><th>任务名称 <em>*</em></th><th>类型</th><th>等级</th><th>预估工时</th><th>执行人 <em>*</em></th><th>授权</th><th>开票</th><th>截止时间 <em>*</em></th><th>任务标签</th><th></th></tr></thead>' +
               '<tbody id="ntSubBody"></tbody>' +
             '</table>' +
           '</div>' +
@@ -804,7 +883,7 @@
 
     U().modal({
       title: editing ? (live ? '编辑任务' : '编辑草稿任务') : '新建任务',
-      sub: editing ? editing.id + ' · ' + (live ? '修改任务内容，审批中不可编辑' : '草稿可继续拆分，确认派发后进入执行流程') : '创建时直接拆分子任务 · 保存草稿或直接派发',
+      sub: editing ? editing.id + ' · ' + (live ? '修改任务内容，审批中不可编辑' : '草稿可继续拆分，确认派发后进入执行流程') : '创建时直接拆分任务 · 保存草稿或直接派发',
       xwide: true,
       body: body,
       foot: foot,
@@ -863,16 +942,16 @@
 
         function rowHtml(row, i) {
           return '<tr data-row="' + i + '">' +
-            '<td><input class="cell-input" data-f="name" type="text" maxlength="40" placeholder="子任务名称" value="' + U().esc(row.name) + '"></td>' +
+            '<td><input class="cell-input" data-f="name" type="text" maxlength="40" placeholder="任务名称" value="' + U().esc(row.name) + '"></td>' +
             '<td><select class="cell-select" data-f="type"><option value="">请选择类型</option>' + U().statusOptions(TASK_TYPES, row.type) + '</select></td>' +
             '<td><select class="cell-select" data-f="level"><option value="">请选择等级</option>' + U().statusOptions(LEVELS, row.level) + '</select></td>' +
             '<td><input class="cell-input num" data-f="hours" type="number" min="0.5" max="200" step="0.5" value="' + row.hours + '" placeholder="工时"></td>' +
-            '<td><select class="cell-select" data-f="owner"' + (live ? ' disabled' : '') + '><option value="">请选择执行人</option>' + U().peopleOptions(currentGroup, row.owner) + '</select></td>' +
+            '<td><select class="cell-select" data-f="owner"' + (live ? ' disabled' : '') + '><option value="">请选择执行人</option>' + U().peopleOptions(currentGroup, row.owner, { auth: row.auth, hours: row.hours }) + '</select></td>' +
             '<td><select class="cell-select" data-f="auth"' + (row.ticket ? '' : ' disabled') + '><option value="">请选择授权</option>' + U().statusOptions(AUTH_TYPES, row.auth) + '</select></td>' +
             '<td class="cell-center"><label class="ticket-check" title="是否需要开票"><input type="checkbox" data-f="ticket"' + (row.ticket ? ' checked' : '') + '><span></span></label></td>' +
             '<td><input class="cell-input" data-f="due" data-date-picker="1" type="datetime-local" value="' + U().esc(row.due) + '"></td>' +
             '<td><div class="sub-tags" data-row-tags="' + i + '"></div></td>' +
-            '<td class="cell-center">' + (live ? '' : '<button class="row-del" data-del-row="' + i + '" type="button" aria-label="删除子任务">' + U().icon('trash') + '</button>') + '</td>' +
+            '<td class="cell-center">' + (live ? '' : '<button class="row-del" data-del-row="' + i + '" type="button" aria-label="删除任务">' + U().icon('trash') + '</button>') + '</td>' +
           '</tr>';
         }
 
@@ -910,7 +989,7 @@
         function hints() {
           modeHint.textContent = currentMode === 'single'
             ? '普通任务只需要一套执行信息，执行完成后进入负责人审批。'
-            : '父任务只填基本信息，子任务独立派发、执行、审批，全部完成后父任务闭环。';
+            : '父任务只填基本信息，任务独立派发、执行、审批，全部完成后父任务闭环。';
         }
 
         function paintMainTags() {
@@ -975,7 +1054,9 @@
           syncRows();
           currentGroup = groupSel.value;
           ownerSel.innerHTML = '<option value="">请选择负责人</option>' + U().leadOptions(currentGroup, '');
-          singleOwner.innerHTML = '<option value="">请选择执行人</option>' + U().peopleOptions(currentGroup, '');
+          singleOwner.innerHTML = '<option value="">请选择执行人</option>' + U().peopleOptions(currentGroup, '', {
+            auth: singleAuth.value, hours: singleHours.value
+          });
           rows = rows.map(function (row) { row.owner = ''; return row; });
           renderRows();
         });
@@ -1018,7 +1099,7 @@
           if (tagBtn) {
             syncRows();
             const i = Number(tagBtn.dataset.tagRow);
-            openTagPicker(root, '子任务标签 · ' + (rows[i].name || '未命名'), rows[i].tags, function (picked) {
+            openTagPicker(root, '任务标签 · ' + (rows[i].name || '未命名'), rows[i].tags, function (picked) {
               rows[i].tags = picked;
               paintRowTags(i);
             });
@@ -1085,7 +1166,7 @@
           } else if (isDraft) {
             kept = kept.filter(function (row) { return row.name || row.tags.length || row.ticket; });
           } else {
-            if (!kept.length) { U().toast('请至少拆分一个子任务', 'warn'); return; }
+            if (!kept.length) { U().toast('请至少拆分一个任务', 'warn'); return; }
             if (subErrors) { subErrors.hidden = true; subErrors.innerHTML = ''; }
             tbody.querySelectorAll('.is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
             tbody.querySelectorAll('.sel-wrap.is-invalid, .date-wrap.is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
@@ -1093,7 +1174,7 @@
               const tr = tbody.querySelector('tr[data-row="' + i + '"]');
               if (!tr) continue;
               const checks = [
-                ['name', '请输入子任务名称'],
+                ['name', '请输入任务名称'],
                 ['type', '请选择类型'],
                 ['level', '请选择等级'],
                 ['hours', '请输入工时'],
@@ -1111,6 +1192,20 @@
             if (tbody.querySelector('.is-invalid')) return;
           }
 
+          const assignments = currentMode === 'single'
+            ? [{ name: single.owner, auth: single.ticket ? single.auth : '无需授权', hours: single.hours, due: single.due }]
+            : kept.map(function (row) {
+                return { name: row.owner, auth: row.ticket ? row.auth : '无需授权', hours: Number(row.hours) || 0, due: row.due };
+              });
+          const risky = (!isDraft && !isLive && ITO.assigneeInfo) ? assignments.map(function (a) {
+            return { a: a, info: ITO.assigneeInfo(a.name, a.auth, a.hours, a.due) };
+          }).filter(function (entry) {
+            return entry.info.weekAfter > 100 || entry.info.monthAfter > 100 || !entry.info.authOk;
+          }) : [];
+
+          const proceed = function () {
+          const cf = ITO.readCustomFields ? ITO.readCustomFields(root, 'task', editing ? editing.extra : null) : { values: {}, errors: [] };
+          if (cf.errors.length) { U().toast(cf.errors[0], 'warn'); return; }
           const baseId = editing ? editing.id : 'T' + (st.taskSeq++);
           let subs;
           if (currentMode === 'single') {
@@ -1133,7 +1228,7 @@
               const subStatus = isLive && existing ? existing.status : (isDraft ? '草稿' : '待分发');
               return {
                 id: existing ? existing.id : baseId + '-' + String(i + 1).padStart(2, '0'),
-                name: row.name || '未命名子任务', group: currentGroup, owner: row.owner, initiator: initiator,
+                name: row.name || '未命名任务', group: currentGroup, owner: row.owner, initiator: initiator,
                 level: row.level, type: row.type, status: subStatus,
                 due: (row.due || '').replace('T', ' '), hours: row.hours || 0,
                 progress: isLive && existing ? existing.progress : 0,
@@ -1155,6 +1250,7 @@
             id: baseId, name: name, group: currentGroup, owner: owner,
             initiator: initiator, source: source, level: level, type: type,
             due: due, tags: mainTags.slice(), desc: descEl.value.trim() || '待补充任务背景与验收标准。',
+            extra: cf.values,
             mode: currentMode, draft: isDraft, canceled: null,
             summaryRework: isLive ? !!editing.summaryRework : false,
             leaderApproval: editing ? editing.leaderApproval : null,
@@ -1182,7 +1278,7 @@
 
           ITO.log(
             isLive ? '编辑任务' : isDraft ? (editing ? '更新任务草稿' : '保存任务草稿') : (editing ? '派发草稿任务' : '新建并派发任务'),
-            baseId + ' ' + name + ' · ' + subs.length + ' 个子任务',
+            baseId + ' ' + name + ' · ' + subs.length + ' 个任务',
             '任务'
           );
 
@@ -1193,6 +1289,30 @@
           close();
           U().toast(isLive ? '任务已更新' : isDraft ? '草稿已保存，可稍后继续拆分' : '任务已创建并进入待分发');
           ITO.refresh();
+          };
+
+          if (risky.length) {
+            const lines = risky.map(function (entry) {
+              const reasons = [];
+              if (entry.info.weekAfter > 100 || entry.info.monthAfter > 100) {
+                reasons.push('本周 ' + entry.info.weekAfter + '% / 本月 ' + entry.info.monthAfter + '%');
+              }
+              if (!entry.info.authOk) reasons.push('缺少' + (entry.a.auth || '所需授权'));
+              return '<li style="margin:4px 0"><b>' + U().esc(entry.a.name || '未选择执行人') + '</b> · ' + U().esc(entry.a.hours || 0) + 'h · ' + U().esc(reasons.join(' / ')) + '</li>';
+            }).join('');
+            U().modal({
+              title: '派发风险确认',
+              sub: '以下人员负荷将超过 100% 或缺少作业授权',
+              body: '<div class="detail-section"><p style="margin:0 0 8px">仍可继续派发，确认后任务进入待分发状态。</p><ul style="margin:0;padding-left:18px">' + lines + '</ul></div>',
+              foot: '<button class="btn btn-ghost" data-close type="button">返回调整</button><button class="btn btn-primary" data-ok type="button">确认继续</button>',
+              onMount: function (closeGuard, root) {
+                root.querySelector('[data-close]').addEventListener('click', closeGuard);
+                root.querySelector('[data-ok]').addEventListener('click', function () { closeGuard(); proceed(); });
+              }
+            });
+          } else {
+            proceed();
+          }
         }
 
         root.querySelector('[data-cancel]').addEventListener('click', close);
@@ -1217,7 +1337,7 @@
     U().confirm({
       title: '删除草稿任务',
       text: (t.subs.length
-        ? '将删除「' + t.name + '」及其 ' + t.subs.length + ' 个子任务草稿。'
+        ? '将删除「' + t.name + '」及其 ' + t.subs.length + ' 个任务草稿。'
         : '将删除草稿「' + t.name + '」。') + '该操作不会影响在办、超期与趋势统计。',
       okText: '删除草稿',
       danger: true
@@ -1241,41 +1361,66 @@
     const dueVal = String(sub.due).replace(' ', 'T');
 
     U().modal({
-      title: '派发子任务',
+      title: '派发任务',
       sub: t.id + ' · ' + t.name,
       body:
         '<div class="dispatch-preview">' + U().badge(sub.level) + U().groupPill(sub.group) +
           '<b>' + U().esc(sub.name) + '</b><span class="mono">' + sub.id + '</span></div>' +
         '<div class="form-grid" style="margin-top:16px">' +
-          U().formRow({ label: '执行人', required: true, control: '<select id="dpOwner">' + U().peopleOptions(sub.group, sub.owner) + '</select>' }) +
+          U().formRow({ label: '执行人', required: true, control: '<select id="dpOwner">' + U().peopleOptions(sub.group, sub.owner, { auth: sub.ticket ? sub.auth : '无需授权', hours: sub.hours, due: sub.due }) + '</select>' }) +
           U().formRow({ label: '截止时间', required: true, control: '<input id="dpDue" type="datetime-local" value="' + dueVal + '">' }) +
           U().formRow({ label: '作业授权', full: true, control: '<select id="dpAuth">' + U().statusOptions(AUTH_TYPES, sub.ticket ? (sub.auth === '—' ? '工作负责人授权' : sub.auth) : '无需授权') + '</select>' }) +
+          '<div class="form-field full"><div class="assign-hint" id="dpHint"></div></div>' +
           U().formRow({ label: '派发说明', full: true, control: '<textarea id="dpNote" placeholder="说明交付物、验收标准与注意事项"></textarea>' }) +
         '</div>',
       foot: '<button class="btn btn-ghost" data-cancel type="button">取消</button><button class="btn btn-primary" data-ok type="button">' + U().icon('send') + '确认派发</button>',
       onMount: function (close, root) {
         const authSel = root.querySelector('#dpAuth');
         if (!sub.ticket) authSel.disabled = true;
+        const ownerSel = root.querySelector('#dpOwner');
+        const dueInput = root.querySelector('#dpDue');
+        const dpHint = root.querySelector('#dpHint');
+        const paintHint = function () {
+          if (!dpHint || !ITO.assigneeInfo) return;
+          const auth = sub.ticket ? authSel.value : '无需授权';
+          const info = ITO.assigneeInfo(ownerSel.value, auth, sub.hours, (dueInput.value || '').replace('T', ' '));
+          const bad = info.weekAfter > 100 || info.monthAfter > 100 || !info.authOk;
+          dpHint.innerHTML = '<span class="' + (bad ? 'text-red' : '') + '">本周 ' + info.weekRate + '% → ' + info.weekAfter + '% · 本月 ' +
+            info.monthRate + '% → ' + info.monthAfter + '% · 本周剩余 ' + info.weekRemain + 'h · ' +
+            (info.authOk ? '授权匹配' : '缺少' + U().esc(auth)) + '</span>';
+        };
+        paintHint();
+        ownerSel.addEventListener('change', paintHint);
+        authSel.addEventListener('change', paintHint);
+        dueInput.addEventListener('change', paintHint);
         root.querySelector('[data-cancel]').addEventListener('click', close);
         root.querySelector('[data-ok]').addEventListener('click', function () {
           const owner = root.querySelector('#dpOwner').value;
           const dueRaw = root.querySelector('#dpDue').value;
           if (!owner || !dueRaw) { U().toast('请补全执行人与截止时间', 'warn'); return; }
-          sub.owner = owner;
-          sub.due = dueRaw.replace('T', ' ');
-          sub.auth = sub.ticket ? authSel.value : '无需授权';
-          sub.status = '执行中';
-          sub.note = root.querySelector('#dpNote').value.trim();
-          ITO.log('派发任务', sub.id + ' ' + sub.name + ' → ' + owner, '任务');
-          ITO.notify(owner, {
-            type: '任务',
-            title: '新任务已派发',
-            body: t.name + ' · ' + sub.name + '，截止 ' + sub.due,
-            link: '#/mine'
-          });
-          close();
-          U().toast('已派发给 ' + owner + '，任务进入执行中');
-          ITO.refresh();
+          const authVal = sub.ticket ? authSel.value : '无需授权';
+          const commit = function () {
+            sub.owner = owner;
+            sub.due = dueRaw.replace('T', ' ');
+            sub.auth = authVal;
+            sub.status = '执行中';
+            sub.note = root.querySelector('#dpNote').value.trim();
+            ITO.log('派发任务', sub.id + ' ' + sub.name + ' → ' + owner, '任务');
+            ITO.notify(owner, {
+              type: '任务',
+              title: '新任务已派发',
+              body: t.name + ' · ' + sub.name + '，截止 ' + sub.due,
+              link: '#/mine'
+            });
+            close();
+            U().toast('已派发给 ' + owner + '，任务进入执行中');
+            ITO.refresh();
+          };
+          if (ITO.guardAssignment) {
+            ITO.guardAssignment({ name: owner, auth: authVal, hours: sub.hours, due: dueRaw.replace('T', ' ') }, commit);
+          } else {
+            commit();
+          }
         });
       }
     });
@@ -1295,6 +1440,7 @@
           U().formRow({ label: '执行人', control: '<div class="static-field">' + U().esc(sub.owner) + '</div>' }) +
           U().formRow({ label: '负责人审批', control: '<div class="static-field">' + U().esc(t.owner) + '</div>' }) +
           U().formRow({ label: ticket ? '开票 / 授权' : '开票', control: '<div class="static-field">' + (ticket ? '需开票 · ' + U().esc(sub.auth) : '无需开票') + '</div>' }) +
+          U().formRow({ label: '本次投入工时', required: true, control: '<input id="sbHours" type="number" min="0.5" max="200" step="0.5" value="' + (ITO.remainingHoursOf ? Math.max(0.5, ITO.remainingHoursOf(sub)) : (sub.hours || 1)) + '"><span class="form-hint">按本次实际投入填写，用于个人工时与负载统计</span>' }) +
           U().formRow({ label: '成果说明', full: true, control: '<textarea id="sbNote" placeholder="填写交付物、验证结果与遗留事项"></textarea>' }) +
           U().formRow({ label: '成果物', full: true, control: '<div id="sbFiles"></div><div class="form-hint">至少上传 1 个文件；提交后进入审批中。</div>' }) +
         '</div>',
@@ -1308,8 +1454,14 @@
           const okBtn = root.querySelector('[data-ok]');
           const note = root.querySelector('#sbNote').value.trim();
           const files = uploader ? uploader.getFiles() : [];
+          const hoursEl = root.querySelector('#sbHours');
+          const hours = Number(hoursEl.value) || 0;
           if (!files.length) {
             U().toast('请至少上传 1 个成果物文件', 'warn');
+            return;
+          }
+          if (!(hours > 0)) {
+            U().showFieldError(hoursEl, '请填写本次投入工时');
             return;
           }
           okBtn.disabled = true;
@@ -1338,7 +1490,8 @@
               status: sub.status, progress: sub.progress, submittedAt: submittedAt,
               submissionNote: note, approval: sub.approval
             });
-            ITO.log('提交成果物', sub.id + ' ' + sub.name + ' · ' + files.length + ' 个文件 · 等待 ' + t.owner + ' 审批', '任务');
+            if (ITO.addWorkLog) ITO.addWorkLog(sub, hours);
+            ITO.log('提交成果物', sub.id + ' ' + sub.name + ' · ' + files.length + ' 个文件 · ' + hours + 'h · 等待 ' + t.owner + ' 审批', '任务');
             ITO.notify(t.owner, {
               type: '成果物',
               title: '收到新的成果物',
@@ -1374,7 +1527,7 @@
       wide: true,
       body:
         '<div class="approve-grid">' +
-          '<div class="detail-field"><label>子任务</label><div>' + U().esc(sub.name) + '</div></div>' +
+          '<div class="detail-field"><label>任务</label><div>' + U().esc(sub.name) + '</div></div>' +
           '<div class="detail-field"><label>编号</label><div class="mono">' + sub.id + '</div></div>' +
           '<div class="detail-field"><label>执行人</label><div>' + U().esc(sub.owner) + '</div></div>' +
           '<div class="detail-field"><label>审批人</label><div>' + U().esc(ap.approver) + '</div></div>' +
@@ -1402,15 +1555,17 @@
           sub.approval.status = '通过';
           sub.approval.decidedAt = now();
           sub.approval.comment = comment();
+          const closureHours = ITO.ensureCompletionHours ? ITO.ensureCompletionHours(sub, sub.completedAt.slice(0, 10)) : 0;
           if (window.DeliverableStore) {
             window.DeliverableStore.saveWorkflow(sub.id, t.id, {
-              status: sub.status, progress: sub.progress, completedAt: sub.completedAt, approval: sub.approval
+              status: sub.status, progress: sub.progress, completedAt: sub.completedAt, approval: sub.approval,
+              actualHours: sub.actualHours, workLogs: sub.workLogs
             });
           }
           grantExecutionTags(t, sub);
           ensureLeaderApproval(t);
           completionMetrics(t, before);
-          ITO.log('审批通过', sub.id + ' ' + sub.name + (comment() ? ' · ' + comment() : ''), '审批');
+          ITO.log('审批通过', sub.id + ' ' + sub.name + (closureHours ? ' · 补记 ' + closureHours + 'h' : '') + (comment() ? ' · ' + comment() : ''), '审批');
           ITO.notify(sub.owner, {
             type: '审批',
             title: '审批通过',
@@ -1418,7 +1573,7 @@
             link: '#/mine'
           });
           close();
-          U().toast('审批通过，子任务已闭环');
+          U().toast('审批通过，任务已闭环');
           ITO.refresh();
         });
         root.querySelector('[data-reject]').addEventListener('click', function () {
@@ -1460,6 +1615,7 @@
         '<div class="form-grid">' +
           U().formRow({ label: '执行人', control: '<div class="static-field">' + U().esc(sub.owner) + '</div>' }) +
           U().formRow({ label: '审批人', control: '<div class="static-field">' + U().esc(t.owner) + '</div>' }) +
+          U().formRow({ label: '本次补录工时', required: true, control: '<input id="rsHours" type="number" min="0.5" max="200" step="0.5" value="' + (ITO.remainingHoursOf ? (ITO.remainingHoursOf(sub) || Math.max(0.5, (sub.hours || 2) * 0.1)) : 1) + '"><span class="form-hint">补充本次投入，会计入个人工时与负载</span>' }) +
           U().formRow({ label: '重新提交说明', full: true, control: '<textarea id="rsNote" placeholder="说明本次补充或修正的内容"></textarea>' }) +
           U().formRow({ label: '成果物', full: true, control: '<div id="rsFiles"></div><div class="form-hint">至少上传 1 个文件；历史版本会保留。</div>' }) +
         '</div>' +
@@ -1474,8 +1630,14 @@
           const okBtn = root.querySelector('[data-ok]');
           const note = root.querySelector('#rsNote').value.trim();
           const files = uploader ? uploader.getFiles() : [];
+          const hoursEl = root.querySelector('#rsHours');
+          const hours = Number(hoursEl.value) || 0;
           if (!files.length) {
             U().toast('请至少上传 1 个成果物文件', 'warn');
+            return;
+          }
+          if (!(hours > 0)) {
+            U().showFieldError(hoursEl, '请填写本次补录工时');
             return;
           }
           okBtn.disabled = true;
@@ -1504,7 +1666,8 @@
               status: sub.status, progress: sub.progress, submittedAt: submittedAt,
               submissionNote: note, approval: sub.approval
             });
-            ITO.log('重新提交成果物', sub.id + ' ' + sub.name + ' · ' + files.length + ' 个文件 · 审批计时重新开始', '任务');
+            if (ITO.addWorkLog) ITO.addWorkLog(sub, hours);
+            ITO.log('重新提交成果物', sub.id + ' ' + sub.name + ' · ' + files.length + ' 个文件 · ' + hours + 'h · 审批计时重新开始', '任务');
             ITO.notify(t.owner, {
               type: '成果物',
               title: '成果物已重新提交',
@@ -1695,7 +1858,7 @@
           '<div class="detail-field"><label>发起人</label><div>' + U().esc(t.initiator) + '</div></div>' +
           '<div class="detail-field"><label>负责人</label><div>' + U().esc(t.owner) + '</div></div>' +
           '<div class="detail-field"><label>任务状态</label><div>' + U().badge(U().mainStatus(t)) + '</div></div>' +
-          '<div class="detail-field"><label>汇总子任务</label><div>' + t.subs.length + ' 个</div></div>' +
+          '<div class="detail-field"><label>汇总任务</label><div>' + t.subs.length + ' 个</div></div>' +
         '</div>' +
         '<div class="summary-list">' + subs + '</div>' +
         '<div class="form-field" style="margin-top:14px"><label>汇总说明</label><textarea id="laSummary" placeholder="汇总成果物、验收结论与需要领导关注的事项"></textarea></div>' +
@@ -1768,8 +1931,8 @@
       body:
         '<div class="form-field"><label>驳回原因 <em>*</em></label><textarea id="lrReason" placeholder="说明材料问题、成果问题或需要整改的内容"></textarea></div>' +
         '<div class="reject-options">' +
-          '<label class="reject-option"><input type="radio" name="lrMode" value="summary" checked><span><b>退回负责人补充汇总</b><small>子任务保持已完成，负责人修改汇总后重新提交</small></span></label>' +
-          '<label class="reject-option"><input type="radio" name="lrMode" value="reopen"><span><b>重开指定子任务</b><small>勾选的子任务退回执行中，其余保持已完成</small></span></label>' +
+          '<label class="reject-option"><input type="radio" name="lrMode" value="summary" checked><span><b>退回负责人补充汇总</b><small>任务保持已完成，负责人修改汇总后重新提交</small></span></label>' +
+          '<label class="reject-option"><input type="radio" name="lrMode" value="reopen"><span><b>重开指定任务</b><small>勾选的任务退回执行中，其余保持已完成</small></span></label>' +
         '</div>' +
         '<div class="reopen-list" id="lrReopen" hidden>' + subs + '</div>',
       foot: '<button class="btn btn-ghost" data-cancel type="button">取消</button><button class="btn btn-danger" data-ok type="button">确认驳回</button>',
@@ -1784,7 +1947,7 @@
           if (!reason.value.trim()) { U().toast('请填写驳回原因', 'warn'); reason.focus(); return; }
           const mode = root.querySelector('[name="lrMode"]:checked').value;
           const selected = U().$$('#lrReopen input:checked', root).map(function (el) { return el.value; });
-          if (mode === 'reopen' && !selected.length) { U().toast('请至少选择一个需要重开的子任务', 'warn'); return; }
+          if (mode === 'reopen' && !selected.length) { U().toast('请至少选择一个需要重开的任务', 'warn'); return; }
           const before = U().mainStatus(t);
           t.leaderApproval.status = '已驳回';
           t.leaderApproval.decidedAt = now();
@@ -1808,7 +1971,7 @@
             });
           }
           completionMetrics(t, before);
-          ITO.log('领导审批驳回', t.id + ' ' + t.name + ' · ' + (mode === 'summary' ? '补充汇总' : '重开 ' + selected.length + ' 个子任务'), '审批');
+          ITO.log('领导审批驳回', t.id + ' ' + t.name + ' · ' + (mode === 'summary' ? '补充汇总' : '重开 ' + selected.length + ' 个任务'), '审批');
           ITO.notify(t.owner, {
             type: '审批',
             title: '领导审批驳回',
@@ -1833,7 +1996,7 @@
       sub: t.id + ' · ' + t.name,
       body:
         '<div class="form-field"><label>取消原因 <em>*</em></label><textarea id="cancelReason" placeholder="说明取消原因，取消后任务不计闭环、不计在办"></textarea></div>' +
-        '<div class="form-hint" style="margin-top:10px">取消后任务状态变为已取消，所有子任务同步取消，且不可恢复。</div>',
+        '<div class="form-hint" style="margin-top:10px">取消后任务状态变为已取消，所有任务同步取消，且不可恢复。</div>',
       foot: '<button class="btn btn-ghost" data-cancel type="button">返回</button><button class="btn btn-danger" data-ok type="button">确认取消任务</button>',
       onMount: function (close, root) {
         root.querySelector('[data-cancel]').addEventListener('click', close);
@@ -1878,35 +2041,55 @@
       body:
         '<div class="form-grid">' +
           U().formRow({ label: '当前执行人', control: '<div class="static-field">' + U().esc(target.owner) + '</div>' }) +
-          U().formRow({ label: '新执行人', required: true, control: '<select id="raOwner">' + U().peopleOptions(target.group, target.owner) + '</select>' }) +
+          U().formRow({ label: '新执行人', required: true, control: '<select id="raOwner">' + U().peopleOptions(target.group, target.owner, { auth: target.auth, hours: target.hours, due: target.due }) + '</select>' }) +
+          '<div class="form-field full"><div class="assign-hint" id="raHint"></div></div>' +
           U().formRow({ label: '改派原因', full: true, required: true, control: '<textarea id="raReason" placeholder="说明改派原因，改派后保留当前任务状态并记录日志"></textarea>' }) +
         '</div>',
       foot: '<button class="btn btn-ghost" data-cancel type="button">取消</button><button class="btn btn-primary" data-ok type="button">确认改派</button>',
       onMount: function (close, root) {
         const ownerSel = root.querySelector('#raOwner');
         const reason = root.querySelector('#raReason');
+        const hint = root.querySelector('#raHint');
+        const paintHint = function () {
+          if (!hint || !ITO.assigneeInfo) return;
+          const oldInfo = ITO.assigneeInfo(target.owner, target.auth, 0, target.due);
+          const newInfo = ITO.assigneeInfo(ownerSel.value, target.auth, target.hours, target.due);
+          hint.innerHTML = '原执行人 <b>' + U().esc(target.owner) + '</b> 本周 ' + oldInfo.weekRate + '% → 改派后 ' +
+            Math.max(0, Math.round((oldInfo.weekRate - (target.hours || 0) / 40 * 100))) + '%；新执行人 <b>' + U().esc(ownerSel.value || '未选择') + '</b> 本周 ' +
+            newInfo.weekRate + '% → <b>' + newInfo.weekAfter + '%</b>' +
+            (newInfo.authOk ? '' : ' · <span class="text-red">缺少' + U().esc(target.auth || '所需授权') + '</span>');
+        };
+        paintHint();
+        ownerSel.addEventListener('change', paintHint);
         root.querySelector('[data-cancel]').addEventListener('click', close);
         root.querySelector('[data-ok]').addEventListener('click', function () {
           if (!ownerSel.value || ownerSel.value === target.owner) { U().toast('请选择新的执行人', 'warn'); return; }
           if (!reason.value.trim()) { U().toast('请填写改派原因', 'warn'); return; }
           const old = target.owner;
-          target.owner = ownerSel.value;
-          ITO.log('改派执行人', target.id + ' ' + target.name + ' · ' + old + ' → ' + target.owner + ' · ' + reason.value.trim(), '任务');
-          ITO.notify(old, {
-            type: '任务',
-            title: '任务已改派',
-            body: target.name + ' 已改派给 ' + target.owner,
-            link: '#/tasks'
-          });
-          ITO.notify(target.owner, {
-            type: '任务',
-            title: '你收到一个改派任务',
-            body: t.name + ' · ' + target.name + '，截止 ' + target.due,
-            link: '#/mine'
-          });
-          close();
-          U().toast('已改派给 ' + target.owner);
-          ITO.refresh();
+          const commit = function () {
+            target.owner = ownerSel.value;
+            ITO.log('改派执行人', target.id + ' ' + target.name + ' · ' + old + ' → ' + target.owner + ' · ' + reason.value.trim(), '任务');
+            ITO.notify(old, {
+              type: '任务',
+              title: '任务已改派',
+              body: target.name + ' 已改派给 ' + target.owner,
+              link: '#/tasks'
+            });
+            ITO.notify(target.owner, {
+              type: '任务',
+              title: '你收到一个改派任务',
+              body: t.name + ' · ' + target.name + '，截止 ' + target.due,
+              link: '#/mine'
+            });
+            close();
+            U().toast('已改派给 ' + target.owner);
+            ITO.refresh();
+          };
+          if (ITO.guardAssignment) {
+            ITO.guardAssignment({ name: ownerSel.value, auth: target.auth, hours: target.hours, due: target.due }, commit);
+          } else {
+            commit();
+          }
         });
       }
     });
@@ -1951,12 +2134,197 @@
     });
   };
 
+  ACT.addWorkLog = function (taskId, subId) {
+    const t = taskById(taskId);
+    const sub = t && findSub(t, subId);
+    if (!sub) return;
+    const actual = ITO.actualHoursOf ? ITO.actualHoursOf(sub) : 0;
+    const budget = Number(sub.hours) || 0;
+    U().modal({
+      title: '补录工时',
+      sub: sub.id + ' · ' + sub.name,
+      body: '<div class="form-grid">' +
+        U().formRow({ label: '执行人', control: '<div class="static-field">' + U().esc(sub.owner) + '</div>' }) +
+        U().formRow({ label: '预算 / 已记录', control: '<div class="static-field">' + budget + ' h / ' + actual + ' h</div>' }) +
+        U().formRow({ label: '本次补录工时', required: true, control: '<input id="wlHours" type="number" min="0.5" max="200" step="0.5" value="1"><span class="form-hint">补录后计入个人工时与工时负载</span>' }) +
+        U().formRow({ label: '补录日期', required: true, control: '<input id="wlDate" type="date" value="' + U().esc(D.meta.today) + '">' }) +
+        U().formRow({ label: '补录说明', full: true, control: '<input id="wlNote" type="text" maxlength="60" placeholder="例如：现场故障排查与恢复">' }) +
+      '</div>',
+      foot: '<button class="btn btn-ghost" data-cancel type="button">取消</button><button class="btn btn-primary" data-ok type="button">确认补录</button>',
+      onMount: function (close, root) {
+        root.querySelector('[data-cancel]').addEventListener('click', close);
+        root.querySelector('[data-ok]').addEventListener('click', function () {
+          const hoursEl = root.querySelector('#wlHours');
+          const dateEl = root.querySelector('#wlDate');
+          const hours = Number(hoursEl.value) || 0;
+          const date = dateEl.value;
+          if (!(hours > 0)) { U().showFieldError(hoursEl, '请输入本次补录工时'); return; }
+          if (!date) { U().showFieldError(dateEl, '请选择补录日期'); return; }
+          const applied = ITO.addWorkLog ? ITO.addWorkLog(sub, hours, date) : 0;
+          if (!applied) { U().showFieldError(hoursEl, '补录工时必须大于 0'); return; }
+          t.updatedAt = D.meta.demoNow;
+          t.updatedBy = S().user.name;
+          ITO.log('补录工时', sub.id + ' ' + sub.name + ' · ' + applied + 'h · ' + date + (root.querySelector('#wlNote').value.trim() ? ' · ' + root.querySelector('#wlNote').value.trim() : ''), '任务');
+          close();
+          U().toast('已补录 ' + applied + ' 小时');
+          ITO.refresh();
+        });
+      }
+    });
+  };
+
+  ACT.updateProgress = function (taskId, subId) {
+    const t = taskById(taskId);
+    const sub = t && findSub(t, subId);
+    if (!sub || !canLogWork(t, sub)) return;
+    const current = Math.max(0, Math.min(100, Number(sub.progress) || 0));
+    const budget = Number(sub.hours) || 0;
+    const next = Math.min(100, current + 10);
+    const suggested = Math.max(0.5, Math.round(Math.max(1, next - current) / 100 * budget * 10) / 10);
+    U().modal({
+      title: '更新执行进度',
+      sub: sub.id + ' · ' + sub.name,
+      body: '<div class="form-grid">' +
+        U().formRow({ label: '当前进度', control: '<div class="static-field">' + current + '%</div>' }) +
+        U().formRow({ label: '更新后进度', required: true, control: '<input id="upProgress" type="number" min="0" max="100" step="1" value="' + next + '"><span class="form-hint">按实际完成比例填写</span>' }) +
+        U().formRow({ label: '本次投入工时', required: true, control: '<input id="upHours" type="number" min="0" max="200" step="0.5" value="' + suggested + '"><span class="form-hint">按进度折算，会计入个人工时</span>' }) +
+        U().formRow({ label: '记录日期', required: true, control: '<input id="upDate" type="date" value="' + U().esc(D.meta.today) + '">' }) +
+        U().formRow({ label: '进度说明', full: true, control: '<input id="upNote" type="text" maxlength="60" placeholder="例如：完成接口联调，进入压测">' }) +
+      '</div>',
+      foot: '<button class="btn btn-ghost" data-cancel type="button">取消</button><button class="btn btn-primary" data-ok type="button">保存进度</button>',
+      onMount: function (close, root) {
+        root.querySelector('[data-cancel]').addEventListener('click', close);
+        root.querySelector('[data-ok]').addEventListener('click', function () {
+          const progressEl = root.querySelector('#upProgress');
+          const hoursEl = root.querySelector('#upHours');
+          const dateEl = root.querySelector('#upDate');
+          const progress = Number(progressEl.value);
+          const hours = Number(hoursEl.value) || 0;
+          if (!(progress >= 0 && progress <= 100)) { U().showFieldError(progressEl, '进度需在 0–100 之间'); return; }
+          if (!(hours > 0)) { U().showFieldError(hoursEl, '请输入本次投入工时'); return; }
+          if (!dateEl.value) { U().showFieldError(dateEl, '请选择记录日期'); return; }
+          if (progress === current && hours <= 0) { U().showFieldError(progressEl, '请更新进度或填写工时'); return; }
+          sub.progress = Math.round(progress);
+          sub.updatedAt = D.meta.demoNow;
+          sub.updatedBy = S().user.name;
+          ITO.addWorkLog(sub, hours, dateEl.value, 'progress');
+          if (window.DeliverableStore) {
+            window.DeliverableStore.saveWorkflow(sub.id, t.id, {
+              progress: sub.progress, actualHours: sub.actualHours, workLogs: sub.workLogs
+            });
+          }
+          const note = root.querySelector('#upNote').value.trim();
+          ITO.log('更新执行进度', sub.id + ' · ' + sub.progress + '% · ' + hours + 'h' + (note ? ' · ' + note : ''), '任务');
+          close();
+          U().toast('进度与工时已更新');
+          ITO.refresh();
+        });
+      }
+    });
+  };
+
+  ACT.closeDirect = function (taskId, subId) {
+    const t = taskById(taskId);
+    const sub = t && findSub(t, subId);
+    if (!sub || !canDirectClose(t, sub)) return;
+    const actual = ITO.actualHoursOf ? ITO.actualHoursOf(sub) : 0;
+    const target = Math.round((Number(sub.hours) || 0) * 0.9 * 10) / 10;
+    const suggested = Math.max(0.5, Math.round(Math.max(0, target - actual) * 10) / 10);
+    U().modal({
+      title: '直接闭环任务',
+      sub: sub.id + ' · ' + sub.name,
+      body: '<div class="form-grid">' +
+        U().formRow({ label: '当前状态', control: '<div class="static-field">' + U().esc(sub.status) + ' · ' + (Number(sub.progress) || 0) + '%</div>' }) +
+        U().formRow({ label: '本次投入工时', required: true, control: '<input id="dcHours" type="number" min="0" max="200" step="0.5" value="' + suggested + '"><span class="form-hint">闭环后按实际投入补记工时</span>' }) +
+        U().formRow({ label: '完成日期', required: true, control: '<input id="dcDate" type="date" value="' + U().esc(D.meta.today) + '">' }) +
+        U().formRow({ label: '闭环说明', full: true, control: '<input id="dcNote" type="text" maxlength="60" placeholder="例如：现场确认完成，验收通过">' }) +
+      '</div>' +
+      '<div class="form-hint" style="margin-top:10px">直接闭环会跳过成果物审批，适用于线下确认完成或演示补录；操作会写入任务记录。</div>',
+      foot: '<button class="btn btn-ghost" data-cancel type="button">取消</button><button class="btn btn-primary" data-ok type="button">确认闭环</button>',
+      onMount: function (close, root) {
+        root.querySelector('[data-cancel]').addEventListener('click', close);
+        root.querySelector('[data-ok]').addEventListener('click', function () {
+          const hoursEl = root.querySelector('#dcHours');
+          const dateEl = root.querySelector('#dcDate');
+          const hours = Number(hoursEl.value) || 0;
+          if (!(hours > 0)) { U().showFieldError(hoursEl, '请输入本次投入工时'); return; }
+          if (!dateEl.value) { U().showFieldError(dateEl, '请选择完成日期'); return; }
+          const before = U().mainStatus(t);
+          const note = root.querySelector('#dcNote').value.trim();
+          sub.status = '已完成';
+          sub.progress = 100;
+          sub.completedAt = now();
+          if (!sub.approval) {
+            sub.approval = { level: 1, approver: t.owner, submittedAt: now(), dueAt: '', decidedAt: now(), comment: note };
+          }
+          sub.approval.status = '通过';
+          sub.approval.decidedAt = now();
+          sub.approval.comment = note;
+          ITO.addWorkLog(sub, hours, dateEl.value, 'closure');
+          const added = ITO.ensureCompletionHours(sub, dateEl.value);
+          if (window.DeliverableStore) {
+            window.DeliverableStore.saveWorkflow(sub.id, t.id, {
+              status: sub.status, progress: sub.progress, completedAt: sub.completedAt,
+              approval: sub.approval, actualHours: sub.actualHours, workLogs: sub.workLogs
+            });
+          }
+          grantExecutionTags(t, sub);
+          ensureLeaderApproval(t);
+          completionMetrics(t, before);
+          ITO.log('直接闭环', sub.id + ' ' + sub.name + ' · ' + hours + 'h' + (added ? ' · 补记 ' + added + 'h' : '') + (note ? ' · ' + note : ''), '任务');
+          ITO.notify(sub.owner, {
+            type: '任务',
+            title: '任务已闭环',
+            body: t.name + ' · ' + sub.name + ' 已由 ' + S().user.name + ' 闭环',
+            link: '#/mine'
+          });
+          close();
+          U().toast('任务已闭环');
+          ITO.refresh();
+        });
+      }
+    });
+  };
+
+  ACT.editSubFields = function (taskId, subId) {
+    const t = taskById(taskId);
+    const sub = t && findSub(t, subId);
+    if (!sub || !ITO.customFieldForm) return;
+    const form = ITO.customFieldForm('task', sub, 'sub');
+    U().modal({
+      title: '执行任务扩展字段',
+      sub: sub.id + ' · ' + sub.name,
+      wide: true,
+      body: form || U().emptyState('暂无执行任务字段', '可在字典配置中新增作用层级为执行任务的字段', 'clipboard'),
+      foot: '<button class="btn btn-ghost" data-cancel type="button">取消</button><button class="btn btn-primary" data-ok type="button">保存字段</button>',
+      onMount: function (close, root) {
+        root.querySelector('[data-cancel]').addEventListener('click', close);
+        root.querySelector('[data-ok]').addEventListener('click', function () {
+          if (!form) { close(); return; }
+          const cf = ITO.readCustomFields(root, 'task', sub.extra || {}, 'sub');
+          if (cf.errors.length) { U().toast(cf.errors[0], 'warn'); return; }
+          sub.extra = cf.values;
+          sub.updatedAt = D.meta.demoNow;
+          sub.updatedBy = S().user.name;
+          ITO.log('编辑执行任务字段', sub.id + ' · ' + sub.name, '任务');
+          close();
+          U().toast('执行任务字段已保存');
+          ITO.refresh();
+        });
+      }
+    });
+  };
+
   ACT.run = function (act, taskId, subId) {
     if (act === 'dispatch') ACT.openDispatch(taskId, subId);
     else if (act === 'deliverables') ACT.openDeliverables(taskId, subId);
     else if (act === 'approve') ACT.openApprove(taskId, subId);
     else if (act === 'submit') ACT.submit(taskId, subId);
     else if (act === 'resubmit') ACT.resubmit(taskId, subId);
+    else if (act === 'log-hours') ACT.addWorkLog(taskId, subId);
+    else if (act === 'edit-sub-fields') ACT.editSubFields(taskId, subId);
+    else if (act === 'update-progress') ACT.updateProgress(taskId, subId);
+    else if (act === 'close-sub') ACT.closeDirect(taskId, subId);
     else if (act === 'detail-sub') ACT.detail(taskId, subId);
     else if (act === 'detail') ACT.detail(taskId);
     else if (act === 'edit') ACT.openTaskForm(taskId);
@@ -1969,7 +2337,9 @@
 
   ACT.exportTasks = function () {
     const list = visibleTasks();
-    const rows = [['主任务编号', '主任务', '模式', '子任务编号', '子任务', '专业组', '发起人', '任务来源', '负责人', '执行人', '等级', '状态', '完成时间', '审批状态', '审批意见', '授权', '需要开票', '标签', '截止时间', '成果物数量', '成果物文件', '提交说明', '提交版本', '汇总附件数量', '汇总附件', '汇总说明']];
+    const customHeaders = (ITO.customFieldExportHeaders ? ITO.customFieldExportHeaders('task') : [])
+      .concat(ITO.customFieldExportHeaders ? ITO.customFieldExportHeaders('task', 'sub').map(function (h) { return '执行·' + h; }) : []);
+    const rows = [['主任务编号', '主任务', '模式', '任务编号', '任务', '专业组', '发起人', '任务来源', '负责人', '执行人', '等级', '状态', '完成时间', '审批状态', '审批意见', '授权', '需要开票', '标签', '截止时间', '成果物数量', '成果物文件', '提交说明', '提交版本', '汇总附件数量', '汇总附件', '汇总说明'].concat(customHeaders)];
     list.forEach(function (t) {
       const summaryRec = window.DeliverableStore ? window.DeliverableStore.getLatestSummary(t.id) : null;
       visibleSubs(t).forEach(function (s) {
@@ -1988,7 +2358,8 @@
           summaryRec ? summaryRec.files.length : 0,
           summaryRec ? summaryRec.files.map(function (f) { return f.name; }).join(' / ') : '',
           summaryRec ? summaryRec.note : ''
-        ]);
+        ].concat(ITO.customFieldExport ? ITO.customFieldExport('task', t) : [])
+          .concat(ITO.customFieldExport ? ITO.customFieldExport('task', s, 'sub') : []));
       });
     });
     U().exportPreview({ title: '任务清单导出预览', rows: rows, filename: 'ITO任务清单-' + D.meta.today + '.csv' });
@@ -2004,6 +2375,7 @@
       const st = S();
       const f = st.taskFilters;
       if (typeof f.q !== 'string') { f.q = ''; f.group = ''; f.status = ''; f.level = ''; f.type = ''; f.age = ''; }
+      f.custom = f.custom || {};
       const hq = hashQuery();
       if (Object.keys(hq).length) {
         if (st.appliedTaskHash !== location.hash) {
@@ -2021,6 +2393,7 @@
       const list = visibleTasks();
       ledgerPage = Math.min(Math.max(1, ledgerPage), Math.max(1, Math.ceil(list.length / LEDGER_PAGE_SIZE)));
       const listPage = list.slice((ledgerPage - 1) * LEDGER_PAGE_SIZE, ledgerPage * LEDGER_PAGE_SIZE);
+      const taskCustomHeaders = ITO.customFieldHeaders ? ITO.customFieldHeaders('task') : [];
       const flowStatuses = ['草稿', '待分发', '执行中', '审批中', '已挂起', '待汇总', '审批驳回', '已完成', '已取消'];
       const statusLabels = {
         '': '全部状态', '草稿': '草稿', '待分发': '待分发', '执行中': '执行中',
@@ -2048,8 +2421,8 @@
           '<select class="select" id="fGroup"><option value="">全部专业组</option>' + U().groupOptions(f.group) + '</select>' +
           '<select class="select" id="fStatus">' +
             '<option value=""' + (f.status === '' ? ' selected' : '') + '>全部状态</option>' +
-            '<optgroup label="流程状态">' + flowStatuses.map(statusOption).join('') + '</optgroup>' +
-            '<optgroup label="超期视图"><option value="超期"' + (f.status === '超期' ? ' selected' : '') + '>超期</option></optgroup>' +
+            flowStatuses.map(statusOption).join('') +
+            '<option value="超期"' + (f.status === '超期' ? ' selected' : '') + '>超期</option>' +
           '</select>' +
           '<select class="select" id="fLevel"><option value="">全部优先级</option>' + U().statusOptions(['紧急', '重要', '一般'], f.level) + '</select>' +
           '<select class="select" id="fType"><option value="">全部类型</option>' + U().statusOptions(TASK_TYPES, f.type) + '<option value="其他"' + (f.type === '其他' ? ' selected' : '') + '>其他</option></select>' +
@@ -2060,14 +2433,19 @@
             '<option value="3to5"' + (f.age === '3to5' ? ' selected' : '') + '>3–5 天</option>' +
             '<option value="gte5"' + (f.age === 'gte5' ? ' selected' : '') + '>≥5 天</option>' +
           '</select>' +
-          '<button class="btn btn-ghost btn-sm" id="clearFilters" type="button">' + U().icon('refresh') + '重置</button>' +
+          (ITO.customFieldFilters ? ITO.customFieldFilters('task').map(function (cf) {
+            return customFilterHtml(cf, f.custom[cf.key]);
+          }).join('') : '') +
+          '<button class="btn btn-ghost" id="clearFilters" type="button">' + U().icon('refresh') + '重置</button>' +
         '</div>' +
       '</div>' +
       '<section class="card table-card" id="ledgerCard">' +
-        '<div class="table-head"><div><h3>专项任务</h3><p class="table-note">手工新建任务 · <a href="#/overhaul">大修管理</a> · 点击行查看详情，展开可查看子任务；审批中的任务不可编辑</p></div>' +
+        '<div class="table-head"><div><h3>专项任务</h3><p class="table-note">手工新建任务 · <a href="#/overhaul">大修管理</a> · 点击行查看详情，展开可查看任务；审批中的任务不可编辑</p></div>' +
           '<div class="ledger-meta"><span id="ledgerStats">' + statsChipsHtml(list) + '</span><button class="btn btn-ghost btn-sm" id="taskExportBtn" type="button">' + U().icon('download') + '导出清单</button></div></div>' +
         '<div class="table-wrap"><table class="data-table task-table">' +
-          '<thead><tr><th>任务</th><th>专业组</th><th>发起人</th><th>负责人</th><th>授权</th><th>标签</th><th>优先级</th><th>截止时间</th><th>状态</th><th>操作</th></tr></thead>' +
+          '<thead><tr><th>任务</th><th>专业组</th><th>发起人</th><th>负责人</th><th>授权</th><th>标签</th><th>优先级</th><th>截止时间</th><th>状态</th>' +
+            taskCustomHeaders.map(function (h) { return '<th>' + U().esc(h) + '</th>'; }).join('') +
+            '<th>操作</th></tr></thead>' +
           '<tbody id="taskTbody">' + rowsHtml(listPage) + '</tbody>' +
         '</table></div>' +
         (list.length ? '<div id="ledgerPager">' + ITO.pager('ledger', list.length, ledgerPage, LEDGER_PAGE_SIZE) + '</div>' : '') +
@@ -2101,15 +2479,66 @@
       if (ft) ft.addEventListener('change', function () { f.type = ft.value; applyFilter(); });
       const fa = document.getElementById('fAge');
       if (fa) fa.addEventListener('change', function () { f.age = fa.value; applyFilter(); });
+      U().$$('[data-cf-filter-wrap]').forEach(function (wrap) {
+        const key = wrap.dataset.cfFilterWrap;
+        const toggle = wrap.querySelector('.cf-filter-toggle');
+        const menu = wrap.querySelector('.cf-filter-menu');
+        const hidden = wrap.querySelector('[data-task-cf]');
+        const opts = Array.prototype.slice.call(wrap.querySelectorAll('[data-cf-filter-opt]'));
+        const label = toggle.dataset.cfFilterLabel;
+        const sync = function () {
+          const selected = opts.filter(function (cb) { return cb.checked; }).map(function (cb) { return cb.dataset.cfFilterOpt; });
+          hidden.value = selected.join(',');
+          toggle.textContent = selected.length ? selected.join('、') : label;
+          f.custom = f.custom || {};
+          f.custom[key] = selected;
+          applyFilter();
+        };
+        toggle.addEventListener('click', function (e) {
+          e.stopPropagation();
+          const willOpen = menu.hidden;
+          U().$$('.cf-filter-menu').forEach(function (m) { m.hidden = true; });
+          menu.hidden = !willOpen;
+          toggle.setAttribute('aria-expanded', String(willOpen));
+        });
+        opts.forEach(function (cb) { cb.addEventListener('change', sync); });
+        const clearBtn = wrap.querySelector('[data-cf-filter-clear]');
+        if (clearBtn) clearBtn.addEventListener('click', function () {
+          opts.forEach(function (cb) { cb.checked = false; });
+          sync();
+        });
+      });
+      if (!window.__cfFilterDocBound) {
+        window.__cfFilterDocBound = true;
+        document.addEventListener('click', function (e) {
+          if (e.target.closest('.cf-filter-multi')) return;
+          U().$$('.cf-filter-menu').forEach(function (m) { m.hidden = true; });
+        });
+      }
+      const taskCf = Array.prototype.slice.call(document.querySelectorAll('[data-task-cf]'));
+      taskCf.forEach(function (el) {
+        ['input', 'change'].forEach(function (ev) {
+          el.addEventListener(ev, function () {
+            f.custom = f.custom || {};
+            f.custom[el.dataset.taskCf] = el.value;
+            applyFilter();
+          });
+        });
+      });
       const clear = document.getElementById('clearFilters');
       if (clear) clear.addEventListener('click', function () {
         f.q = ''; f.group = ''; f.status = ''; f.level = ''; f.type = ''; f.age = '';
+        f.custom = {};
         if (search) search.value = '';
-        if (fg) fg.value = '';
-        if (fs) fs.value = '';
-        if (fl) fl.value = '';
-        if (ft) ft.value = '';
-        if (fa) fa.value = '';
+        [fg, fs, fl, ft, fa].forEach(function (el) {
+          if (el) { el.value = ''; if (el.__syncPicker) el.__syncPicker(); }
+        });
+        taskCf.forEach(function (el) { el.value = ''; });
+        U().$$('.cf-filter-multi').forEach(function (wrap) {
+          wrap.querySelectorAll('[data-cf-filter-opt]').forEach(function (cb) { cb.checked = false; });
+          const toggle = wrap.querySelector('.cf-filter-toggle');
+          if (toggle) toggle.textContent = toggle.dataset.cfFilterLabel;
+        });
         applyFilter();
       });
       const ledgerCard = document.getElementById('ledgerCard');
@@ -2162,6 +2591,8 @@
                 row.hidden = !row.hidden;
                 st.expanded[id] = !row.hidden;
                 btn.classList.toggle('open', !row.hidden);
+                btn.setAttribute('aria-expanded', String(!row.hidden));
+                btn.setAttribute('aria-label', row.hidden ? '展开任务' : '收起任务');
               }
               return;
             }
@@ -2176,6 +2607,22 @@
           }
           const row = e.target.closest('tr.task-main-row');
           if (row) ACT.detail(row.dataset.id);
+        });
+        tbody.addEventListener('keydown', function (e) {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          if (e.target.closest('button, a, input, select, textarea')) return;
+          const subItem = e.target.closest('.sub-item[data-sub-detail]');
+          if (subItem) {
+            e.preventDefault();
+            const parts = subItem.dataset.subDetail.split('|');
+            ACT.run('detail-sub', parts[0], parts[1]);
+            return;
+          }
+          const row = e.target.closest('tr.task-main-row');
+          if (row) {
+            e.preventDefault();
+            ACT.detail(row.dataset.id);
+          }
         });
       }
 

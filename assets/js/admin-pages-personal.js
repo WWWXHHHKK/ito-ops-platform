@@ -84,13 +84,51 @@
 
   function tagCard(tag) {
     const isPerson = tag.type === '人员标签';
-    return '<article class="personal-tag ' + (isPerson ? 'person' : 'task') + '">' +
-      '<div class="personal-tag-top"><b>' + U().esc(tag.name) + '</b>' +
-        '<span class="tag-kind">' + U().esc(tag.type) + '</span></div>' +
-      (isPerson ? stars(tag.source === '授权' ? 3 : tag.stars) : '<span class="task-tag-count">完成 ' + tag.count + ' 次</span>') +
-      (isPerson && tag.source !== '授权' ? '<span class="personal-tag-first">首次领取 ' + U().esc(tag.firstClaimed || '—') + '</span>' : '') +
-      '<p>' + U().esc(tag.desc || '') + '</p>' +
+    const mark = isPerson
+      ? (tag.source === '授权' ? '<span class="auth-mark">授权</span>' : stars(tag.stars))
+      : '<span class="task-tag-count">完成 ' + tag.count + ' 次</span>';
+    return '<article class="personal-tag ' + (isPerson ? 'person' : 'task') + '" role="button" tabindex="0" data-tag-name="' + U().esc(tag.name) + '" data-tag-type="' + U().esc(tag.type) + '">' +
+      '<b>' + U().esc(tag.name) + '</b>' + mark +
     '</article>';
+  }
+
+  function openPersonalTag(tag) {
+    const st = S();
+    const wall = (st.wallTags || []).find(function (t) { return t.name === tag.name && t.type === tag.type; });
+    const isPerson = tag.type === '人员标签';
+    const isAuth = tag.source === '授权';
+    const rows = [
+      ['标签名称', tag.name],
+      ['标签类型', tag.type],
+      ['来源', isAuth ? '授权' : (isPerson ? '能力评定' : '任务完成')]
+    ];
+    if (isPerson) {
+      rows.push([isAuth ? '标签标识' : '星级', isAuth ? '<span class="auth-mark">授权</span>' : stars(tag.stars)]);
+      if (!isAuth) {
+        rows.push(['累计次数', (tag.count || 0) + ' 次']);
+        rows.push(['首次领取', tag.firstClaimed || '—']);
+      }
+    } else {
+      rows.push(['完成次数', (tag.count || 0) + ' 次']);
+    }
+    rows.push(['描述', tag.desc || (wall && wall.desc) || '—']);
+    rows.push(['解锁条件', isAuth ? '取得对应授权后自动获得该标签' : ((wall && wall.unlock) || '—')]);
+    if (isPerson && !isAuth) {
+      rows.push(['升星规则', '默认 5 次升 2 星、10 次升 3 星' + (wall && wall.star2 != null ? '；当前标签：' + wall.star2 + ' / ' + wall.star3 + ' 次' : '')]);
+    }
+    if (isAuth) rows.push(['领取规则', '取得对应授权即默认授权，不记录次数与首次领取时间']);
+    U().detailModal({
+      title: tag.name,
+      sub: tag.type + (isAuth ? ' · 授权' : ''),
+      body: '<div class="detail-section"><div class="table-wrap"><table class="data-table"><tbody>' +
+        rows.map(function (r) {
+          const htmlRow = r[0] === '星级' || r[0] === '标签标识';
+          return '<tr><td>' + U().esc(r[0]) + '</td><td>' + (htmlRow ? r[1] : U().esc(r[1])) + '</td></tr>';
+        }).join('') +
+      '</tbody></table></div></div>',
+      foot: '<button class="btn btn-ghost" data-close type="button">关闭</button>',
+      onMount: function (close, root) { root.querySelector('[data-close]').addEventListener('click', close); }
+    });
   }
 
   function kpi(label, value, unit, meta, tone, icon) {
@@ -105,7 +143,7 @@
     if (!m.items.length) {
       return '<tr><td colspan="7">' + U().emptyState(
         '当前没有以你为执行人的当月任务',
-        '个人统计只统计执行人是你、且截止时间在本月的子任务',
+        '个人统计只统计执行人是你、且截止时间在本月的任务',
         'task'
       ) + '</td></tr>';
     }
@@ -157,8 +195,10 @@
     }).join('');
 
     const personTags = m.personTags.map(function (a) {
-      return '<span class="tag"><b>' + E(a.name) + '</b>' + '★'.repeat(Math.max(0, Math.min(3, a.stars))) +
-        '<em>' + E(a.type) + '</em></span>';
+      const mark = a.source === '授权'
+        ? '<em class="auth-mark">授权</em>'
+        : '<span class="stars">' + '★'.repeat(Math.max(0, Math.min(3, a.stars))) + '</span>';
+      return '<span class="tag"><b>' + E(a.name) + '</b>' + mark + '</span>';
     }).join('');
 
     const taskTags = m.taskTags.map(function (a) {
@@ -283,11 +323,22 @@
       scope === 'group' ? ((group ? group.name : '—')) :
       scope === 'team' ? (group ? group.name : '全部专业组') :
       scope === 'initiated' ? st.user.name : st.user.name;
-    const tags = (personName ? (st.personAchievements || []).filter(function (a) {
-      return a.person === personName && a.type === '人员标签';
-    }) : []).map(function (a) {
-      return '<span class="tag"><b>' + E(a.name) + '</b>' + '★'.repeat(Math.max(1, Math.min(3, a.source === '授权' ? 3 : (a.stars || 1)))) + (a.source === '授权' ? '' : '<em>首次 ' + E(a.firstClaimed || '—') + '</em>') + '</span>';
-    }).join('');
+    const medals = (personName ? (st.personAchievements || []).filter(function (a) {
+      return a.person === personName && (a.type === '人员标签' || a.type === '任务标签');
+    }) : []);
+    const medalStars = function (n) {
+      const v = Math.max(1, Math.min(3, Number(n) || 1));
+      return '<span class="st">' + '★'.repeat(v) + '<i>' + '★'.repeat(3 - v) + '</i></span>';
+    };
+    const medalCard = function (a) {
+      const isAuth = a.source === '授权';
+      const isTask = a.type === '任务标签';
+      const note = isAuth ? '授权标签 · 取得授权后自动获得' : isTask
+        ? '任务标签 · 累计 ' + (a.count || 0) + ' 次'
+        : '累计 ' + (a.count || 0) + ' 次' + (a.firstClaimed ? ' · 首次 ' + E(a.firstClaimed) : '');
+      const right = isTask ? '<span class="kind">任务标签</span>' : (isAuth ? '<span class="auth-mark">授权</span>' : medalStars(isAuth ? 3 : a.stars));
+      return '<div class="medal' + (isTask ? ' t' : '') + '"><div class="mt"><b>' + E(a.name) + '</b>' + right + '</div><small>' + note + '</small></div>';
+    };
     const tableRows = m.items.map(function (x) {
       return '<tr><td>' + E(x.sub.name) + '</td><td>' + E(x.sub.id) + '</td><td>' + E(x.sub.owner) + '</td><td>' + E(x.sub.type || x.task.type) +
         '</td><td>' + E(x.sub.level || x.task.level) + '</td><td>' + (x.sub.hours || 0) + ' h</td><td>' + E(x.sub.due) +
@@ -298,18 +349,32 @@
       '.sheet{max-width:1000px;margin:0 auto;background:#fff;border-radius:18px;padding:42px 46px;box-shadow:0 20px 60px rgba(0,0,0,.08)}' +
       'h1{font-size:26px;margin:0;letter-spacing:-.02em}h2{font-size:14px;margin:28px 0 10px;padding-bottom:8px;border-bottom:1px solid #eee}' +
       '.sub{color:#8A8A8E;font-size:12px;margin-top:8px}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:22px}' +
-      '.kpi{background:#FFF7F2;border:1px solid #FFE2D2;border-radius:12px;padding:14px}.kpi b{display:block;font-size:24px}.kpi span{display:block;font-size:10px;color:#8A8A8E;margin-top:4px}' +
-      '.tag{display:inline-flex;align-items:center;gap:6px;margin:0 8px 8px 0;padding:7px 10px;border:1px solid #eee;border-radius:999px;font-size:11px}' +
-      '.tag em{font-style:normal;font-size:9px;color:#8A8A8E}table{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}' +
+      '.kpi{background:#fff;border:1px solid #F0E7DF;border-top:3px solid #EB612A;border-radius:10px;padding:14px 16px}.kpi b{display:block;font-size:22px;letter-spacing:-.01em}.kpi span{display:block;font-size:10px;color:#8A8A8E;margin-top:4px}' +
+      '.kpi.g{border-top-color:#1FAE5C}.kpi.g b{color:#1FAE5C}.kpi.b{border-top-color:#0A72E8}.kpi.b b{color:#0A72E8}.kpi.r{border-top-color:#CF4B18}.kpi.r b{color:#CF4B18}' +
+      '.medals{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}' +
+      '.medal{background:linear-gradient(145deg,#FFF8F3,#FFF4EC);border:1px solid rgba(235,97,42,.14);border-radius:10px;padding:12px 14px}' +
+      '.medal .mt{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.medal .mt b{font-size:12.5px}' +
+      '.medal .st{color:#EB612A;font-size:10px;letter-spacing:1px;white-space:nowrap}.medal .st i{font-style:normal;color:rgba(29,29,31,.15)}' +
+      '.medal small{display:block;font-size:10.5px;color:#8A8A8E;margin-top:5px}' +
+      '.medal.t{background:linear-gradient(145deg,#F5F9FF,#EDF4FE);border-color:rgba(10,114,232,.14)}.medal.t .st{color:#0A72E8}.medal .kind{font-size:9px;color:#0A72E8;letter-spacing:.06em}' +
+      '.medal .auth-mark,.tag .auth-mark{display:inline-flex;align-items:center;height:17px;padding:0 6px;border-radius:5px;background:#FFF0E7;color:#C2501C;font-size:9px;font-weight:650;font-style:normal;white-space:nowrap}' +
+      'table{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}' +
       'th{text-align:left;color:#8A8A8E;font-weight:600;padding:8px 9px;background:#F7F6F4;border-bottom:1px solid #eee}' +
       'td{padding:8px 9px;border-bottom:1px solid #f1f1f1;color:#4A4A4F}.foot{margin-top:30px;font-size:10px;color:#AEAEB2;display:flex;justify-content:space-between}' +
+      (opts.fixed ?
+        'html,body{height:100%}body{padding:0;box-sizing:border-box;overflow:hidden}' +
+        '.sheet{max-width:none;width:100%;height:100%;box-sizing:border-box;padding:26px 30px 18px;display:flex;flex-direction:column;border-radius:0;box-shadow:none}' +
+        '.detail{flex:1;min-height:0;overflow:auto}.foot{flex:0 0 auto;margin-top:12px}' : '') +
       '</style></head><body><div class="sheet"><h1>' + E(title) + '</h1>' +
       '<div class="sub">' + E(rangeLabel) + ' · ' + E(month) + ' · 生成于 ' + E(D.meta.today) + '</div>' +
-      '<div class="kpis"><div class="kpi"><b>' + m.total + '</b><span>任务总数</span></div><div class="kpi"><b>' + m.done + '</b><span>已完成</span></div>' +
-      '<div class="kpi"><b>' + m.doing + '</b><span>进行中</span></div><div class="kpi"><b>' + m.overdue + '</b><span>超期</span></div></div>' +
-      (tags ? '<h2>人员标签</h2><div>' + tags + '</div>' : '') +
-      '<h2>任务明细</h2><table><thead><tr><th>任务</th><th>UID</th><th>执行人</th><th>类型</th><th>等级</th><th>工时</th><th>截止</th><th>状态</th></tr></thead><tbody>' +
-      (tableRows || '<tr><td colspan="8">当前筛选暂无任务</td></tr>') + '</tbody></table>' +
+      '<div class="kpis">' +
+        '<div class="kpi"><b>' + m.total + '</b><span>当月任务</span></div>' +
+        '<div class="kpi g"><b>' + m.done + '</b><span>已完成</span></div>' +
+        '<div class="kpi b"><b>' + m.doing + '</b><span>进行中</span></div>' +
+        '<div class="kpi r"><b>' + m.overdue + '</b><span>超期</span></div></div>' +
+      (medals.length ? '<h2>属性勋章</h2><div class="medals">' + medals.map(medalCard).join('') + '</div>' : '') +
+      '<h2>任务明细</h2><div class="detail"><table><thead><tr><th>任务</th><th>UID</th><th>执行人</th><th>类型</th><th>等级</th><th>工时</th><th>截止</th><th>状态</th></tr></thead><tbody>' +
+      (tableRows || '<tr><td colspan="8">当前筛选暂无任务</td></tr>') + '</tbody></table></div>' +
       '<div class="foot"><span>ITO 运维中心 · ' + E(title) + '</span><span>演示数据，仅用于产品演示</span></div></div></body></html>';
   }
 
@@ -443,16 +508,20 @@
     }).join('');
     const personOptions = reportPersonOptions(activePersonPool, ui.reportPerson);
     return '<section class="card report-inline-card">' +
-      '<div class="report-filter-row">' +
-        '<label>范围<select id="prScope">' + scopes.map(function (s) {
-          return '<option value="' + s.id + '"' + (s.id === ui.reportScope ? ' selected' : '') + '>' + s.name + '</option>';
-        }).join('') + '</select></label>' +
-        '<label>月份<select id="prMonth">' + months.map(function (m) {
-          return '<option value="' + m.key + '"' + (m.key === ui.reportMonth ? ' selected' : '') + '>' + m.label + '</option>';
-        }).join('') + '</select></label>' +
-        '<label id="prGroupWrap">专业组<select id="prGroup"' + (st.role === 'manager' && ui.reportScope === 'group' ? ' disabled' : '') + '>' + groupOptions + '</select></label>' +
-        '<label id="prEmpGroupWrap">专业组<select id="prEmpGroup">' + empGroupOptions + '</select></label>' +
-        '<label id="prPersonWrap">人员<select id="prPerson" data-picker="1">' + personOptions + '</select></label>' +
+      '<div class="report-head">' +
+        '<div class="report-head-left">' +
+          '<h3>月报导出与预览</h3>' +
+          '<select id="prScope" aria-label="范围">' + scopes.map(function (s) {
+            return '<option value="' + s.id + '"' + (s.id === ui.reportScope ? ' selected' : '') + '>' + s.name + '</option>';
+          }).join('') + '</select>' +
+          '<select id="prMonth" aria-label="月份">' + months.map(function (m) {
+            return '<option value="' + m.key + '"' + (m.key === ui.reportMonth ? ' selected' : '') + '>' + m.label + '</option>';
+          }).join('') + '</select>' +
+          '<span id="prGroupWrap" hidden><select id="prGroup" aria-label="专业组"' + (st.role === 'manager' && ui.reportScope === 'group' ? ' disabled' : '') + '>' + groupOptions + '</select></span>' +
+          '<span id="prEmpGroupWrap" hidden><select id="prEmpGroup" aria-label="员工范围专业组">' + empGroupOptions + '</select></span>' +
+          '<span id="prPersonWrap" hidden><select id="prPerson" aria-label="人员" data-picker="1">' + personOptions + '</select></span>' +
+        '</div>' +
+        '<button class="btn btn-ghost" id="personalDownloadBtn" type="button">' + U().icon('download') + '下载月报</button>' +
       '</div>' +
       '<iframe class="report-frame report-inline-frame" id="personalReportFrame" title="月报预览"></iframe>' +
     '</section>';
@@ -475,7 +544,7 @@
         '</div>' +
         '<section class="card table-card personal-task-card">' +
           '<div class="table-head"><div><h3>当月任务（' + monthLabel() + '）</h3>' +
-            '<p class="table-note">仅统计执行人是你、且截止时间在本月的子任务；点击行查看任务详情</p></div>' +
+            '<p class="table-note">仅统计执行人是你、且截止时间在本月的任务；点击行查看任务详情</p></div>' +
             '<span class="table-note">' + m.total + ' 项</span></div>' +
           '<div class="table-wrap"><table class="data-table personal-task-table">' +
             '<thead><tr><th>任务名称</th><th>任务UID</th><th>任务类型</th><th>任务等级</th><th>预估工时</th><th>截止时间</th><th>状态</th></tr></thead>' +
@@ -489,10 +558,7 @@
 
       return U().pageHead({
         title: '个人统计',
-        sub: st.user.name + ' · ' + (group ? group.name : '运维中心') + ' · ' + st.user.title + ' · ' + monthLabel(),
-        actions: tab === 'report'
-          ? '<button class="btn btn-ghost" id="personalDownloadBtn" type="button">' + U().icon('download') + '下载月报</button>'
-          : ''
+        sub: st.user.name + ' · ' + (group ? group.name : '运维中心') + ' · ' + st.user.title + ' · ' + monthLabel()
       }) +
       tabs +
       (tab === 'report' ? inlineReportView() : stats);
@@ -515,6 +581,17 @@
           if (ITO.taskActions && ITO.taskActions.detail) ITO.taskActions.detail(row.dataset.task, row.dataset.sub);
         });
       }
+
+      const personalTags = model().personTags.concat(model().taskTags);
+      U().$$('.personal-tag').forEach(function (card) {
+        const tag = personalTags.find(function (t) { return t.name === card.dataset.tagName && t.type === card.dataset.tagType; });
+        if (!tag) return;
+        const open = function () { openPersonalTag(tag); };
+        card.addEventListener('click', open);
+        card.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+        });
+      });
 
       if ((st.ui.personalTab || 'stats') !== 'report') return;
       const ui = personalReportState();
@@ -584,7 +661,7 @@
         st.ui.reportGroup = view.group;
         st.ui.reportEmpGroup = view.empGroup;
         st.ui.reportPerson = view.person;
-        if (frame) frame.srcdoc = reportHtml(view.scope, view);
+        if (frame) frame.srcdoc = reportHtml(view.scope, Object.assign({}, view, { fixed: true }));
       }
 
       [scopeSel, monthSel, groupSel, empGroupSel, personSel].forEach(function (el) {

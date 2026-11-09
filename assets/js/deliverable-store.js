@@ -14,6 +14,8 @@
 
   const state = {
     db: null,
+    memoryMode: false,
+    memoryBlobs: new Map(),
     submissions: new Map(),
     summaries: new Map(),
     workflow: new Map(),
@@ -115,12 +117,23 @@
   }
 
   function put(storeName, value) {
+    if (!state.db) {
+      if (storeName === 'submissions') state.submissions.set(value.subId, value);
+      else if (storeName === 'summaries') state.summaries.set(value.taskId, value);
+      else if (storeName === 'workflow') state.workflow.set(value.subId, value);
+      else if (storeName === 'leaderWorkflow') state.leaderWorkflow.set(value.taskId, value);
+      return Promise.resolve();
+    }
     const tx = state.db.transaction(storeName, 'readwrite');
     tx.objectStore(storeName).put(value);
     return txDone(tx);
   }
 
   function putFiles(fileMetas, blobs) {
+    if (!state.db) {
+      fileMetas.forEach(function (meta, i) { state.memoryBlobs.set(meta.id, blobs[i]); });
+      return Promise.resolve();
+    }
     const tx = state.db.transaction(['fileMeta', 'fileBlobs'], 'readwrite');
     fileMetas.forEach(function (meta, i) {
       tx.objectStore('fileMeta').put(meta);
@@ -157,7 +170,7 @@
   }
 
   async function addFiles(files, uploadedBy) {
-    if (!state.db) throw new Error('成果物存储未初始化，请刷新页面后重试');
+    if (!state.db && !state.memoryMode) throw new Error('成果物存储未初始化，请刷新页面后重试');
     const metas = [];
     const blobs = [];
     for (let i = 0; i < files.length; i += 1) {
@@ -177,6 +190,26 @@
     await putFiles(metas, blobs);
     metas.forEach(function (m) { state.files.set(m.id, m); });
     return metas;
+  }
+
+  async function deleteFiles(ids) {
+    const list = (Array.isArray(ids) ? ids : [ids]).filter(Boolean);
+    if (!list.length) return 0;
+    if (!state.db) {
+      list.forEach(function (id) {
+        state.memoryBlobs.delete(id);
+        state.files.delete(id);
+      });
+      return list.length;
+    }
+    const tx = state.db.transaction(['fileMeta', 'fileBlobs'], 'readwrite');
+    list.forEach(function (id) {
+      tx.objectStore('fileMeta').delete(id);
+      tx.objectStore('fileBlobs').delete(id);
+    });
+    await txDone(tx);
+    list.forEach(function (id) { state.files.delete(id); });
+    return list.length;
   }
 
   function latestOf(record) {
@@ -253,6 +286,10 @@
   async function getFile(fileId) {
     const meta = state.files.get(fileId);
     if (!meta) return null;
+    if (!state.db) {
+      const blob = state.memoryBlobs.get(fileId);
+      return blob ? { meta: meta, blob: blob } : null;
+    }
     const tx = state.db.transaction('fileBlobs', 'readonly');
     const rec = await requestToPromise(tx.objectStore('fileBlobs').get(fileId));
     if (!rec || !rec.blob) return null;
@@ -285,9 +322,18 @@
         const blobs = [];
         for (let j = 0; j < item.files.length; j += 1) {
           const name = item.files[j];
-          const res = await fetch(SAMPLE_BASE + encodeURIComponent(name));
-          if (!res.ok) throw new Error('样例文件加载失败：' + name);
-          const blob = await res.blob();
+          let blob = null;
+          if (location.protocol !== 'file:') {
+            try {
+              const res = await fetch(SAMPLE_BASE + encodeURIComponent(name));
+              if (res.ok) blob = await res.blob();
+            } catch (e) {
+              blob = null;
+            }
+          }
+          if (!blob) {
+            blob = new Blob(['ITO 演示样例文件 · ' + name + '\n\n当前为离线演示模式，文件内容为占位示例。'], { type: mimeOf(name) });
+          }
           blobs.push(new File([blob], name, { type: mimeOf(name, blob.type) }));
         }
         const payload = {
@@ -422,7 +468,15 @@
   }
 
   async function resetAll() {
-    if (!state.db) return false;
+    if (!state.db) {
+      state.submissions.clear();
+      state.summaries.clear();
+      state.files.clear();
+      state.workflow.clear();
+      state.leaderWorkflow.clear();
+      state.memoryBlobs.clear();
+      return true;
+    }
     const stores = ['submissions', 'summaries', 'fileMeta', 'fileBlobs', 'workflow', 'leaderWorkflow', 'meta'];
     await new Promise(function (resolve, reject) {
       const tx = state.db.transaction(stores, 'readwrite');
@@ -454,8 +508,10 @@
       const seeded = results[3].some(function (m) { return m.key === 'seedVersion' && m.value === SEED_VERSION; });
       if (!seeded) await seedSamples();
     } catch (err) {
-      state.error = err;
-      if (window.console && console.error) console.error('[deliverables] init failed:', err);
+      state.memoryMode = true;
+      state.db = null;
+      state.error = location.protocol === 'file:' ? null : err;
+      if (window.console && console.warn) console.warn('[deliverables] 使用内存演示模式:', err.message);
     }
     if (state.resolveReady) state.resolveReady();
   }
@@ -472,12 +528,15 @@
     getLatestSummary: function (taskId) { return latestOf(state.summaries.get(taskId)); },
     getFile: getFile,
     download: download,
+    saveFiles: addFiles,
+    deleteFiles: deleteFiles,
     saveSubmission: saveSubmission,
     saveSummary: saveSummary,
     saveWorkflow: saveWorkflow,
     saveLeaderWorkflow: saveLeaderWorkflow,
     applyWorkflow: applyWorkflow,
     resetAll: resetAll,
+    seedSamples: seedSamples,
     fileListHtml: fileListHtml,
     mountUploader: mountUploader,
     formatSize: formatSize,

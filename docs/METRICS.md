@@ -162,8 +162,8 @@
 | `TSK-BLOCKED` | 挂起任务 | L3 | 规模 | 当前处于已挂起状态的子任务 | 子任务 status=已挂起 计数 | **0** | 0 | `C` |
 | `TSK-URGENT-OPEN` | 紧急在办 | L2 | 规模 | 等级为紧急且未完成/未取消的子任务 | 紧急 且 状态∉{已完成,已取消} | **4** | 0 | `C` |
 | `TSK-HIGH-RISK` | 高风险任务 | L1 | 规模 | 超期且紧急的在办子任务 | 超期 ∩ 紧急 ∩ 未完成 | **3** | 0 | `C` |
-| `TSK-MAIN-STATUS` | 主任务状态分布 | L3 | 分布 | 主任务按状态的数量分布 | 按 mainStatus 分组计数 | **审批中 4 / 执行中 5 / 已完成 3 / 待分发 1 / 已取消 1** | — | `C` |
-| `TSK-SUB-STATUS` | 子任务状态分布 | L3 | 分布 | 子任务按状态的数量分布 | 按 status 分组计数 | **执行中 7 / 待分发 3 / 审批中 4 / 已完成 8 / 已取消 1** | — | `C` |
+| `TSK-MAIN-STATUS` | 主任务状态分布 | L3 | 分布 | 主任务按状态的数量分布 | 按 mainStatus 分组计数 | **执行中 119 / 已挂起 2 / 审批中 2 / 已完成 3 / 待分发 1 / 已取消 1** | — | `C` |
+| `TSK-SUB-STATUS` | 子任务状态分布 | L3 | 分布 | 子任务按状态的数量分布 | 按 status 分组计数 | **执行中 121 / 已完成 8 / 待分发 3 / 已挂起 2 / 审批中 2 / 已取消 1** | — | `C` |
 | `TSK-MAIN-LEVEL` | 主任务等级分布 | L3 | 分布 | 主任务按紧急/重要/一般分布 | 按 level 分组计数 | **紧急 3 / 重要 6 / 一般 5** | 紧急≤3 | `C` |
 | `TSK-SUB-LEVEL` | 子任务等级分布 | L3 | 分布 | 子任务按等级分布 | 按 level 分组计数 | **紧急 4 / 重要 11 / 一般 8** | — | `C` |
 | `TSK-MAIN-TYPE` | 主任务类型分布 | L3 | 分布 | 主任务按巡检/变更/操作等类型分布 | 按 type 分组计数 | **巡检 3 / 变更 4 / 操作 3 / 工单 1 / 开发 1 / 维保 1 / 综合 1** | — | `C` |
@@ -222,8 +222,8 @@
 | `GRP-LOAD-INDEX` | 负荷指数 | L1 | 指数 | 以最高组为 100 的相对负荷 | 组在办÷最高组在办×100 | **应用 100 / 通信 79 / 在线 69 / 基础设施 57** | 极差≤30 | `C` |
 | `GRP-OVERDUE` | 分组超期 | L2 | 分布 | 各组超期子任务数 | 按组统计超期子任务 | **应用 1 / 通信 2 / 在线 2 / 基础设施 2** | 0 | `C` |
 | `GRP-OVERDUE-RATE` | 分组超期率 | L2 | 比率 | 各组超期子任务÷组在办 | 组超期÷组在办 | **应用 2.4 / 通信 6.1 / 在线 6.9 / 基础设施 8.3** | ≤3% | `C` |
-| `GRP-MEMBERS` | 分组人数 | L3 | 规模 | 各专业组成员数 | 按组统计 staff | **每组 2 人** | 2 | `C` |
-| `GRP-PER-CAPITA` | 组内人均在办 | L2 | 比率 | 各组在办÷组内人数 | 组在办÷组人数 | **应用 21.0 / 通信 16.5 / 在线 14.5 / 基础设施 12.0** | ≤18 | `C` |
+| `GRP-MEMBERS` | 分组人数 | L3 | 规模 | 各专业组成员数 | 按组统计 staff | **每组 10 人** | 10 | `C` |
+| `GRP-PER-CAPITA` | 组内人均在办 | L2 | 比率 | 各组在办÷组内人数 | 组在办÷组人数 | **应用 4.2 / 通信 3.3 / 在线 2.9 / 基础设施 2.4** | ≤18 | `C` |
 | `GRP-CV` | 组间负荷变异系数 | L2 | 指数 | 四组在办的标准差÷均值 | σ÷μ | **20.6%** | ≤15% | `C` |
 | `GRP-MAXMIN` | 最大最小比 | L3 | 指数 | 最高组在办÷最低组在办 | max÷min | **1.75** | ≤1.5 | `C` |
 | `GRP-SUB-OPEN` | 分组在办子任务 | L3 | 分布 | 各组未完成子任务数 | 组内 status≠已完成 计数 | **应用 4 / 通信 4 / 在线 4 / 基础设施 3** | — | `C` |
@@ -315,17 +315,17 @@
 
 | ID | 名称 | 层级 | 类型 | 定义 | 公式 | 当前值 | 目标 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `AUT-TOTAL` | 授权总数 | L2 | 规模 | 授权台账记录总数 | count(auths) | **8** | — | `C` |
-| `AUT-VALID` | 有效授权 | L1 | 规模 | 未撤销且未过期的授权数 | count(effective) | **7** | — | `C` |
-| `AUT-EXPIRED` | 已过期 | L2 | 规模 | validTo 早于今天的授权数 | count(过期) | **1** | 0 | `C` |
+| `AUT-TOTAL` | 授权总数 | L2 | 规模 | 授权台账记录总数 | count(auths) | **20** | — | `C` |
+| `AUT-VALID` | 有效授权 | L1 | 规模 | 未撤销且未过期的授权数 | count(effective) | **17** | — | `C` |
+| `AUT-EXPIRED` | 已过期 | L2 | 规模 | validTo 早于今天的授权数 | count(过期) | **3** | 0 | `C` |
 | `AUT-REVOKED` | 已撤销 | L3 | 规模 | 状态为已撤销的授权数 | count(已撤销) | **0** | 0 | `C` |
-| `AUT-EXPIRING-60D` | 60 天内到期 | L1 | 规模 | 未来 60 天内到期且未撤销的授权数 | 0≤剩余天数≤60（`ITO.authStatus` 临期口径） | **8** | ≤6 | `C` |
-| `AUT-COVERAGE` | 授权覆盖率 | L1 | 比率 | 至少持有一条有效授权的人数÷总人数 | 有效授权人数÷8 | **87.5%** | 100% | `C` |
-| `AUT-AVG-REMAIN` | 平均剩余天数 | L2 | 时效 | 有效授权剩余有效期的平均值 | Σ剩余天数÷有效授权数 | **54 天** | ≥60 天 | `C` |
-| `AUT-HIGHRISK` | 高风险授权人数 | L2 | 规模 | 持有效高风险作业授权的人数 | distinct(person, type=高风险作业, 有效) | **2** | ≥2 | `C` |
-| `AUT-WORKLEAD` | 工作负责人授权人数 | L2 | 规模 | 持有效工作负责人授权的人数 | distinct(person, type=工作负责人, 有效) | **3** | ≥3 | `C` |
-| `AUT-UTILIZATION` | 授权使用率 | L2 | 比率 | 被任务实际引用的有效授权÷有效授权数 | 引用数÷7 | **—** | ≥60% | `G` |
-| `AUT-REVOKE-RATE` | 授权撤销率 | L3 | 比率 | 已撤销÷授权总数 | 0÷8 | **0.0%** | 0 | `C` |
+| `AUT-EXPIRING-60D` | 60 天内到期 | L1 | 规模 | 未来 60 天内到期且未撤销的授权数 | 0≤剩余天数≤60（`ITO.authStatus` 临期口径） | **10**（矩阵含基础资格 26） | ≤6 | `C` |
+| `AUT-COVERAGE` | 授权覆盖率 | L1 | 比率 | 至少持有一条有效授权的人数÷总人数 | 有效授权人数÷40 | **95.0%** | 100% | `C` |
+| `AUT-AVG-REMAIN` | 平均剩余天数 | L2 | 时效 | 有效授权剩余有效期的平均值 | Σ剩余天数÷有效授权数 | **91 天** | ≥60 天 | `C` |
+| `AUT-HIGHRISK` | 高风险授权人数 | L2 | 规模 | 持有效高风险作业授权的人数 | distinct(person, type=高风险作业, 有效) | **3** | ≥2 | `C` |
+| `AUT-WORKLEAD` | 工作负责人授权人数 | L2 | 规模 | 持有效工作负责人授权的人数 | distinct(person, type=工作负责人, 有效) | **4** | ≥3 | `C` |
+| `AUT-UTILIZATION` | 授权使用率 | L2 | 比率 | 被任务实际引用的有效授权÷有效授权数 | 引用数÷17 | **—** | ≥60% | `G` |
+| `AUT-REVOKE-RATE` | 授权撤销率 | L3 | 比率 | 已撤销÷授权总数 | 0÷20 | **0.0%** | 0 | `C` |
 | `AUT-EXPIRY-90D` | 90 天内到期 | L2 | 规模 | 未来 90 天内到期且未撤销的授权数 | 0≤剩余≤90 | **6** | ≤4 | `C` |
 
 ### 3.9 消息 `MSG`（11）
@@ -380,16 +380,16 @@
 | `PPL-TITLE-SENIOR` | 高级工程师 | L3 | 规模 | 职称为高级工程师的人数 | count(title=高级工程师) | **4** | — | `C` |
 | `PPL-TITLE-ENGINEER` | 工程师 | L3 | 规模 | 职称为工程师的人数 | count(title=工程师) | **4** | — | `C` |
 | `PPL-CORE` | 核心岗 | L1 | 规模 | 持核心岗标签的人数 | count(tags 含 核心岗) | **4** | ≥4 | `C` |
-| `PPL-CORE-RATE` | 核心岗占比 | L2 | 比率 | 核心岗人数÷总人数 | 核心岗÷8 | **50.0%** | 50% | `C` |
-| `PPL-PER-CAPITA-ACTIVE` | 全员人均在办 | L1 | 比率 | 在办任务÷在册人数 | 128÷8 | **16.0** | ≤16 | `C` |
+| `PPL-CORE-RATE` | 核心岗占比 | L2 | 比率 | 核心岗人数÷总人数 | 核心岗÷40 | **50.0%** | 50% | `C` |
+| `PPL-PER-CAPITA-ACTIVE` | 全员人均在办 | L1 | 比率 | 在办任务÷在册人数 | 128÷40 | **3.2** | ≤16 | `C` |
 | `PPL-OPEN-MAX` | 单人最大在办 | L2 | 规模 | 单人未完成子任务数的最大值 | max(open per person) | **3** | ≤4 | `C` |
 | `PPL-OVERDUE-MAX` | 单人最大超期 | L2 | 规模 | 单人超期子任务数的最大值 | max(overdue per person) | **2** | 0 | `C` |
-| `PPL-TAG-COVERAGE` | 人员标签覆盖率 | L2 | 比率 | 至少有一个旧标签字段值的人数÷总人数 | 非空 tags÷8 | **100.0%** | 100% | `C` |
-| `PPL-SYSTEM-SKILL` | 系统熟练度覆盖 | L3 | 比率 | 标注 KCC 或 DTT 熟练度的人数÷总人数 | 含 KCC/DTT÷8 | **25.0%** | ≥50% | `C` |
-| `PPL-SKILL-COVERAGE` | 技能标签覆盖率 | L2 | 比率 | 至少有一个 SKL 标签的人数÷总人数 | 4÷8 | **50.0%** | ≥80% | `C` |
-| `PPL-HIGHRISK-RATE` | 高风险授权覆盖率 | L2 | 比率 | 持有效高风险授权人数÷总人数 | 2÷8 | **25.0%** | ≥25% | `C` |
+| `PPL-TAG-COVERAGE` | 人员标签覆盖率 | L2 | 比率 | 至少有一个旧标签字段值的人数÷总人数 | 非空 tags÷40 | **100.0%** | 100% | `C` |
+| `PPL-SYSTEM-SKILL` | 系统熟练度覆盖 | L3 | 比率 | 标注 KCC 或 DTT 熟练度的人数÷总人数 | 含 KCC/DTT÷40 | **17.5%** | ≥50% | `C` |
+| `PPL-SKILL-COVERAGE` | 技能标签覆盖率 | L2 | 比率 | 至少有一个 SKL 标签的人数÷总人数 | 23÷40 | **57.5%** | ≥80% | `C` |
+| `PPL-HIGHRISK-RATE` | 高风险授权覆盖率 | L2 | 比率 | 持有效高风险授权人数÷总人数 | 3÷40 | **7.5%** | ≥25% | `C` |
 | `PPL-UTILIZATION` | 工时利用率 | L2 | 比率 | 实际工时÷可用工时 | 实际÷可用 | **—** | 70–90% | `G` |
-| `PPL-TRAINING` | 人均培训时长 | L3 | 时效 | 培训总时长÷人数 | Σ培训÷8 | **—** | ≥40h | `G` |
+| `PPL-TRAINING` | 人均培训时长 | L3 | 时效 | 培训总时长÷人数 | Σ培训÷40 | **—** | ≥40h | `G` |
 
 ### 3.13 数据与平台 `DAT`（14）
 
@@ -404,8 +404,8 @@
 | `DAT-TAG-AVG` | 平均标签数 | L2 | 比率 | 每个已打标主任务的平均标签数 | 引用数÷已打标主任务 | **1.93** | 3–6 | `C` |
 | `DAT-TAG-UNIQUE-USED` | 已使用标签数 | L3 | 规模 | 当前任务实际引用的去重标签数 | distinct(tasks.tags) | **23** | — | `C` |
 | `DAT-FIELD-COMPLETION` | 字段完整率 | L2 | 比率 | 关键字段非空的记录占比 | 非空字段数÷应填字段数 | **—** | ≥95% | `G` |
-| `DAT-PERM-CELLS` | 权限矩阵单元 | L3 | 规模 | 角色×模块的权限单元总数 | 角色数×模块数 | **32** | — | `C` |
-| `DAT-PERM-RATE` | 权限开放率 | L2 | 比率 | 已开放权限单元÷权限单元总数 | 已开放÷32 | **65.6%** | — | `C` |
+| `DAT-PERM-CELLS` | 权限矩阵单元 | L3 | 规模 | 角色×模块的权限单元总数 | 角色数×模块数 | **40** | — | `C` |
+| `DAT-PERM-RATE` | 权限开放率 | L2 | 比率 | 已开放权限单元÷权限单元总数 | 已开放÷40 | **65%** | — | `C` |
 | `DAT-LOG-TOTAL` | 操作日志数 | L3 | 规模 | 操作日志记录总数 | count(logs) | **10** | — | `C` |
 | `DAT-ACH-AWARDS` | 成就标签累计 | L3 | 规模 | 成就标签累计获奖次数 | Σ achievements.count | **36** | — | `C` |
 | `DAT-TAG-USAGE` | 标签使用率 | L2 | 比率 | 已使用标签÷标签总数 | 23÷200 | **11.5%** | ≥40% | `C` |
@@ -514,10 +514,10 @@
 ### 4.13 授权覆盖率 `AUT-COVERAGE`
 
 - **公式**：至少持有一条有效授权的人数 ÷ 总人数。
-- **当前值**：7 / 8 = 87.5%。
+- **当前值**：38 / 40 = 95.0%。
 - **目标 / 预警**：100% / <90%。
-- **读法**：8 人中 7 人有效；吴工的工作班成员授权已于 2026-11-01 过期。
-- **注意**：有效授权 7 条，但 30 天内到期 3 条；覆盖率不是“长期安全”的同义词。
+- **读法**：40 人中 38 人至少持有一条有效授权；2 人暂无有效授权。
+- **注意**：有效授权 17 条，其中 60 天内到期 10 条；覆盖率不是“长期安全”的同义词。
 
 ### 4.14 未读消息 `MSG-UNREAD`
 
@@ -538,9 +538,9 @@
 ### 4.16 全员人均在办 `PPL-PER-CAPITA-ACTIVE`
 
 - **公式**：在办任务 ÷ 在册人数。
-- **当前值**：128 ÷ 8 = 16.0 件/人。
+- **当前值**：128 ÷ 40 = 3.2 件/人。
 - **目标 / 预警**：≤16 / >20。
-- **读法**：全员平均刚好压在目标线上；按组看，应用组 21.0 件/人最高。
+- **读法**：全员平均 3.2 件/人；按组看，应用组 42 ÷ 10 = 4.2 件/人最高。
 - **注意**：全员平均会掩盖组间差异，必须和 `GRP-PER-CAPITA` 一起看。
 
 ### 4.17 子任务标签覆盖率 `DAT-TAG-SUB-COVERAGE`
@@ -640,7 +640,7 @@
 | 05 | 任务流量沙盘 | `TSK-OPENING`、`TSK-NEW-30D`、`TSK-CLOSED-30D`、`TSK-ACTIVE` | 86 + 384 = 470，342 + 128 = 470；节点下钻 |
 | 06 | 任务类型构成 | — | 巡检 38 / 变更 31 / 开发 27 / 维保 19 / 试验 13，切片树图 |
 | 07 | 超期时长分布 | `TSK-OVERDUE` | <1 天 1 / 1–3 天 2 / 3–5 天 2 / ≥5 天 2，合计 7 |
-| 08 | 值班与授权 | `DUT-CURRENT`、`DUT-NEXT`、`AUT-VALID`、`AUT-EXPIRING-30D`、`AUT-COVERAGE` | 李工 / 陈工，授权覆盖 7/8 |
+| 08 | 值班与授权 | `DUT-CURRENT`、`DUT-NEXT`、`AUT-VALID`、`AUT-EXPIRING-60D`、`AUT-COVERAGE` | 周工 / 郭工，授权覆盖 38/40 |
 | 09 | 任务 SLA | `SLA-TASK`、`SLA-ONTIME`、`SLA-AVG-CLOSE`、`SLA-OVERDUE-RATE` | 96.2%，目标 95.0% |
 | 10 | 维保计划 | `MNT-ENABLED`、`MNT-NEXT`、`MNT-VENDORS-ACTIVE` | 3/4 启用，下次 11-07 09:00，厂商 3 家 |
 | 11 | 待办与消息 | `TSK-PENDING`、`MSG-UNREAD`、`MSG-TOTAL` | 待处理 9，未读 3 / 共 6 |
@@ -650,18 +650,18 @@
 | 页面 | 主要指标 | 备注 |
 | --- | --- | --- |
 | 个人统计 | `TSK-COMPLETION-RATE`、`TSK-OVERDUE`、`TSK-PENDING`、`DAT-TAG-MAIN-COVERAGE` | 当前登录人当月任务；人员标签 1–3 星，任务标签完成次数；月报预览与导出 |
-| 任务中心 | `TSK-MAIN-STATUS`、`TSK-SUB-STATUS`、`TSK-COMPLETION-RATE`、`DAT-TAG-MAIN-COVERAGE`、`DAT-TAG-SUB-COVERAGE` | 主任务 14 / 子任务 23；进度仅保留在数据层，不展示 |
+| 任务中心 | `TSK-MAIN-STATUS`、`TSK-SUB-STATUS`、`TSK-COMPLETION-RATE`、`DAT-TAG-MAIN-COVERAGE`、`DAT-TAG-SUB-COVERAGE` | 主任务 128 / 子任务 137；进度仅保留在数据层，不展示 |
 | 派发与审批 | `TSK-PENDING`、`SLA-APPROVAL-72H`、`SLA-APPROVAL-AGE-AVG`、`SLA-APPROVAL-AGE-MAX`、`SLA-APPROVAL-OVERDUE` | 6 项待审批，3 项超 72h |
 | 巡检管理 | `INS-PLANS`、`INS-ENABLED`、`INS-RECORDS`、`INS-ABNORMAL-ITEMS`、`INS-RECTIFY-RATE` | 5 计划 / 4 启用 / 5 记录 / 2 异常 |
 | 维保管理 | `MNT-PLANS`、`MNT-ENABLED`、`MNT-RECORDS`、`MNT-VENDORS-ALL`、`MNT-NEXT` | 4 计划 / 3 启用 / 4 记录 / 4 厂商 |
-| 值班管理 | `DUT-WEEKS`、`DUT-ROTATION`、`DUT-COVERAGE`、`DUT-CURRENT`、`DUT-NEXT` | 13 周 / 8 人 / 本周李工 |
-| 组织架构 | `GRP-ACTIVE`、`GRP-OVERDUE`、`GRP-PER-CAPITA`、`PPL-TOTAL`、`PPL-CORE` | 4 组 / 8 人 / 每组 2 人 |
-| 授权管理 | `AUT-TOTAL`、`AUT-VALID`、`AUT-EXPIRED`、`AUT-EXPIRING-30D`、`AUT-COVERAGE` | 8 条 / 7 有效 / 1 过期 / 3 临期 |
+| 值班管理 | `DUT-WEEKS`、`DUT-ROTATION`、`DUT-COVERAGE`、`DUT-CURRENT`、`DUT-NEXT` | 13 周 / 8 人 / 本周周工 |
+| 组织架构 | `GRP-ACTIVE`、`GRP-OVERDUE`、`GRP-PER-CAPITA`、`PPL-TOTAL`、`PPL-CORE` | 4 组 / 40 人 / 每组 10 人 |
+| 授权管理 | `AUT-TOTAL`、`AUT-VALID`、`AUT-EXPIRED`、`AUT-EXPIRING-60D`、`AUT-COVERAGE` | 台账 20 条 / 17 有效 / 3 过期 / 10 临期；矩阵 38 实际 / 32 可拿 / 26 临期 / 9 过期 |
 | 站内消息 | `MSG-TOTAL`、`MSG-UNREAD`、`MSG-TODAY`、`MSG-TYPES` | 6 条 / 3 未读 / 2 今日 / 6 类 |
 | 预警规则 | `ALR-RULES`、`ALR-ENABLED`、`ALR-ENABLE-RATE`、`ALR-CHANNELS` | 5 条 / 4 启用 / 4 种渠道 |
 | 操作日志 | `DAT-LOG-TOTAL` | 10 条 / 今日 4 / 系统 4 / 7 个操作人 / 6 类 |
 | 成就墙 | `DAT-ACH-AWARDS` | 7 个人员标签 / 21 个任务标签；人员标签按完成次数升星 |
-| 配置中心 | `DAT-PERM-CELLS`、`DAT-PERM-RATE` | 4 角色 × 8 模块 = 32 格，21 格开放 |
+| 配置中心 | `DAT-PERM-CELLS`、`DAT-PERM-RATE` | 4 角色 × 10 模块 = 40 格，26 格开放 |
 
 ### 6.3 内部复盘清单
 
@@ -699,7 +699,7 @@
 | --- | --- | --- |
 | `DAT-TAG-TOTAL` / `DAT-TAG-USAGE` | 标签库规模与使用率 | 使用率<40%，清理僵尸标签 |
 | `DAT-TAG-AVG` | 平均标签数 | <3 或 >8，调整打标规范 |
-| `AUT-EXPIRING-30D` | 临期授权 | >3，提前续期 |
+| `AUT-EXPIRING-60D` | 临期授权 | >3，提前续期 |
 | `PPL-SKILL-COVERAGE` | 人员技能覆盖 | <80%，补 SKL 标签与培训 |
 | `ALR-ENABLE-RATE` | 预警规则启用 | <80%，逐条评估规则 |
 | `DAT-PERM-RATE` | 权限开放率 | 偏离基线，复核最小权限 |
@@ -803,15 +803,15 @@
 | --- | --- | --- |
 | `ito-data.js dashboard` | `TSK-ACTIVE`、`TSK-CLOSED-30D`、`SLA-TASK`、`SLA-ONTIME`、`TSK-OVERDUE`、`GRP-ACTIVE` | 演示汇总快照 |
 | `ito-data.js trend` | `TSK-NEW-30D`、`TSK-CLOSED-30D`、`TSK-NET-FLOW`、`SLA-CLOSE-CAPACITY` | 30 项日值 |
-| `ito-data.js tasks/subs` | `TSK-*`、`SLA-*`、`GRP-*`、`DAT-TAG-*` | 14 主任务 / 23 子任务 |
-| `ito-data.js staff/groups` | `PPL-*`、`GRP-MEMBERS`、`GRP-PER-CAPITA` | 8 人 / 4 组 |
+| `ito-data.js tasks/subs` | `TSK-*`、`SLA-*`、`GRP-*`、`DAT-TAG-*` | 128 主任务 / 137 子任务 |
+| `ito-data.js staff/groups` | `PPL-*`、`GRP-MEMBERS`、`GRP-PER-CAPITA` | 40 人 / 4 组 |
 | `ito-data.js inspection*` | `INS-*` | 5 计划 / 5 记录 |
 | `ito-data.js maintenance*` | `MNT-*` | 4 计划 / 4 记录 |
 | `ito-data.js duty` | `DUT-*` | 13 周 / 8 人轮换 |
-| `ito-data.js auths` | `AUT-*` | 8 条授权 |
+| `ito-data.js auths` | `AUT-*` | 20 条授权 |
 | `ito-data.js messages` | `MSG-*` | 6 条消息 |
 | `ito-data.js alertRules` | `ALR-*` | 5 条规则 |
-| `ito-data.js logs/achievements/permissions` | `DAT-*` | 10 日志 / 6 成就标签 / 4×9 权限 |
+| `ito-data.js logs/achievements/permissions` | `DAT-*` | 10 日志 / 6 成就标签 / 4×10 权限 |
 | `docs/TAGS.md` | `DAT-TAG-TOTAL`、`DAT-TAG-BIZ`、`DAT-TAG-SKL` | 200 个标签 |
 | `docs/HANDOFF.md` | `HLT-*`、`RES-*`、`ALR-CONVERGENCE` | 历史口径，仅对照 |
 
