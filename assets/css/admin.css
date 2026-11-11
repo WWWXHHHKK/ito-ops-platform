@@ -6,15 +6,14 @@
 :root {
   --brand:        #EB612A;
   --brand-strong: #C2501C;
-  --brand-stronger:#B44617;
   --brand-deep:   #A83E12;
   --brand-soft:   #FFF0E7;
   --brand-line:   rgba(235, 97, 42, 0.22);
-  --shell-side:   linear-gradient(180deg, #B44617 0%, #A83E12 100%);
-  --shell-top:    #A83E12;
+  --shell-side:   linear-gradient(180deg, #E5743B 0%, #DE6A30 52%, #D46029 100%);
+  --shell-top:    #B44617;
   --shell-top-bg:
-    radial-gradient(560px 120px at 30% -20%, rgba(255, 255, 255, 0.14), transparent 72%),
-    linear-gradient(100deg, #C2501C 0%, #B44617 52%, #A83E12 100%);
+    radial-gradient(560px 120px at 30% -20%, rgba(255, 255, 255, 0.16), transparent 72%),
+    linear-gradient(100deg, #E0713A 0%, #D75F27 14%, #D05A23 34%, #C2501C 52%, #B44617 70%, #B44617 100%);
   --shell-ink:    #FFFFFF;
   --shell-muted:  #FFE9DC;
   --shell-line:   rgba(255, 255, 255, 0.14);
@@ -1178,13 +1177,13 @@ svg { display: block; }
   stroke-linejoin: round;
 }
 .btn-primary {
-  background: linear-gradient(180deg, var(--brand-strong), var(--brand-stronger));
+  background: linear-gradient(180deg, #F0733D, var(--brand));
   color: #fff;
-  box-shadow: 0 6px 16px rgba(168, 62, 18, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  box-shadow: 0 6px 16px rgba(235, 97, 42, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 .btn-primary:hover {
-  background: linear-gradient(180deg, var(--brand-stronger), var(--brand-deep));
-  box-shadow: 0 8px 20px rgba(168, 62, 18, 0.28);
+  background: linear-gradient(180deg, #F57E4A, #E4561E);
+  box-shadow: 0 8px 20px rgba(235, 97, 42, 0.3);
   transform: translateY(-1px);
 }
 .btn-ghost {
