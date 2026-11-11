@@ -40,15 +40,16 @@
 
   function baseFact(person, type, index) {
     if (type === '值班授权') {
-      // 值班授权按值班轮换名单发放；应用组不需要值班授权
-      const rotation = (D.duty && D.duty.rotation) || [];
-      if (person.group === 'app' || rotation.indexOf(person.name) === -1) return null;
+      // 值班授权按人发放：通信组 10 人（含值班主管），其他组不持有
+      const pool = (D.duty && D.duty.authPool) || [];
+      if (pool.indexOf(person.name) === -1) return null;
       return { validTo: '2026-12-31', base: true, source: '基础资格' };
     }
     // 入厂授权 / 基本安全培训：准入基础，全员持有；少数已过期 / 临期用于演示补办提醒
     let validTo = type === '入厂授权' ? '2027-10-28' : '2027-06-30';
-    if (index % 14 === 2) validTo = type === '入厂授权' ? '2026-10-15' : '2026-09-30';
-    if (index % 11 === 3) validTo = '2026-12-20';
+    const sample = person.name !== '赵工';
+    if (sample && index % 14 === 2) validTo = type === '入厂授权' ? '2026-10-15' : '2026-09-30';
+    if (sample && index % 11 === 3) validTo = '2026-12-20';
     return { validTo: validTo, base: true, source: '基础资格' };
   }
 
@@ -300,7 +301,7 @@
         '<select class="select" id="authGroup"><option value="">全部专业组</option>' + U().groupOptions('') + '</select>' +
       '</div>' + (isEmployee ? '' : '<span class="table-note" id="authCount">' + scoped.length + ' 人</span>') + '</div>' +
       '<section class="card table-card"><div class="table-wrap auth-table-wrap">' +
-        '<table class="data-table auth-matrix"><thead><tr><th class="auth-person-cell">员工姓名</th><th class="auth-uid-cell">UID</th><th class="auth-group-cell">专业组</th>' +
+        '<table class="data-table auth-matrix"><thead><tr><th class="auth-person-cell"><span>员工姓名</span></th><th class="auth-uid-cell"><span>UID</span></th><th class="auth-group-cell"><span>专业组</span></th>' +
           COLUMNS.map(function (type) {
             return '<th><span>' + U().esc(type) + '</span>' +
               (isEmployee ? '' : '<small>实际 ' + actualByType[type] + '</small>') + '</th>';

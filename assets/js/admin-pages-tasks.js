@@ -18,9 +18,49 @@
   function S() { return ITO.state; }
   function U() { return ITO.ui; }
   function taskTagNames() {
-    return (S().wallTags || [])
+    const names = (S().wallTags || [])
       .filter(function (tag) { return tag.type === '任务标签'; })
       .map(function (tag) { return tag.name; });
+    (D.systemGroups || []).forEach(function (group) {
+      (group.systems || []).forEach(function (name) {
+        if (names.indexOf(name) === -1) names.push(name);
+      });
+    });
+    return names;
+  }
+
+  function systemAliasSet() {
+    const out = {};
+    Object.keys(D.systemAliases || {}).forEach(function (system) {
+      (D.systemAliases[system] || []).forEach(function (alias) { out[alias] = true; });
+    });
+    return out;
+  }
+
+  function matchesSystemTag(tag, system) {
+    if (tag === system) return true;
+    const aliases = (D.systemAliases && D.systemAliases[system]) || [];
+    return aliases.indexOf(tag) > -1;
+  }
+
+  function taskSystemTags(task) {
+    const values = [];
+    const push = function (list) {
+      (list || []).forEach(function (tag) {
+        if (values.indexOf(tag) === -1) values.push(tag);
+      });
+    };
+    push(task.tags);
+    (task.subs || []).forEach(function (sub) { push(sub.tags); });
+    return values;
+  }
+
+  function taskMatchesSystems(task, selected) {
+    if (!selected || !selected.length) return true;
+    const tags = taskSystemTags(task);
+    return selected.some(function (system) {
+      return tags.some(function (tag) { return matchesSystemTag(tag, system); });
+    });
   }
   function pd(str) { return new Date(String(str).replace(/-/g, '/').replace('T', ' ')); }
   function now() { return D.meta.demoNow; }
@@ -101,6 +141,9 @@
     if (ITO.customFieldMatch && f.custom && Object.keys(f.custom).some(function (k) { return !!f.custom[k]; })) {
       list = list.filter(function (t) { return ITO.customFieldMatch('task', t, f.custom); });
     }
+    if (f.systems && f.systems.length) {
+      list = list.filter(function (t) { return taskMatchesSystems(t, f.systems); });
+    }
 
     if (f.q) {
       const q = f.q.toLowerCase();
@@ -174,7 +217,7 @@
 
   function sourceOf(t) {
     if (t.source) return t.source;
-    if (t.initiator === '张总') return 'leader';
+    if (t.initiator === '张经理') return 'leader';
     if (t.initiator === '系统') return 'system';
     return 'self';
   }
@@ -240,6 +283,7 @@
     const st = S();
     if (!st.user) return '';
     if (ITO.roleIs('leader', 'manager')) {
+      if (U().mainStatus(task) === '已完成') return '';
       const enabled = canEditTask(task);
       return '<button class="btn btn-soft btn-sm" type="button"' +
         (enabled
@@ -292,19 +336,20 @@
     const st = S();
     if (task.draft || task.canceled) return '<span class="muted">—</span>';
     let out = '';
+    const editable = sub.status !== '已完成';
     if ((sub.owner === st.user.name || ITO.isSuper()) && sub.status === '执行中') {
       out += '<button class="btn btn-primary btn-sm" data-act="submit" data-task="' + task.id + '" data-sub="' + sub.id + '" type="button">提交成果</button>';
     }
     if ((sub.owner === st.user.name || ITO.isSuper()) && sub.status === '已挂起') {
       out += '<button class="btn btn-soft btn-sm" data-act="resubmit" data-task="' + task.id + '" data-sub="' + sub.id + '" type="button">重新提交</button>';
     }
-    if (canLogWork(task, sub)) {
+    if (editable && canLogWork(task, sub)) {
       out += '<button class="btn btn-ghost btn-sm" data-act="log-hours" data-task="' + task.id + '" data-sub="' + sub.id + '" type="button">补录工时</button>';
     }
-    if (canLogWork(task, sub) && ITO.fieldDefsFor && ITO.fieldDefsFor('task', 'sub').length) {
+    if (editable && canLogWork(task, sub) && ITO.fieldDefsFor && ITO.fieldDefsFor('task', 'sub').length) {
       out += '<button class="btn btn-ghost btn-sm" data-act="edit-sub-fields" data-task="' + task.id + '" data-sub="' + sub.id + '" type="button">执行字段</button>';
     }
-    if (canLogWork(task, sub) && ['待分发', '执行中', '已挂起'].indexOf(sub.status) > -1) {
+    if (editable && canLogWork(task, sub) && ['待分发', '执行中', '已挂起'].indexOf(sub.status) > -1) {
       out += '<button class="btn btn-ghost btn-sm" data-act="update-progress" data-task="' + task.id + '" data-sub="' + sub.id + '" type="button">更新进度</button>';
     }
     if (canDirectClose(task, sub)) {
@@ -370,6 +415,27 @@
     return '<input class="oh-search" type="search" data-task-cf="' + U().esc(f.key) + '" value="' + U().esc(value || '') + '" placeholder="筛选' + U().esc(f.label) + '">';
   }
 
+  function systemFilterHtml(selected) {
+    const chosen = selected || [];
+    const groups = D.systemGroups || [];
+    const label = chosen.length === 1 ? chosen[0] : (chosen.length ? '已选 ' + chosen.length + ' 项' : '全部涉及业务系统');
+    return '<div class="cf-system-filter" data-system-filter>' +
+      '<button type="button" class="select cf-filter-toggle cf-system-trigger" aria-expanded="false">' + U().esc(label) + '</button>' +
+      '<div class="cf-system-menu" hidden>' +
+        '<div class="cf-system-search"><input type="search" data-system-search placeholder="搜索系统组 / 业务系统" aria-label="搜索业务系统"></div>' +
+        '<div class="cf-system-tree">' + groups.map(function (group) {
+          const systems = group.systems || [];
+          const allChecked = systems.length && systems.every(function (name) { return chosen.indexOf(name) > -1; });
+          return '<section class="cf-system-group" data-system-group="' + U().esc(group.key) + '">' +
+            '<label class="cf-system-group-head"><input type="checkbox" data-system-group-box="' + U().esc(group.key) + '"' + (allChecked ? ' checked' : '') + '><b>' + U().esc(group.name) + '</b></label>' +
+            '<div class="cf-system-children">' + systems.map(function (name) {
+              return '<label class="cf-system-option" data-system-option-text="' + U().esc(name) + '"><input type="checkbox" data-system-opt="' + U().esc(name) + '"' + (chosen.indexOf(name) > -1 ? ' checked' : '') + '><span>' + U().esc(name) + '</span></label>';
+            }).join('') + '</div></section>';
+        }).join('') + '</div>' +
+        '<div class="cf-system-foot"><span data-system-count>已选 ' + chosen.length + ' 项</span><button type="button" class="link-btn" data-system-clear>清空</button></div>' +
+      '</div></div>';
+  }
+
   function rowsHtml(list) {
     const st = S();
     const customHeaders = ITO.customFieldHeaders ? ITO.customFieldHeaders('task') : [];
@@ -385,12 +451,12 @@
       const expandable = t.mode !== 'single';
 
       const mainRow =
-        '<tr class="task-main-row" data-id="' + t.id + '" tabindex="0" role="button" aria-label="查看任务 ' + U().esc(t.name) + '">' +
+        '<tr class="task-main-row" data-id="' + t.id + '">' +
           '<td><div class="task-name">' +
             (expandable
               ? '<button class="expand-btn' + (expanded ? ' open' : '') + '" data-act="expand" data-id="' + t.id + '" type="button" aria-label="' + (expanded ? '收起任务' : '展开任务') + '" aria-expanded="' + (expanded ? 'true' : 'false') + '">' + caret + '</button>'
-              : '<span class="expand-space"></span>') +
-            '<div class="task-name-text"><b>' + U().esc(t.name) + '</b><small>' + t.id + ' · ' + modeLabel(t) + ' · ' + U().esc(t.type) + '</small></div></div></td>' +
+              : '') +
+            '<button class="task-name-text" data-act="detail" data-task="' + t.id + '" type="button"><b>' + U().esc(t.name) + '</b><small>' + t.id + ' · ' + modeLabel(t) + ' · ' + U().esc(t.type) + '</small></button></div></td>' +
           '<td>' + U().groupPill(t.group) + '</td>' +
           '<td style="white-space:nowrap">' + U().roleChip(t.initiator, 'initiator') + '</td>' +
           '<td style="white-space:nowrap">' + U().roleChip(t.owner, 'owner') + '</td>' +
@@ -426,7 +492,7 @@
     const s = stats(list);
     const parts = [
       '<span class="stat-chip">主任务 <b>' + s.main + '</b></span>',
-      '<span class="stat-chip">任务 <b>' + s.subs + '</b></span>',
+      '<span class="stat-chip">子任务 <b>' + s.subs + '</b></span>',
       '<span class="stat-chip">审批中 <b>' + s.approval + '</b></span>',
       '<span class="stat-chip' + (s.hung ? ' warn' : '') + '">已挂起 <b>' + s.hung + '</b></span>',
       '<span class="stat-chip' + (s.allOverdue ? ' warn' : '') + '" title="含未完成超期与已完成但晚于截止的任务">超期 <b>' + s.allOverdue + '</b></span>',
@@ -508,6 +574,9 @@
     const st = S();
     const status = U().displayStatus(t);
     const focus = subId ? findSub(t, subId) : null;
+    const focusStatus = focus && focus.status ? focus.status : '';
+    const displayStatusText = focusStatus || status;
+    const closedView = focusStatus === '已完成' || U().mainStatus(t) === '已完成';
     const auths = [];
     t.subs.forEach(function (s) {
       if (s.auth && s.auth !== '—' && s.auth !== '无需授权' && auths.indexOf(s.auth) === -1) auths.push(s.auth);
@@ -528,7 +597,7 @@
         '<td><div class="cell-task"><b>' + U().esc(s.name) + '</b><small>' + U().esc(s.type) + ' · ' + (s.hours || 0) + 'h</small></div></td>' +
         '<td style="white-space:nowrap">' + U().roleChip(s.owner, 'executor') + '</td>' +
         '<td>' + U().badge(s.level) + '</td>' +
-        '<td>' + U().esc(s.auth || '—') + '</td>' +
+        '<td>' + (s.auth && s.auth !== '—' ? '<span class="tag-inline auth-inline">' + U().esc(s.auth) + '</span>' : '<span class="muted">—</span>') + '</td>' +
         '<td>' + (s.ticket ? U().badge('需开票', 'yellow') : '<span class="muted">—</span>') + '</td>' +
         '<td>' + (subTags.length ? subTags.map(function (tag) { return '<span class="tag-inline">' + U().esc(tag) + '</span>'; }).join('') : '<span class="muted">—</span>') + '</td>' +
         '<td>' + U().badge(s.status) + '</td>' +
@@ -571,10 +640,13 @@
     })();
 
     const body =
-      '<div class="detail-top">' + U().groupPill(t.group) + U().badge(t.level) + U().badge(status) +
+      '<div class="detail-top">' + U().groupPill(t.group) + U().badge(t.level) + U().badge(displayStatusText) +
         '<span class="detail-id">' + t.id + '</span></div>' +
       (t.desc ? '<p class="detail-desc">' + U().esc(t.desc) + '</p>' : '') +
       (t.canceled ? '<div class="cancel-note"><b>任务已取消</b><span>' + U().esc(t.canceled.reason) + ' · ' + U().esc(t.canceled.by) + ' · ' + U().esc(t.canceled.at) + '</span></div>' : '') +
+      (focusStatus === '已完成' && t.subs.some(function (s) { return s.status !== '已完成' && s.status !== '已取消'; })
+        ? '<p class="table-note" style="margin:0 0 10px">当前关注子任务已完成，仅可查看；其他子任务按各自状态操作。</p>'
+        : '') +
       '<div class="detail-grid">' +
         '<div class="detail-field"><label>任务编号</label><div class="mono">' + t.id + '</div></div>' +
         (focus ? '<div class="detail-field"><label>执行任务编号</label><div class="mono">' + focus.id + '</div></div>' : '') +
@@ -589,7 +661,7 @@
           return '<span class="tag-inline">' + U().esc(x) + '</span>';
         }).join('') : '<span class="muted">—</span>') + '</div></div>' +
         '<div class="detail-field"><label>授权汇总</label><div>' + (auths.length ? auths.map(function (a) {
-          return '<span class="tag-inline">' + U().esc(a) + '</span>';
+          return '<span class="tag-inline auth-inline">' + U().esc(a) + '</span>';
         }).join('') : '<span class="muted">—</span>') + '</div></div>' +
         '<div class="detail-field"><label>开票需求</label><div>' + (tickets ? tickets + ' 个任务需开票' : '无需开票') + '</div></div>' +
         '<div class="detail-field"><label>实际工时</label><div>' + (ITO.actualHoursOf ? Math.round(t.subs.reduce(function (n, s) { return n + ITO.actualHoursOf(s); }, 0) * 10) / 10 : 0) + ' 小时</div></div>' +
@@ -623,6 +695,9 @@
         }).join('') + '</div></div>';
 
     let foot = '<button class="btn btn-ghost" data-detail-close type="button">关闭</button><span class="spacer"></span>';
+    if (closedView) {
+      foot += '<span class="muted" style="margin-right:8px">任务已闭环 · 仅可查看</span>';
+    }
     if (t.draft) {
       if (ITO.roleIs('manager')) {
         foot += '<button class="btn btn-danger" data-draft-delete type="button">删除草稿</button>';
@@ -631,7 +706,7 @@
         foot += '<button class="btn btn-primary" data-draft-edit type="button">编辑草稿</button>';
       }
     } else {
-      if (canEditTask(t)) {
+      if (canEditTask(t) && !closedView) {
         foot += '<button class="btn btn-soft" data-edit-task type="button">编辑任务</button>';
       }
       if (t.mode === 'single' && U().isTaskEditable(t) && t.subs[0] && ['待分发', '执行中'].indexOf(t.subs[0].status) > -1 && canManage(t)) {
@@ -641,10 +716,10 @@
         if (single.status === '执行中') foot += '<button class="btn btn-primary" data-submit-single type="button">提交成果</button>';
         if (single.status === '已挂起') foot += '<button class="btn btn-soft" data-resubmit-single type="button">重新提交</button>';
       }
-      if (t.mode === 'single' && single && canLogWork(t, single)) {
+      if (t.mode === 'single' && single && single.status !== '已完成' && canLogWork(t, single)) {
         foot += '<button class="btn btn-ghost" data-act="log-hours" data-task="' + t.id + '" data-sub="' + single.id + '" type="button">补录工时</button>';
       }
-      if (t.mode === 'single' && single && canLogWork(t, single) && ITO.fieldDefsFor && ITO.fieldDefsFor('task', 'sub').length) {
+      if (t.mode === 'single' && single && single.status !== '已完成' && canLogWork(t, single) && ITO.fieldDefsFor && ITO.fieldDefsFor('task', 'sub').length) {
         foot += '<button class="btn btn-ghost" data-act="edit-sub-fields" data-task="' + t.id + '" data-sub="' + single.id + '" type="button">执行字段</button>';
       }
       if (t.mode === 'single' && single && canLogWork(t, single) && ['待分发', '执行中', '已挂起'].indexOf(single.status) > -1) {
@@ -653,11 +728,11 @@
       if (t.mode === 'single' && single && canDirectClose(t, single)) {
         foot += '<button class="btn btn-soft" data-act="close-sub" data-task="' + t.id + '" data-sub="' + single.id + '" type="button">直接闭环</button>';
       }
-      if (U().isTaskCancelable(t) && isOwnerOrInitiator(t)) {
+      if (U().isTaskCancelable(t) && isOwnerOrInitiator(t) && !closedView) {
         foot += '<button class="btn btn-danger" data-cancel-task type="button">取消任务</button>';
       }
-      const approvalPending = ['审批中', '已挂起', '审批驳回', '待汇总'].indexOf(status) > -1;
-      if (approvalPending) {
+      const approvalPending = ['审批中', '已挂起', '审批驳回', '待汇总'].indexOf(displayStatusText) > -1;
+      if (approvalPending && !closedView) {
         foot += '<a class="btn btn-soft" href="#/dispatch">前往派发与审批</a>';
       }
     }
@@ -730,14 +805,30 @@
     if (!shell) return;
     const current = selected.slice();
     const available = taskTagNames();
+    const aliases = systemAliasSet();
+    const used = {};
+    const groups = (D.systemGroups || []).map(function (group) {
+      const systems = (group.systems || []).filter(function (name) { return available.indexOf(name) > -1; });
+      systems.forEach(function (name) { used[name] = true; });
+      return { name: group.name, systems: systems };
+    }).filter(function (group) { return group.systems.length; });
+    const other = available.filter(function (tag) { return !used[tag] && !aliases[tag]; });
+    const tagButton = function (tag) {
+      return '<button class="tag-option' + (current.indexOf(tag) > -1 ? ' is-on' : '') + '" data-tag="' + U().esc(tag) + '" type="button">' + U().esc(tag) + '</button>';
+    };
+    const groupHtml = function (name, tags) {
+      if (!tags.length) return '';
+      return '<div class="tag-group"><div class="tag-group-title">' + U().esc(name) + '</div><div class="tag-group-options">' +
+        tags.map(tagButton).join('') + '</div></div>';
+    };
+    const groupedHtml = groups.map(function (group) { return groupHtml(group.name, group.systems); }).join('') +
+      (other.length ? groupHtml('其他标签', other) : '');
     const mask = document.createElement('div');
     mask.className = 'tag-pop-mask';
     mask.innerHTML =
       '<div class="tag-pop" role="dialog" aria-label="' + U().esc(title) + '">' +
         '<div class="tag-pop-head"><b>' + U().esc(title) + '</b><span>可多选 · 不限数量</span></div>' +
-        '<div class="tag-pop-body">' + (available.length ? available.map(function (tag) {
-          return '<button class="tag-option' + (current.indexOf(tag) > -1 ? ' is-on' : '') + '" data-tag="' + U().esc(tag) + '" type="button">' + U().esc(tag) + '</button>';
-        }).join('') : '<p class="muted" style="padding:16px 2px">暂无可选任务标签</p>') + '</div>' +
+        '<div class="tag-pop-body">' + (groupedHtml || '<p class="muted" style="padding:16px 2px">暂无可选任务标签</p>') + '</div>' +
         '<div class="tag-pop-foot"><span>已选 <b>0</b> 项</span><span class="spacer"></span>' +
           '<button class="btn btn-ghost btn-sm" data-tag-cancel type="button">取消</button>' +
           '<button class="btn btn-primary btn-sm" data-tag-done type="button">确定</button></div>' +
@@ -2376,6 +2467,7 @@
       const f = st.taskFilters;
       if (typeof f.q !== 'string') { f.q = ''; f.group = ''; f.status = ''; f.level = ''; f.type = ''; f.age = ''; }
       f.custom = f.custom || {};
+      f.systems = f.systems || [];
       const hq = hashQuery();
       if (Object.keys(hq).length) {
         if (st.appliedTaskHash !== location.hash) {
@@ -2419,13 +2511,13 @@
         '<div class="filters">' +
           '<label class="search-field">' + U().icon('search') + '<input id="taskSearch" type="search" placeholder="搜索任务、人员或编号" value="' + U().esc(f.q) + '"></label>' +
           '<select class="select" id="fGroup"><option value="">全部专业组</option>' + U().groupOptions(f.group) + '</select>' +
-          '<select class="select" id="fStatus">' +
+          '<select class="select" id="fStatus" data-search="0" aria-label="状态">' +
             '<option value=""' + (f.status === '' ? ' selected' : '') + '>全部状态</option>' +
             flowStatuses.map(statusOption).join('') +
             '<option value="超期"' + (f.status === '超期' ? ' selected' : '') + '>超期</option>' +
           '</select>' +
           '<select class="select" id="fLevel"><option value="">全部优先级</option>' + U().statusOptions(['紧急', '重要', '一般'], f.level) + '</select>' +
-          '<select class="select" id="fType"><option value="">全部类型</option>' + U().statusOptions(TASK_TYPES, f.type) + '<option value="其他"' + (f.type === '其他' ? ' selected' : '') + '>其他</option></select>' +
+          '<select class="select" id="fType" data-search="0" aria-label="类型"><option value="">全部类型</option>' + U().statusOptions(TASK_TYPES, f.type) + '<option value="其他"' + (f.type === '其他' ? ' selected' : '') + '>其他</option></select>' +
           '<select class="select" id="fAge">' +
             '<option value="">全部超期时长</option>' +
             '<option value="lt1"' + (f.age === 'lt1' ? ' selected' : '') + '>&lt;1 天</option>' +
@@ -2433,9 +2525,12 @@
             '<option value="3to5"' + (f.age === '3to5' ? ' selected' : '') + '>3–5 天</option>' +
             '<option value="gte5"' + (f.age === 'gte5' ? ' selected' : '') + '>≥5 天</option>' +
           '</select>' +
-          (ITO.customFieldFilters ? ITO.customFieldFilters('task').map(function (cf) {
+          (ITO.customFieldFilters ? ITO.customFieldFilters('task').filter(function (cf) {
+            return cf.key !== 'changeNo';
+          }).map(function (cf) {
             return customFilterHtml(cf, f.custom[cf.key]);
           }).join('') : '') +
+          systemFilterHtml(f.systems) +
           '<button class="btn btn-ghost" id="clearFilters" type="button">' + U().icon('refresh') + '重置</button>' +
         '</div>' +
       '</div>' +
@@ -2479,6 +2574,103 @@
       if (ft) ft.addEventListener('change', function () { f.type = ft.value; applyFilter(); });
       const fa = document.getElementById('fAge');
       if (fa) fa.addEventListener('change', function () { f.age = fa.value; applyFilter(); });
+      const systemFilter = document.querySelector('[data-system-filter]');
+      if (systemFilter) {
+        const trigger = systemFilter.querySelector('.cf-system-trigger');
+        const menu = systemFilter.querySelector('.cf-system-menu');
+        const search = systemFilter.querySelector('[data-system-search]');
+        const count = systemFilter.querySelector('[data-system-count]');
+        const clearBtn = systemFilter.querySelector('[data-system-clear]');
+        const options = Array.prototype.slice.call(systemFilter.querySelectorAll('[data-system-opt]'));
+        const sections = Array.prototype.slice.call(systemFilter.querySelectorAll('[data-system-group]'));
+        const collect = function () {
+          return options.filter(function (cb) { return cb.checked; }).map(function (cb) { return cb.dataset.systemOpt; });
+        };
+        const positionMenu = function () {
+          if (menu.hidden) return;
+          menu.style.left = '0px';
+          const triggerRect = trigger.getBoundingClientRect();
+          const menuRect = menu.getBoundingClientRect();
+          let offset = 0;
+          if (menuRect.right > window.innerWidth - 12) offset = (window.innerWidth - 12) - menuRect.right;
+          if (triggerRect.left + offset < 12) offset = 12 - triggerRect.left;
+          menu.style.left = offset + 'px';
+        };
+        const paint = function (apply) {
+          const picked = collect();
+          f.systems = picked;
+          if (count) count.textContent = '已选 ' + picked.length + ' 项';
+          trigger.textContent = picked.length === 1 ? picked[0] : (picked.length ? '已选 ' + picked.length + ' 项' : '全部涉及业务系统');
+          sections.forEach(function (section) {
+            const boxes = Array.prototype.slice.call(section.querySelectorAll('[data-system-opt]'));
+            const checked = boxes.filter(function (cb) { return cb.checked; }).length;
+            const groupBox = section.querySelector('[data-system-group-box]');
+            if (groupBox) {
+              groupBox.checked = boxes.length > 0 && checked === boxes.length;
+              groupBox.indeterminate = checked > 0 && checked < boxes.length;
+            }
+          });
+          if (apply) applyFilter();
+        };
+        trigger.addEventListener('click', function (e) {
+          e.stopPropagation();
+          const willOpen = menu.hidden;
+          U().$$('.cf-system-menu, .cf-filter-menu').forEach(function (m) { m.hidden = true; });
+          menu.hidden = !willOpen;
+          trigger.setAttribute('aria-expanded', String(willOpen));
+          if (willOpen) requestAnimationFrame(positionMenu);
+          if (willOpen && search) {
+            search.value = '';
+            search.dispatchEvent(new Event('input', { bubbles: true }));
+            setTimeout(function () { search.focus(); }, 0);
+          }
+        });
+        sections.forEach(function (section) {
+          const groupBox = section.querySelector('[data-system-group-box]');
+          if (!groupBox) return;
+          groupBox.addEventListener('change', function () {
+            section.querySelectorAll('[data-system-opt]').forEach(function (cb) { cb.checked = groupBox.checked; });
+            paint(true);
+          });
+        });
+        options.forEach(function (cb) { cb.addEventListener('change', function () { paint(true); }); });
+        if (search) {
+          search.addEventListener('input', function () {
+            const q = search.value.trim().toLowerCase();
+            sections.forEach(function (section) {
+              const name = section.querySelector('.cf-system-group-head b').textContent.trim().toLowerCase();
+              const groupMatch = !q || name.indexOf(q) > -1;
+              let visible = 0;
+              section.querySelectorAll('.cf-system-option').forEach(function (opt) {
+                const text = String(opt.dataset.systemOptionText || '').toLowerCase();
+                const match = !q || groupMatch || text.indexOf(q) > -1;
+                opt.style.display = match ? '' : 'none';
+                if (match) visible += 1;
+              });
+              section.style.display = visible ? '' : 'none';
+            });
+          });
+        }
+        if (clearBtn) clearBtn.addEventListener('click', function () {
+          options.forEach(function (cb) { cb.checked = false; });
+          paint(true);
+        });
+        paint(false);
+        window.__systemFilterPosition = positionMenu;
+      }
+      if (!window.__systemFilterResizeBound) {
+        window.__systemFilterResizeBound = true;
+        window.addEventListener('resize', function () {
+          if (window.__systemFilterPosition) window.__systemFilterPosition();
+        });
+      }
+      if (!window.__systemFilterDocBound) {
+        window.__systemFilterDocBound = true;
+        document.addEventListener('click', function (e) {
+          if (e.target.closest('.cf-system-filter')) return;
+          U().$$('.cf-system-menu').forEach(function (m) { m.hidden = true; });
+        });
+      }
       U().$$('[data-cf-filter-wrap]').forEach(function (wrap) {
         const key = wrap.dataset.cfFilterWrap;
         const toggle = wrap.querySelector('.cf-filter-toggle');
@@ -2529,6 +2721,7 @@
       if (clear) clear.addEventListener('click', function () {
         f.q = ''; f.group = ''; f.status = ''; f.level = ''; f.type = ''; f.age = '';
         f.custom = {};
+        f.systems = [];
         if (search) search.value = '';
         [fg, fs, fl, ft, fa].forEach(function (el) {
           if (el) { el.value = ''; if (el.__syncPicker) el.__syncPicker(); }
@@ -2538,6 +2731,14 @@
           wrap.querySelectorAll('[data-cf-filter-opt]').forEach(function (cb) { cb.checked = false; });
           const toggle = wrap.querySelector('.cf-filter-toggle');
           if (toggle) toggle.textContent = toggle.dataset.cfFilterLabel;
+        });
+        U().$$('[data-system-filter]').forEach(function (wrap) {
+          wrap.querySelectorAll('[data-system-opt]').forEach(function (cb) { cb.checked = false; });
+          wrap.querySelectorAll('[data-system-group-box]').forEach(function (cb) { cb.checked = false; cb.indeterminate = false; });
+          const toggle = wrap.querySelector('.cf-system-trigger');
+          if (toggle) toggle.textContent = '全部涉及业务系统';
+          const counter = wrap.querySelector('[data-system-count]');
+          if (counter) counter.textContent = '已选 0 项';
         });
         applyFilter();
       });

@@ -46,9 +46,32 @@
     return direct || st.groups.find(function (g) { return g.manager === st.user.name; }) || null;
   }
 
+  function scopeSubs() {
+    const st = S();
+    const key = monthKey();
+    const group = myGroup();
+    const out = [];
+    st.tasks.forEach(function (t) {
+      if (t.canceled || t.draft) return;
+      t.subs.forEach(function (s) {
+        if (String(s.due || '').slice(0, 7) !== key) return;
+        if (s.status === '已取消') return;
+        if (st.role === 'leader' || st.role === 'super') {
+          // 领导层查看整体当月任务
+        } else if (st.role === 'manager') {
+          if (!group || s.group !== group.id) return;
+        } else if (s.owner !== st.user.name) {
+          return;
+        }
+        out.push({ task: t, sub: s });
+      });
+    });
+    return out.sort(function (a, b) { return String(a.sub.due).localeCompare(String(b.sub.due)); });
+  }
+
   function model() {
     const st = S();
-    const items = mySubs();
+    const items = scopeSubs();
     const done = items.filter(function (x) { return x.sub.status === '已完成'; });
     const overdue = items.filter(function (x) { return U().isOverdue(x.sub) || U().isLateClosed(x.sub); });
     const doing = items.filter(function (x) {
@@ -59,12 +82,23 @@
       const wall = (st.wallTags || []).find(function (t) { return t.name === a.name && t.type === '人员标签'; });
       return Object.assign({}, a, { stars: a.source === '授权' ? 3 : U().starForCount(a.count, wall && wall.star2, wall && wall.star3) });
     });
-    const taskTags = allTags.filter(function (a) { return a.type === '任务标签'; }).map(function (a) {
-      const completed = done.filter(function (x) {
-        return (x.sub.tags || []).indexOf(a.name) > -1 || (x.task.tags || []).indexOf(a.name) > -1;
-      }).length;
-      return Object.assign({}, a, { count: Math.max(a.count || 0, completed) });
+    const taskTagCounts = {};
+    const allowedTaskTags = {};
+    (D.taskTags || []).forEach(function (name) { allowedTaskTags[name] = true; });
+    items.forEach(function (x) {
+      const tags = (x.sub.tags || []).concat(x.task.tags || []);
+      tags.forEach(function (name) {
+        if (!allowedTaskTags[name]) return;
+        taskTagCounts[name] = (taskTagCounts[name] || 0) + 1;
+      });
     });
+    allTags.filter(function (a) { return a.type === '任务标签'; }).forEach(function (a) {
+      if (!allowedTaskTags[a.name]) return;
+      taskTagCounts[a.name] = Math.max(taskTagCounts[a.name] || 0, a.count || 0);
+    });
+    const taskTags = Object.keys(taskTagCounts).map(function (name) {
+      return { person: st.user.name, name: name, type: '任务标签', count: taskTagCounts[name], source: '任务' };
+    }).sort(function (a, b) { return (b.count || 0) - (a.count || 0); });
     return {
       items: items,
       total: items.length,
@@ -87,9 +121,9 @@
     const mark = isPerson
       ? (tag.source === '授权' ? '<span class="auth-mark">授权</span>' : stars(tag.stars))
       : '<span class="task-tag-count">完成 ' + tag.count + ' 次</span>';
-    return '<article class="personal-tag ' + (isPerson ? 'person' : 'task') + '" role="button" tabindex="0" data-tag-name="' + U().esc(tag.name) + '" data-tag-type="' + U().esc(tag.type) + '">' +
+    return '<div class="personal-tag ' + (isPerson ? 'person' : 'task') + '" role="button" tabindex="0" data-tag-name="' + U().esc(tag.name) + '" data-tag-type="' + U().esc(tag.type) + '">' +
       '<b>' + U().esc(tag.name) + '</b>' + mark +
-    '</article>';
+    '</div>';
   }
 
   function openPersonalTag(tag) {
@@ -141,9 +175,9 @@
 
   function rowsHtml(m) {
     if (!m.items.length) {
-      return '<tr><td colspan="7">' + U().emptyState(
-        '当前没有以你为执行人的当月任务',
-        '个人统计只统计执行人是你、且截止时间在本月的任务',
+      return '<tr><td colspan="9">' + U().emptyState(
+        '当前没有符合条件的当月任务',
+        '调整月份或统计范围后再查看',
         'task'
       ) + '</td></tr>';
     }
@@ -151,6 +185,8 @@
       const s = x.sub;
       return '<tr class="personal-task-row" data-task="' + U().esc(x.task.id) + '" data-sub="' + U().esc(s.id) + '">' +
         '<td><div class="cell-task"><b>' + U().esc(s.name) + '</b><small>' + U().esc(x.task.name) + '</small></div></td>' +
+        '<td>' + U().groupPill(s.group || x.task.group) + '</td>' +
+        '<td>' + U().esc(s.owner || '—') + '</td>' +
         '<td class="mono">' + U().esc(s.id) + '</td>' +
         '<td>' + U().esc(s.type || x.task.type || '—') + '</td>' +
         '<td>' + U().badge(s.level || x.task.level) + '</td>' +
@@ -162,19 +198,22 @@
   }
 
   function tagsHtml(m) {
+    const role = S().role;
+    if (role === 'leader' || role === 'super') return '';
+    const count = m.personTags.length + m.taskTags.length;
     return '<section class="card personal-tags-card">' +
       '<div class="table-head"><div><h3>我的属性勋章</h3>' +
-        '<p class="table-note">人员标签按能力评定 1–3 星，任务标签按完成次数累计</p></div>' +
-        '<span class="table-note">' + (m.personTags.length + m.taskTags.length) + ' 项</span></div>' +
+        '<p class="table-note">人员标签按能力评定 1–3 星，任务标签按当月任务与历史完成次数聚合</p></div>' +
+        '<span class="table-note">' + count + ' 项</span></div>' +
       '<div class="personal-tag-groups">' +
         '<div class="personal-tag-group">' +
-          '<div class="personal-tag-head"><h4>人员标签</h4><span>' + m.personTags.length + ' 项</span></div>' +
+          '<div class="personal-tag-head"><h2>人员标签</h2><span>' + m.personTags.length + ' 项</span></div>' +
           '<div class="personal-tag-grid">' +
             (m.personTags.length ? m.personTags.map(tagCard).join('') : '<div class="mini-empty">暂无人员标签</div>') +
           '</div>' +
         '</div>' +
         '<div class="personal-tag-group">' +
-          '<div class="personal-tag-head"><h4>任务标签</h4><span>' + m.taskTags.length + ' 项</span></div>' +
+          '<div class="personal-tag-head"><h2>任务标签</h2><span>' + m.taskTags.length + ' 项</span></div>' +
           '<div class="personal-tag-grid">' +
             (m.taskTags.length ? m.taskTags.map(tagCard).join('') : '<div class="mini-empty">暂无任务标签</div>') +
           '</div>' +
@@ -258,7 +297,7 @@
     const base = new Date(String(D.meta.today).replace(/-/g, '/'));
     base.setDate(1);
     const out = [];
-    for (let i = 0; i < 3; i += 1) {
+    for (let i = 0; i < 5; i += 1) {
       const d = new Date(base.getFullYear(), base.getMonth() - i, 1);
       const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
       out.push({ key: key, label: d.getFullYear() + ' 年 ' + (d.getMonth() + 1) + ' 月' });
@@ -269,15 +308,44 @@
   function scopeDefs() {
     const role = S().role;
     if (role === 'super') {
-      return [{ id: 'team', name: '团队月报' }, { id: 'group', name: '专业组月报' }, { id: 'employee', name: '员工月报' }];
+      return [{ id: 'group', name: '专业组月报' }, { id: 'employee', name: '员工月报' }];
     }
     if (role === 'manager') {
-      return [{ id: 'me', name: '我的月报' }, { id: 'group', name: '专业组月报' }, { id: 'person', name: '组员月报' }];
+      return [{ id: 'me', name: '我的月报' }, { id: 'group', name: '本组月报' }, { id: 'person', name: '组员月报' }];
     }
     if (role === 'leader') {
-      return [{ id: 'initiated', name: '我的月报（我发起）' }, { id: 'team', name: '团队月报' }, { id: 'employee', name: '员工月报' }];
+      return [{ id: 'initiated', name: '个人月报' }, { id: 'group', name: '专业组月报' }, { id: 'employee', name: '员工月报' }];
     }
     return [{ id: 'me', name: '我的月报' }];
+  }
+
+  function archiveAsItem(item) {
+    return {
+      task: {
+        id: item.taskId || item.id,
+        name: item.task,
+        group: item.group,
+        type: item.type,
+        level: item.level,
+        tags: item.tags || [],
+        initiator: item.initiator || '',
+        source: 'archive'
+      },
+      sub: {
+        id: item.id,
+        name: item.name,
+        owner: item.owner,
+        group: item.group,
+        type: item.type,
+        level: item.level,
+        hours: item.hours || 0,
+        due: item.due || item.completedAt,
+        completedAt: item.completedAt,
+        status: '已完成',
+        tags: item.tags || [],
+        progress: 100
+      }
+    };
   }
 
   function collectReport(scope, opts) {
@@ -291,19 +359,39 @@
     }
     const items = [];
     const groupId = opts.group || '';
-    st.tasks.forEach(function (t) {
-      if (t.canceled || t.draft) return;
-      t.subs.forEach(function (s) {
-        if (String(s.due || '').slice(0, 7) !== opts.month) return;
-        if (s.status === '已取消') return;
-        if (scope === 'me' && s.owner !== st.user.name) return;
-        if (scope === 'person' && s.owner !== opts.person) return;
-        if (scope === 'employee' && s.owner !== opts.person) return;
-        if (scope === 'group' && s.group !== groupId) return;
-        if (scope === 'team' && groupId && s.group !== groupId) return;
-        if (scope === 'initiated' && t.initiator !== st.user.name) return;
-        items.push({ task: t, sub: s });
+    const useArchive = String(opts.month) < monthKey();
+    const addArchive = function () {
+      (D.personalArchive || []).forEach(function (a) {
+        if (String(a.completedAt || '').slice(0, 7) !== opts.month) return;
+        if (scope === 'me' && a.owner !== st.user.name) return;
+        if (scope === 'person' && a.owner !== opts.person) return;
+        if (scope === 'employee' && a.owner !== opts.person) return;
+        if (scope === 'group' && groupId && a.group !== groupId) return;
+        if (scope === 'initiated' && a.initiator !== st.user.name) return;
+        items.push(archiveAsItem(a));
       });
+    };
+    if (useArchive) {
+      addArchive();
+    } else {
+      st.tasks.forEach(function (t) {
+        if (t.canceled || t.draft) return;
+        t.subs.forEach(function (s) {
+          if (String(s.due || '').slice(0, 7) !== opts.month) return;
+          if (s.status === '已取消') return;
+          if (scope === 'me' && s.owner !== st.user.name) return;
+          if (scope === 'person' && s.owner !== opts.person) return;
+          if (scope === 'employee' && s.owner !== opts.person) return;
+          if (scope === 'group' && groupId && s.group !== groupId) return;
+          if (scope === 'initiated' && t.initiator !== st.user.name) return;
+          items.push({ task: t, sub: s });
+        });
+      });
+      /* 当月某些员工没有任务时，用历史归档兜底，避免员工月报空白。 */
+      if (!items.length) addArchive();
+    }
+    items.sort(function (a, b) {
+      return String(a.sub.completedAt || a.sub.due).localeCompare(String(b.sub.completedAt || b.sub.due));
     });
     const done = items.filter(function (x) { return x.sub.status === '已完成'; });
     const overdue = items.filter(function (x) { return U().isOverdue(x.sub) || U().isLateClosed(x.sub); });
@@ -317,12 +405,11 @@
     const group = opts.group ? ITO.getGroup(opts.group) : null;
     const personName = (scope === 'person' || scope === 'employee') ? opts.person : (scope === 'me' ? st.user.name : '');
     const month = (monthChoices().find(function (x) { return x.key === opts.month; }) || {}).label || opts.month;
-    const titleMap = { me: '个人运维月报', person: '个人运维月报', employee: '员工月报', group: '专业组月报', team: '团队月报', initiated: '我发起的任务月报' };
+    const titleMap = { me: '个人运维月报', person: '个人运维月报', employee: '员工月报', group: '专业组月报', initiated: '个人月报' };
     const title = titleMap[scope] || '运维月报';
     const rangeLabel = (scope === 'person' || scope === 'employee') ? (personName || '—') :
-      scope === 'group' ? ((group ? group.name : '—')) :
-      scope === 'team' ? (group ? group.name : '全部专业组') :
-      scope === 'initiated' ? st.user.name : st.user.name;
+      scope === 'group' ? (group ? group.name : '全部专业组') :
+      scope === 'initiated' ? st.user.name + '（发起）' : st.user.name;
     const medals = (personName ? (st.personAchievements || []).filter(function (a) {
       return a.person === personName && (a.type === '人员标签' || a.type === '任务标签');
     }) : []);
@@ -386,7 +473,7 @@
       scope: scopes[0].id,
       month: months[0].key,
       group: st.role === 'manager' ? ((myGroup() || {}).id || '') : '',
-      person: st.user.name
+      person: (st.staff[0] || {}).name || st.user.name
     };
     const scopeOptions = scopes.map(function (s) { return '<option value="' + s.id + '">' + s.name + '</option>'; }).join('');
     const monthOptions = months.map(function (m) { return '<option value="' + m.key + '">' + m.label + '</option>'; }).join('');
@@ -422,8 +509,8 @@
 
         function applyVisibility() {
           const scope = scopeSel.value;
-          groupWrap.hidden = scope !== 'group' && scope !== 'team';
-          personWrap.hidden = scope !== 'person';
+          groupWrap.hidden = scope !== 'group';
+          personWrap.hidden = scope !== 'person' && scope !== 'employee';
           if (scope === 'group' && st.role === 'manager') {
             groupSel.value = (myGroup() || {}).id || groupSel.value;
             groupSel.disabled = true;
@@ -466,7 +553,9 @@
     if (!st.ui.reportMonth) st.ui.reportMonth = monthChoices()[0].key;
     if (st.ui.reportGroup == null) st.ui.reportGroup = st.role === 'manager' ? ((myGroup() || {}).id || '') : '';
     if (st.ui.reportEmpGroup == null) st.ui.reportEmpGroup = '';
-    if (!st.ui.reportPerson) st.ui.reportPerson = st.user.name;
+    if (!st.ui.reportPerson || !st.staff.some(function (p) { return p.name === st.ui.reportPerson; })) {
+      st.ui.reportPerson = st.staff[0] ? st.staff[0].name : st.user.name;
+    }
     return st.ui;
   }
 
@@ -534,20 +623,24 @@
       const m = model();
       const group = myGroup();
       const tab = st.ui.personalTab || 'stats';
+      const isLeader = st.role === 'leader' || st.role === 'super';
+      const isManager = st.role === 'manager';
+      const title = isLeader ? '运营统计' : (isManager ? '团队统计' : '个人统计');
+      const scopeText = isLeader ? '全部专业组' : (isManager ? (group ? group.name : '本组') : '本人');
 
       const stats = tagsHtml(m) +
         '<div class="kpi-grid personal-kpis">' +
-          kpi('当月总任务', m.total, '项', '<span>截止时间在本月</span>', '', 'task') +
+          kpi(isLeader || isManager ? '当月团队任务' : '当月总任务', m.total, '项', '<span>截止时间在本月 · ' + U().esc(scopeText) + '</span>', '', 'task') +
           kpi('已完成', m.done, '项', '<span>完成率 ' + m.rate + '%</span>', 'green', 'check') +
           kpi('执行中', m.doing, '项', '<span>含审批中与待分发</span>', 'blue', 'clock') +
           kpi('超期', m.overdue, '项', '<span>含已完成但晚于截止</span>', 'red', 'alert') +
         '</div>' +
         '<section class="card table-card personal-task-card">' +
           '<div class="table-head"><div><h3>当月任务（' + monthLabel() + '）</h3>' +
-            '<p class="table-note">仅统计执行人是你、且截止时间在本月的任务；点击行查看任务详情</p></div>' +
+            '<p class="table-note">' + (isLeader || isManager ? '统计范围：' + U().esc(scopeText) : '仅统计本人执行、且截止时间在本月的任务') + '；点击行查看任务详情</p></div>' +
             '<span class="table-note">' + m.total + ' 项</span></div>' +
-          '<div class="table-wrap"><table class="data-table personal-task-table">' +
-            '<thead><tr><th>任务名称</th><th>任务UID</th><th>任务类型</th><th>任务等级</th><th>预估工时</th><th>截止时间</th><th>状态</th></tr></thead>' +
+          '<div class="table-wrap"><table class="data-table personal-task-table mine-task-table">' +
+            '<thead><tr><th>任务名称</th><th>专业组</th><th>执行人</th><th>任务UID</th><th>任务类型</th><th>任务等级</th><th>预估工时</th><th>截止时间</th><th>状态</th></tr></thead>' +
             '<tbody id="personalTbody">' + rowsHtml(m) + '</tbody></table></div>' +
         '</section>';
 
@@ -557,7 +650,7 @@
       '</div>';
 
       return U().pageHead({
-        title: '个人统计',
+        title: title,
         sub: st.user.name + ' · ' + (group ? group.name : '运维中心') + ' · ' + st.user.title + ' · ' + monthLabel()
       }) +
       tabs +
@@ -620,7 +713,7 @@
 
       function syncVisibility() {
         const scope = scopeSel.value;
-        const showGroup = scope === 'group' || scope === 'team';
+        const showGroup = scope === 'group';
         const showPerson = scope === 'person' || scope === 'employee';
         groupWrap.hidden = !showGroup;
         personWrap.hidden = !showPerson;

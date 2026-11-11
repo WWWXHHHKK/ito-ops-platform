@@ -9,7 +9,7 @@
 
   const DB_NAME = 'ito-deliverables-v3';
   const DB_VERSION = 1;
-  const SEED_VERSION = '2026-11-03-v2';
+  const SEED_VERSION = '2026-11-04-v3';
   const SAMPLE_BASE = 'assets/samples/deliverables/';
 
   const state = {
@@ -68,6 +68,30 @@
       note: '核心交换机巡检汇总：设备整体正常，2 个端口错包已转整改。',
       submittedAt: '2026-11-02 19:40',
       files: ['核心交换机巡检汇总.pptx', '巡检照片.zip']
+    },
+    {
+      subId: 'T10027-03', taskId: 'T10027',
+      note: 'UPS 电池组放电测试完成，放电曲线与内阻数据已归档。',
+      submittedAt: '2026-11-05 09:00',
+      files: ['UPS电池组放电测试记录.xlsx']
+    },
+    {
+      subId: 'T10023-01', taskId: 'T10023',
+      note: '防火墙策略评审完成，高风险端口已按最小权限收敛。',
+      submittedAt: '2026-11-09 10:00',
+      files: ['防火墙策略评审意见.pdf']
+    },
+    {
+      subId: 'T10022-02', taskId: 'T10022',
+      note: '扩容实施完成，回退验证通过，连接池参数已更新。',
+      submittedAt: '2026-11-06 10:00',
+      files: ['扩容实施与回退验证.docx']
+    },
+    {
+      subId: 'T10018-02', taskId: 'T10018',
+      note: '缓存策略调整完成，命中率提升 12%，慢查询下降。',
+      submittedAt: '2026-11-02 10:00',
+      files: ['缓存策略调整报告.pdf']
     }
   ];
 

@@ -44,8 +44,21 @@
     if (w.key === st.duty.nextKey) return { label: '下周', tone: 'blue' };
     return w.key < st.duty.currentKey ? { label: '已结束', tone: 'gray' } : { label: '待开始', tone: 'gray' };
   }
-  function canEditDuty() {
-    return ITO.roleIs('manager', 'leader');
+  function dutyRosterOf(week) {
+    return (week && week.dutyRoster) || D.dutyRoster || [];
+  }
+
+  function dutyAssistantOf(week) {
+    const roster = dutyRosterOf(week);
+    const row = roster.find(function (item) { return item.post === '通信助理'; }) || roster[0];
+    return row ? row.name : '';
+  }
+
+  function canEditDuty(week) {
+    if (ITO.isSuper() || S().role === 'leader') return true;
+    if (!ITO.roleIs('manager')) return false;
+    const w = week || currentWeek();
+    return !!w && dutyAssistantOf(w) === S().user.name;
   }
   function openTasksOf(name) {
     const out = [];
@@ -98,7 +111,7 @@
     const auths = activeAuthsOf(w.person);
     const weekIdx = S().duty.weeks.indexOf(w);
     const after = S().duty.weeks[weekIdx + 1];
-    const canEdit = canEditDuty() && w.key >= S().duty.currentKey;
+    const canEdit = canEditDuty(w) && w.key >= S().duty.currentKey;
 
     const list = tasks.slice(0, 6).map(function (x) {
       return '<div class="mini-row"><span class="dot" style="background:' +
@@ -142,7 +155,7 @@
     const st = S();
     const w = weekByKey(key);
     if (!w) return;
-    if (!canEditDuty()) { U().toast('当前身份不可调整值班', 'warn'); return; }
+    if (!canEditDuty(w)) { U().toast('当前身份不可调整值班', 'warn'); return; }
     if (w.key < st.duty.currentKey) { U().toast('已结束的周不可调整', 'warn'); return; }
 
     const idx = st.duty.weeks.indexOf(w);
@@ -208,7 +221,7 @@
       const nxt = memberOf(next.person);
       const curGroup = cur ? ITO.getGroup(cur.group) : null;
       const nxtGroup = nxt ? ITO.getGroup(nxt.group) : null;
-      const canEdit = canEditDuty();
+      const canEdit = canEditDuty(current);
       const handover = next.start + ' ' + st.duty.handover;
 
       const rows = weeks.map(function (w) {
@@ -227,7 +240,7 @@
           '<td class="duty-open"><b>' + open + '</b> 项</td>' +
           '<td>' + U().badge(status.label, status.tone) + '</td>' +
           '<td><div class="row-actions">' +
-            (canEdit && !isPast ? '<button class="btn btn-soft btn-sm" data-duty-edit="' + w.key + '" type="button">调整</button>' : '<span class="muted">—</span>') +
+            (canEditDuty(w) && !isPast ? '<button class="btn btn-soft btn-sm" data-duty-edit="' + w.key + '" type="button">调整</button>' : '<span class="muted">—</span>') +
           '</div></td></tr>';
       }).join('');
 
@@ -257,7 +270,7 @@
       '<div class="duty-notes">' +
         '<div class="card duty-note"><b>交接时间</b><span>每周一 08:00 由上一周值班人与下一周值班人完成交接；系统提前 30 分钟提醒，08:15 未确认将升级通知。</span></div>' +
         '<div class="card duty-note"><b>交接内容</b><span>未闭环任务、在途变更、未处理告警、授权到期与高风险作业，逐项确认责任人与下一步动作。</span></div>' +
-        '<div class="card duty-note"><b>升级路径</b><span>值班人 15 分钟未响应 → 专业组主管；30 分钟未恢复 → 部门负责人；P1 事件直接上报张总。</span></div>' +
+        '<div class="card duty-note"><b>升级路径</b><span>值班人 15 分钟未响应 → 专业组主管；30 分钟未恢复 → 部门负责人；P1 事件直接上报张经理。</span></div>' +
       '</div>';
     },
 
@@ -448,7 +461,7 @@
             const stars = Math.max(1, Math.min(3, a.stars || 1));
             const mark = a.source === '授权' ? '<span class="auth-mark">授权</span>' : '<em>' + '★'.repeat(stars) + '</em>';
             return '<div class="member-medal-card">' +
-              '<span class="member-medal-icon" style="background:' + U().esc(color) + '">' + U().esc(String(a.name || '').slice(0, 2)) + '</span>' +
+              '<span class="member-medal-icon" style="background:color-mix(in srgb, ' + U().esc(color) + ' 62%, #2B211D)">' + U().esc(String(a.name || '').slice(0, 2)) + '</span>' +
               '<div class="member-medal-main"><b>' + U().esc(a.name) + '</b><span>' + U().esc(a.type) + ' · ' + mark + '</span></div>' +
             '</div>';
           }).join('') || '<span class="muted">暂无属性勋章</span>') +
@@ -506,7 +519,7 @@
         const pct = Math.round(members / (g.fullStrength || members) * 100);
         return '<div class="group-card' + (filter === g.id ? ' active' : '') + '" data-group="' + g.id + '" role="button" tabindex="0" style="--gcolor:' + g.color + '">' +
           '<div class="group-card-top"><span class="group-code">' + g.code + '</span>' +
-            '<div><h3>' + g.name + '</h3></div></div>' +
+            '<div><h2>' + g.name + '</h2></div></div>' +
           '<div class="group-lead-row"><span>主管 <b>' + g.manager + '</b></span><span>组长 <b>' + (g.leader || '—') + '</b></span></div>' +
           '<div class="group-desc">' + g.desc + '</div>' +
           '<div class="group-stats group-stats-2">' +
@@ -550,7 +563,7 @@
         '<section class="card chart-card">' +
           '<div class="chart-head"><div><h3 class="chart-title">' + (activeGroup ? activeGroup.name + '人员变动' : '人员变动情况') + '</h3><p class="chart-sub">近 6 个月' + (activeGroup ? activeGroup.name : '各组') + '人数变化</p></div>' +
             '<span class="head-tag">HEADCOUNT</span></div>' +
-          '<div class="chart-body" id="groupLoadChart"></div>' +
+          '<div class="chart-body" id="groupLoadChart" role="img" aria-label="专业组负荷对比图，展示各组在办任务与负荷指数"></div>' +
           '<div class="group-chart-foot">' +
             '<span>当前 <b>' + scopeNow + '</b> / 满配 <b>' + scopeFull + '</b></span>' +
             '<div class="group-chart-bar"><i style="width:' + scopeBar + '%;background:' + (activeGroup ? activeGroup.color : 'linear-gradient(90deg, var(--brand), #F59A6B)') + '"></i></div>' +
@@ -714,7 +727,7 @@
       const todayStatus = type.statuses[meta.dow] || '正常';
       const elapsed = meta.dow + 1;
       const percent = Math.round(elapsed / 7 * 100);
-      const canEdit = ITO.roleIs('manager', 'leader', 'admin');
+      const canEdit = canEditDuty(currentWeek());
       const statusTone = function (s) { return s === '正常' ? 'green' : 'red'; };
 
       const tabs = types.map(function (t) {
@@ -900,7 +913,7 @@
     const st = S();
     const w = st.duty.weeks.find(function (x) { return x.key === weekKey; });
     if (!w) return;
-    const canEdit = ITO.roleIs('manager', 'leader', 'admin');
+    const canEdit = canEditDuty(w);
     let roster = (w.dutyRoster || D.dutyRoster || []).map(function (r) { return Object.assign({}, r); });
     let status = w.dutyStatus || '正常';
 
@@ -1053,11 +1066,162 @@
     });
   }
 
-  function openDutySheet(weekKey) {
+  /* ── 值班交接：清单、快照与接班确认 ───────── */
+  function handoverSectionHtml(w) {
+    const st = S();
+    const idx = st.duty.weeks.indexOf(w);
+    const next = st.duty.weeks[idx + 1];
+    const isPast = w.key < st.duty.currentKey;
+    const ho = w.handover || { status: '待交接' };
+    const nextHo = next ? (next.handover || { status: '待交接' }) : null;
+    const submitted = !!(nextHo && nextHo.submittedAt && (nextHo.tasks || []).length);
+    const incoming = !!(ho.submittedAt && (ho.tasks || []).length);
+    const stats = handoverStats(w);
+    const list = isPast && !submitted && !incoming ? [] : (incoming ? ho.tasks : (submitted ? nextHo.tasks : stats.list));
+    const canSubmit = !!next && w.key === st.duty.currentKey && canEditDuty(w) && !submitted;
+    const canConfirm = ho.status !== '已完成' && canConfirmHandover(w) &&
+      (w.key <= st.duty.currentKey || (w.key === st.duty.nextKey && ho.status === '待接班确认'));
+
+    const riskTags = function (flags) {
+      if (!flags || !flags.length) return '<span class="muted">—</span>';
+      return flags.map(function (f) {
+        const tone = f === '超期' ? 'red' : (f === '高风险' ? 'amber' : 'blue');
+        return '<span class="risk-tag ' + tone + '">' + U().esc(f) + '</span>';
+      }).join('');
+    };
+
+    const rows = list.map(function (t) {
+      return '<tr>' +
+        '<td class="mono">' + U().esc(t.id) + '</td>' +
+        '<td class="duty-hx-name"><b>' + U().esc(t.name) + '</b>' +
+          (t.sources && t.sources.length ? '<small>' + U().esc(t.sources.join(' / ')) + '</small>' : '') + '</td>' +
+        '<td>' + U().esc(t.owner || '—') + '</td>' +
+        '<td>' + U().badge(t.status) + '</td>' +
+        '<td class="mono">' + U().esc(t.due || '—') + '</td>' +
+        '<td>' + riskTags(t.flags) + '</td>' +
+      '</tr>';
+    }).join('');
+
+    const submitInfo = incoming
+      ? '<p class="handover-submitted">本周接班清单由 第 ' + (st.duty.weeks[idx - 1] ? st.duty.weeks[idx - 1].weekNo : '—') + ' 周提交 · ' +
+        ho.tasks.length + ' 项 · ' + U().esc(ho.submittedAt) + ' · ' + U().esc(ho.submittedBy || '—') +
+        (ho.note ? ' · 说明：' + U().esc(ho.note) : '') + '</p>'
+      : (submitted
+        ? '<p class="handover-submitted">已提交给 第 ' + next.weekNo + ' 周 · ' + U().esc(next.person) + ' · ' +
+          nextHo.tasks.length + ' 项 · ' + U().esc(nextHo.submittedAt) + ' · ' + U().esc(nextHo.submittedBy || '—') +
+          (nextHo.note ? ' · 说明：' + U().esc(nextHo.note) : '') + '</p>'
+        : '');
+
+    return '<div class="detail-section duty-handover" id="dutyHandover">' +
+      '<div class="handover-head">' +
+        '<div><h4>待交接事项（' + list.length + '）</h4>' +
+          '<p class="table-note">范围：本周值班人本人未闭环 + 本专业组超期 / 审批中 / 高风险，同一任务只计一次</p></div>' +
+        '<div class="handover-actions">' +
+          '<span class="badge ' + handoverStatusTone(ho.status) + '">' + (w.key === st.duty.currentKey ? '本周接班' : '接班状态') + ' · ' + U().esc(ho.status) + '</span>' +
+          (canConfirm ? '<button class="btn btn-soft btn-sm" id="dutyConfirmHandover" type="button">' + (w.key === st.duty.currentKey ? '确认本周接班' : '确认接班') + '</button>' : '') +
+          (canSubmit ? '<button class="btn btn-primary btn-sm" id="dutySubmitHandover" type="button">提交交接</button>' : '') +
+        '</div>' +
+      '</div>' +
+      submitInfo +
+      (list.length
+        ? '<div class="table-wrap"><table class="data-table duty-hx-table"><thead><tr><th>任务编号</th><th>任务名称</th><th>执行人</th><th>状态</th><th>截止时间</th><th>风险</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+        : '<p class="muted handover-empty">' + (isPast ? '本周交接已完成，无需处理。' : '当前没有待交接任务，本周可直接完成交接。') + '</p>') +
+    '</div>';
+  }
+
+  DUTY.confirmHandover = function (weekKey) {
+    const st = S();
+    const w = weekByKey(weekKey);
+    if (!w) return;
+    if (!canConfirmHandover(w)) { U().toast('当前身份不可确认接班', 'warn'); return; }
+    const ho = w.handover || (w.handover = { status: '待交接', tasks: [] });
+    if (ho.status === '已完成') { U().toast('本周接班已确认'); return; }
+    ho.status = '已完成';
+    ho.confirmedAt = D.meta.demoNow;
+    ho.confirmedBy = st.user.name;
+    ITO.log('确认值班接班', '第 ' + w.weekNo + ' 周 · ' + w.person, '值班');
+    U().toast('接班已确认');
+    ITO.refresh();
+  };
+
+  DUTY.handoverSubmit = function (weekKey) {
+    const st = S();
+    const w = weekByKey(weekKey);
+    if (!w) return;
+    const idx = st.duty.weeks.indexOf(w);
+    const next = st.duty.weeks[idx + 1];
+    if (!next) { U().toast('没有下一周可交接', 'warn'); return; }
+    if (!canEditDuty(w)) { U().toast('当前身份不可提交交接', 'warn'); return; }
+    const tasks = handoverTasksOf(w);
+    if (!tasks.length) { U().toast('当前没有待交接任务', 'warn'); return; }
+
+    U().modal({
+      title: '提交值班交接',
+      sub: '第 ' + w.weekNo + ' 周 → 第 ' + next.weekNo + ' 周 · 接班人 ' + next.person,
+      wide: true,
+      body:
+        '<div class="handover-picker">' +
+          '<label class="handover-pick-all"><input id="hxAll" type="checkbox" checked> 全选待交接任务（' + tasks.length + ' 项）</label>' +
+          '<div class="handover-pick-list">' + tasks.map(function (t) {
+            const flags = (t.flags || []).map(function (f) {
+              const tone = f === '超期' ? 'red' : (f === '高风险' ? 'amber' : 'blue');
+              return '<span class="risk-tag ' + tone + '">' + U().esc(f) + '</span>';
+            }).join('');
+            return '<label class="handover-pick-item">' +
+              '<input type="checkbox" data-hx="' + U().esc(t.id) + '" checked>' +
+              '<span class="hx-pick-main"><b>' + U().esc(t.name) + '</b><small>' + U().esc(t.id + ' · ' + (t.owner || '—') + ' · ' + (t.due || '—')) + '</small></span>' +
+              '<span class="hx-pick-flag">' + (flags || '<span class="muted">—</span>') + '</span>' +
+            '</label>';
+          }).join('') + '</div>' +
+          '<label class="form-field"><span>交接说明</span><textarea id="hxNote" rows="3" maxlength="120" placeholder="填写在途进展、注意事项与下一步动作"></textarea></label>' +
+        '</div>',
+      foot: '<button class="btn btn-ghost" data-cancel type="button">取消</button>' +
+        '<span class="spacer"></span><button class="btn btn-primary" data-save type="button">提交交接</button>',
+      onMount: function (close, root) {
+        const all = root.querySelector('#hxAll');
+        const boxes = Array.prototype.slice.call(root.querySelectorAll('[data-hx]'));
+        all.addEventListener('change', function () {
+          boxes.forEach(function (b) { b.checked = all.checked; });
+        });
+        boxes.forEach(function (b) {
+          b.addEventListener('change', function () {
+            all.checked = boxes.every(function (x) { return x.checked; });
+          });
+        });
+        root.querySelector('[data-cancel]').addEventListener('click', close);
+        root.querySelector('[data-save]').addEventListener('click', function () {
+          const picked = boxes.filter(function (b) { return b.checked; }).map(function (b) {
+            return tasks.find(function (t) { return t.id === b.dataset.hx; });
+          }).filter(Boolean);
+          if (!picked.length) { U().toast('请至少选择 1 项交接任务', 'warn'); return; }
+          next.handover = {
+            status: '待接班确认',
+            note: root.querySelector('#hxNote').value.trim(),
+            tasks: picked.map(function (t) {
+              return {
+                id: t.id, name: t.name, owner: t.owner, status: t.status,
+                due: t.due, flags: (t.flags || []).slice(), sources: (t.sources || []).slice()
+              };
+            }),
+            submittedAt: D.meta.demoNow,
+            submittedBy: st.user.name,
+            confirmedAt: '',
+            confirmedBy: ''
+          };
+          ITO.log('提交值班交接', '第 ' + w.weekNo + ' 周 → 第 ' + next.weekNo + ' 周 · ' + picked.length + ' 项', '值班');
+          U().toast('交接已提交，等待 ' + next.person + ' 确认');
+          close();
+          ITO.refresh();
+        });
+      }
+    });
+  };
+
+  function openDutySheet(weekKey, options) {
     const st = S();
     const w = st.duty.weeks.find(function (x) { return x.key === weekKey; });
     if (!w) return;
-    const canEdit = ITO.roleIs('manager', 'leader', 'admin');
+    const canEdit = canEditDuty(w);
     let roster = (w.dutyRoster || D.dutyRoster || []).map(function (r) { return Object.assign({}, r); });
     let status = w.dutyStatus || '正常';
     let detailBody = null;
@@ -1217,49 +1381,193 @@
 
   ITO.openDutySheet = openDutySheet;
 
+  /* ── 待交接任务（B 口径）───────────────────── */
+  function handoverRiskFlags(sub) {
+    const flags = [];
+    if (U().isOverdue(sub)) flags.push('超期');
+    if (sub.status === '审批中' || sub.status === '已挂起') flags.push('审批中');
+    if (sub.status !== '已完成' && /高风险/.test(sub.auth || '')) flags.push('高风险');
+    return flags;
+  }
+
+  function handoverTasksOf(week) {
+    if (!week) return [];
+    const person = week.person;
+    const member = memberOf(person);
+    const groupId = member ? member.group : '';
+    const out = [];
+    const index = {};
+
+    const push = function (sub, source, flags) {
+      if (index[sub.id] != null) {
+        const item = out[index[sub.id]];
+        if (item.sources.indexOf(source) === -1) item.sources.push(source);
+        flags.forEach(function (f) { if (item.flags.indexOf(f) === -1) item.flags.push(f); });
+        return;
+      }
+      index[sub.id] = out.length;
+      out.push({
+        id: sub.id, name: sub.name, owner: sub.owner, status: sub.status,
+        due: sub.due, group: sub.group, level: sub.level, auth: sub.auth,
+        sources: [source], flags: flags.slice()
+      });
+    };
+
+    S().tasks.forEach(function (task) {
+      if (task.canceled || task.draft) return;
+      (task.subs || []).forEach(function (sub) {
+        if (!sub || !sub.id) return;
+        if (['已完成', '已取消', '草稿', '待分发'].indexOf(sub.status) > -1) return;
+        if (sub.owner === person) push(sub, '本人未闭环', handoverRiskFlags(sub));
+      });
+    });
+    if (groupId) {
+      S().tasks.forEach(function (task) {
+        if (task.canceled || task.draft) return;
+        (task.subs || []).forEach(function (sub) {
+          if (!sub || !sub.id) return;
+          if ((sub.group || task.group) !== groupId) return;
+          if (['已完成', '已取消', '草稿', '待分发'].indexOf(sub.status) > -1) return;
+          const flags = handoverRiskFlags(sub);
+          if (!flags.length) return;
+          push(sub, '本组风险', flags);
+        });
+      });
+    }
+
+    return out.sort(function (a, b) {
+      if (!!b.flags.length !== !!a.flags.length) return b.flags.length ? 1 : -1;
+      return String(a.due || '').localeCompare(String(b.due || ''));
+    });
+  }
+
+  function handoverStats(week) {
+    const list = handoverTasksOf(week);
+    let overdue = 0, approval = 0, high = 0;
+    list.forEach(function (t) {
+      if (t.flags.indexOf('超期') > -1) overdue += 1;
+      if (t.flags.indexOf('审批中') > -1) approval += 1;
+      if (t.flags.indexOf('高风险') > -1) high += 1;
+    });
+    return { list: list, count: list.length, overdue: overdue, approval: approval, high: high };
+  }
+
+  function handoverStatusTone(status) {
+    if (status === '已完成') return 'green';
+    if (status === '待接班确认') return 'yellow';
+    return 'gray';
+  }
+
+  function canConfirmHandover(week) {
+    if (ITO.isSuper() || S().role === 'leader') return true;
+    if (S().user && S().user.name === week.person) return true;
+    return canEditDuty(week);
+  }
+
+  function dutyCallsOf(week) {
+    return ((S().duty && S().duty.calls) || []).filter(function (c) { return c.weekKey === week.key; });
+  }
+
+  function dutyRoleCell(week, key) {
+    const row = (week.dutyRoster || []).find(function (r) { return r.post === '通信值班-' + key; });
+    if (!row) return '<td class="duty-role-cell"><span class="muted">—</span></td>';
+    const person = memberOf(row.name);
+    const group = person ? ITO.getGroup(person.group) : null;
+    return '<td class="duty-role-cell" data-duty-person="' + U().esc(row.name) + '">' +
+      '<b>' + U().esc(row.name) + '</b>' +
+      '<small>' + U().esc(group ? group.name : '通信组') + '</small>' +
+    '</td>';
+  }
+
+  function openDutyCalls(weekKey) {
+    const w = weekByKey(weekKey);
+    if (!w) return;
+    const calls = dutyCallsOf(w).slice().sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
+    const rows = calls.map(function (c) {
+      return '<tr><td class="mono">' + U().esc(c.date) + '</td><td>' + U().esc(c.person) + '</td>' +
+        '<td>' + U().esc(c.role) + '</td><td>' + U().esc(c.reason) + '</td><td class="num">8 h</td></tr>';
+    }).join('');
+    U().detailModal({
+      title: '值班出勤记录',
+      sub: '第 ' + w.weekNo + ' 周 · ' + w.start + ' 至 ' + w.end + ' · ' + (calls.length ? calls.length + ' 天 / ' + (calls.length * 8) + 'h' : '暂无出勤'),
+      body: calls.length
+        ? '<div class="table-wrap"><table class="data-table duty-call-table"><thead><tr><th>日期</th><th>人员</th><th>岗位</th><th>事由</th><th>工时</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+        : U().emptyState('本周暂无出勤', '待命不计工时，出勤才按天计入', 'clock'),
+      foot: '<button class="btn btn-ghost" data-close type="button">关闭</button>',
+      onMount: function (close, root) {
+        root.querySelector('[data-close]').addEventListener('click', close);
+      }
+    });
+  }
+
   P.duty = {
     render: function () {
       const st = S();
       st.ui = st.ui || {};
       const weeks = st.duty.weeks;
-      const ci = weeks.findIndex(function (w) { return w.key === st.duty.currentKey; });
-      const list = weeks;
-      const current = list[0];
-      const base = D.dutyRoster || [];
+      const current = weekByKey(st.duty.currentKey) || weeks[0];
+      if (!weeks.length) return U().pageHead({ title: '值班管理', sub: '暂无值班周' });
 
-      const rows = list.map(function (w) {
-        const roster = w.dutyRoster || base;
-        const head = roster[0] || { name: '—', phone: '—' };
+      const currentRoles = ['应急', '线路', '网络', '桌面'].map(function (key) {
+        const row = (current.dutyRoster || []).find(function (r) { return r.post === '通信值班-' + key; });
+        return row ? row.name : '—';
+      });
+      const currentCalls = dutyCallsOf(current).length;
+      const assistant = memberOf('赵主管') || {};
+
+      const rows = weeks.map(function (w) {
         const status = w.dutyStatus || '正常';
-        return '<tr data-duty-week="' + w.key + '"' + (w.key === st.duty.currentKey ? ' class="is-current"' : '') + ' style="cursor:pointer">' +
-          '<td><b>第 ' + w.weekNo + ' 周</b>' + (w.key === st.duty.currentKey ? '<small class="table-note" style="display:block">本周</small>' : '') + '</td>' +
-          '<td>' + w.start.slice(5).replace('-', '/') + ' – ' + w.end.slice(5).replace('-', '/') + '</td>' +
-          '<td>' + U().esc(head.name) + '</td>' +
-          '<td class="mono">' + U().esc(head.phone) + '</td>' +
+        const isCurrent = w.key === st.duty.currentKey;
+        const isPast = w.key < st.duty.currentKey;
+        const calls = dutyCallsOf(w);
+        const callCell = calls.length
+          ? '<button class="duty-call-btn" data-calls="' + w.key + '" type="button"><b>' + calls.length + '</b> 天 · ' + (calls.length * 8) + 'h</button>'
+          : '<span class="muted">—</span>';
+        return '<tr data-duty-week="' + w.key + '" class="duty-week-row' + (isCurrent ? ' is-current' : '') + (isPast ? ' is-past' : '') + '" style="cursor:pointer">' +
+          '<td class="duty-week-no"><b>第 ' + w.weekNo + ' 周</b>' + (isCurrent ? '<small class="table-note" style="display:block">本周</small>' : '') + '</td>' +
+          '<td class="duty-week-range">' + w.start.slice(5).replace('-', '/') + ' – ' + w.end.slice(5).replace('-', '/') + '</td>' +
+          dutyRoleCell(w, '应急') + dutyRoleCell(w, '线路') + dutyRoleCell(w, '网络') + dutyRoleCell(w, '桌面') +
+          '<td class="duty-call-cell">' + callCell + '</td>' +
           '<td>' + U().badge(status, status === '正常' ? 'green' : 'red') + '</td>' +
         '</tr>';
       }).join('');
 
       return U().pageHead({
         title: '值班管理',
-        sub: current ? '第 ' + current.weekNo + ' 周 · ' + current.start + ' 至 ' + current.end + ' · 点击行查看值班表' : '暂无值班周',
+        sub: '第 ' + current.weekNo + ' 周 · ' + current.start + ' 至 ' + current.end + ' · 通信组 4 人值班 · 点击行查看值班表',
         actions: '<button class="btn btn-ghost" id="dutyExportBtn" type="button">' + U().icon('download') + '导出本周排班</button>'
       }) +
+      summary([
+        { icon: 'calendar', value: '第 ' + current.weekNo + ' 周', label: '本周周期 · ' + weekRange(current) },
+        { icon: 'users', value: '赵主管', label: '通信助理 · ' + U().esc(assistant.phone || '—') + ' · 7×24 联系' },
+        { icon: 'task', value: '4 人', label: currentRoles.join(' / '), tone: 'blue' },
+        { icon: 'clock', value: currentCalls + ' 天', label: (currentCalls * 8) + ' h · 本周出勤', tone: 'green' }
+      ]) +
       '<section class="card table-card">' +
-        '<div class="table-head"><div><h3>周值班表</h3><p class="table-note">通信助理 = 专业组主管；点击任意一周查看完整值班表</p></div>' +
-          '<span class="table-note">' + list.length + ' 周</span></div>' +
-        '<div class="table-wrap"><table class="data-table duty-week-table"><thead><tr><th>周次</th><th>日期范围</th><th>通信助理</th><th>值班电话</th><th>状态</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+        '<div class="table-head"><div><h3>周值班表</h3><p class="table-note">通信组 4 个角色按周轮换 · 通信助理固定为联系人 · 待命不计工时，出勤按天 8h</p></div>' +
+          '<span class="table-note">' + weeks.length + ' 周</span></div>' +
+        '<div class="table-wrap"><table class="data-table duty-week-table"><thead><tr><th>周次</th><th>日期范围</th><th>应急</th><th>线路</th><th>网络</th><th>桌面</th><th>出勤</th><th>状态</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '</section>' +
-      '<div class="duty-notes">' +
-        '<div class="card duty-note"><b>值班表</b><span>点击周次打开 Excel 式值班表，可查看通信助理、应急、线路、网络、桌面与技术助理。</span></div>' +
+      '<div class="duty-notes two-col">' +
+        '<div class="card duty-note"><b>值班表</b><span>点击周次打开 Excel 式值班表，可查看通信助理、应急、线路、网络、桌面与技术助理；有编辑权限时可调整人员并保存。</span></div>' +
         '<div class="card duty-note"><b>模板与导入</b><span>可先下载 XLSX 模板；主管 / 领导 / 管理员导入后先预览，再应用到值班表并保存。</span></div>' +
       '</div>';
     },
 
     after: function () {
       const st = S();
+      st.ui = st.ui || {};
       U().$$('[data-duty-week]').forEach(function (tr) {
-        tr.addEventListener('click', function () { openDutySheet(tr.dataset.dutyWeek); });
+        tr.addEventListener('click', function (e) {
+          const personCell = e.target.closest('[data-duty-person]');
+          if (personCell) {
+            const p = memberOf(personCell.dataset.dutyPerson);
+            if (p) { GROUP.profile(p.uid); return; }
+          }
+          const callBtn = e.target.closest('[data-calls]');
+          if (callBtn) { openDutyCalls(callBtn.dataset.calls); return; }
+          openDutySheet(tr.dataset.dutyWeek);
+        });
       });
       const exp = document.getElementById('dutyExportBtn');
       if (exp) exp.addEventListener('click', function () {
@@ -1269,6 +1577,18 @@
         previewDutyExport(w, roster);
         ITO.log('导出值班表', '第 ' + w.weekNo + ' 周 · ' + roster.length + ' 行', '值班');
       });
+
+      /* 驾驶舱下钻：#/duty?week=YYYY-MM-DD（清理查询参数，避免后续渲染重复弹出） */
+      const target = (st.routeParams || {}).week;
+      if (target && weekByKey(target)) {
+        history.replaceState(null, '', location.pathname + location.search + '#/duty');
+        setTimeout(function () {
+          if ((location.hash || '').split('?')[0] !== '#/duty') return;
+          if (document.querySelector('.duty-sheet')) return;
+          openDutySheet(target);
+        }, 600);
+      }
     }
   };
+
 })();

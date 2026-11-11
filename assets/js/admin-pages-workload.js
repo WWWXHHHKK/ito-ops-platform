@@ -128,25 +128,28 @@
       (st.planTasks || []).forEach(function (task) {
         if (task.executor !== person.name) return;
         const done = task.status === '已完成';
-        const hours = done ? (Number(task.actualHours) || Number(task.hours) || 0) : (Number(task.hours) || 0);
+        let total, actual, remaining;
+        if (task.source === '值班') {
+          actual = Number(task.actualHours) || 0;
+          remaining = done ? 0 : Math.max(0, (Number(task.hours) || 8) - actual);
+          total = actual + remaining;
+        } else {
+          total = done ? (Number(task.actualHours) || Number(task.hours) || 0) : (Number(task.hours) || 0);
+          actual = done ? total : 0;
+          remaining = done ? 0 : total;
+        }
         if (inPeriod(task.due, period, 'week')) {
-          week += hours;
-          if (done) weekActual += hours; else weekRemaining += hours;
+          week += total;
+          weekActual += actual;
+          weekRemaining += remaining;
           weekIds[task.id] = true;
         }
         if (inPeriod(task.due, period, 'month')) {
-          month += hours;
-          if (done) monthActual += hours; else monthRemaining += hours;
+          month += total;
+          monthActual += actual;
+          monthRemaining += remaining;
           monthIds[task.id] = true;
         }
-      });
-
-      // 值班按 8h/天，每周模拟 1 个值班日；仅当前周 / 当月排班计入。
-      (st.duty.weeks || []).forEach(function (weekRow) {
-        if (weekRow.person !== person.name) return;
-        const dutyHours = 8;
-        if (inPeriod(weekRow.start, period, 'week')) { week += dutyHours; weekDuty += dutyHours; weekIds['duty-' + weekRow.key] = true; }
-        if (inPeriod(weekRow.start, period, 'month')) { month += dutyHours; monthDuty += dutyHours; monthIds['duty-' + weekRow.key] = true; }
       });
 
       const round1 = function (n) { return Math.round(n * 10) / 10; };
@@ -255,6 +258,12 @@
 
   function planDetail(task) {
     const group = ITO.getGroup(task.group) || {};
+    const isDuty = task.source === '值班';
+    const calls = (task.attendances || []).slice().sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
+    const callRows = calls.map(function (c) {
+      return '<div class="mini-row"><span class="dot" style="background:var(--brand)"></span>' +
+        '<div class="txt"><b>' + U().esc(c.reason || '现场处置') + '</b><span>' + U().esc(c.date + ' · ' + (c.role || '') + ' · ' + c.hours + 'h') + '</span></div></div>';
+    }).join('');
     U().detailModal({
       title: task.name,
       sub: task.source + ' · ' + task.planId,
@@ -268,7 +277,12 @@
           '<div class="detail-field"><label>标准工时</label><div>' + (task.hours || 0) + ' 小时</div></div>' +
           '<div class="detail-field"><label>状态</label><div>' + U().badge(task.status) + '</div></div>' +
           (task.actualHours ? '<div class="detail-field"><label>实际工时</label><div>' + task.actualHours + ' 小时</div></div>' : '') +
-        '</div>',
+        '</div>' +
+        (isDuty
+          ? '<div class="detail-section"><h4>出勤记录（' + calls.length + '）</h4>' +
+            (calls.length ? '<div class="mini-list">' + callRows + '</div>' : '<p class="muted">本周暂未出勤</p>') +
+            '</div>'
+          : ''),
       foot: '<button class="btn btn-ghost" data-close type="button">关闭</button>',
       onMount: function (close, root) {
         root.querySelector('[data-close]').addEventListener('click', close);
@@ -277,16 +291,8 @@
   }
 
   function dutyHandovers() {
-    const st = S();
-    return st.duty.weeks.slice(0, -1).map(function (week, index) {
-      const next = st.duty.weeks[index + 1];
-      const saved = (st.duty.handovers || {})[week.key];
-      const member = st.staff.find(function (p) { return p.name === week.person; });
-      return Object.assign({
-        week, person: week.person, incoming: next.person, group: member && member.group,
-        due: next.start + ' ' + st.duty.handover, status: '待交接'
-      }, saved);
-    });
+    /* 旧版交接列表已下线；值班改为常规任务，交接区块不再展示。 */
+    return [];
   }
 
   function handoverDetails(h) {
@@ -333,19 +339,17 @@
     const sourceFilter = st.ui.regularSource || '';
     const q = (st.ui.regularSearch || '').trim().toLowerCase();
     const hit = function (hay) { return !q || String(hay).toLowerCase().indexOf(q) > -1; };
-    const isRegularSource = function (task) { return ['巡检计划', '维保计划'].indexOf(task.source) > -1; };
+    const isRegularSource = function (task) { return ['巡检计划', '维保计划', '值班'].indexOf(task.source) > -1; };
     const rows = (st.planTasks || []).filter(function (task) {
       return isRegularSource(task) && (!groupFilter || task.group === groupFilter) && (!sourceFilter || task.source === sourceFilter) &&
         hit([task.name, task.planId, task.source, task.executor].join(' '));
     });
-    const dutyRows = dutyHandovers().filter(function (h) {
-      return (!sourceFilter || sourceFilter === '值班') && (!groupFilter || h.group === groupFilter) &&
-        hit(['值班交接', '第 ' + h.week.weekNo + ' 周', h.week.start, h.week.end, h.person, h.incoming].join(' '));
-    });
-    return { rows: rows, dutyRows: dutyRows };
+    return { rows: rows, dutyRows: [] };
   }
 
   function regularTaskRow(task) {
+    const duty = task.source === '值班';
+    const href = duty ? '#/duty' : '#/' + (task.planType === 'inspection' ? 'inspection' : 'maintenance');
     return '<tr data-plan-task="' + U().esc(task.id) + '" style="cursor:pointer">' +
       '<td><div class="cell-task"><b>' + U().esc(task.name) + '</b><small>' + U().esc(task.planId + ' · ' + task.source) + '</small></div></td>' +
       '<td>' + U().groupPill(task.group) + '</td>' +
@@ -353,7 +357,7 @@
       '<td class="num">' + (task.hours || 0) + ' h</td>' +
       '<td class="num" style="white-space:nowrap">' + U().shortDate(task.due) + '</td>' +
       '<td>' + U().badge(task.status) + '</td>' +
-      '<td style="text-align:right"><a class="btn btn-ghost btn-sm" href="#/' + (task.planType === 'inspection' ? 'inspection' : 'maintenance') + '">查看来源</a></td>' +
+      '<td style="text-align:right"><a class="btn btn-ghost btn-sm" href="' + href + '">' + (duty ? '查看排班' : '查看来源') + '</a></td>' +
     '</tr>';
   }
 
@@ -394,7 +398,9 @@
             '<select class="select" id="regularSource" aria-label="来源"><option value="">全部来源</option>' + sourceOptions + '</select>' +
           '</div>' +
             '<button class="btn btn-ghost btn-sm" id="regularExportBtn" type="button">' + U().icon('download') + '导出常规任务</button></div>' +
-          '<div class="table-wrap"><table class="data-table"><thead><tr><th>任务</th><th>专业组</th><th>执行人</th><th>标准工时</th><th>截止时间</th><th>状态</th><th style="text-align:right">操作</th></tr></thead>' +
+          '<div class="table-wrap"><table class="data-table regular-table">' +
+            '<colgroup><col style="width:24%"><col style="width:16%"><col style="width:10%"><col style="width:10%"><col style="width:14%"><col style="width:11%"><col style="width:15%"></colgroup>' +
+            '<thead><tr><th>任务</th><th>专业组</th><th>执行人</th><th>标准工时</th><th>截止时间</th><th>状态</th><th style="text-align:center">操作</th></tr></thead>' +
             '<tbody id="regularTbody">' + (body || '<tr><td colspan="7">' + U().emptyState('暂无常规任务', '启用巡检 / 维保计划后会自动生成', 'clipboard') + '</td></tr>') + '</tbody></table></div>' +
           (all.length ? '<div id="regularLedgerPager">' + ITO.pager('regularLedger', all.length, page, REGULAR_PAGE_SIZE) + '</div>' : '') +
         '</section>';
@@ -479,18 +485,23 @@
         const state = loadState(Math.max(r.weekRate, r.monthRate));
         return '<tr>' +
           '<td><div class="person-cell"><div><b>' + U().esc(r.person.name) + '</b><small>' + U().esc(r.person.title || '') + '</small></div></div></td>' +
+          '<td class="workload-uid mono">' + U().esc(r.person.uid || '—') + '</td>' +
           '<td>' + U().groupPill(r.group) + '</td>' +
           '<td class="num">' + r.weekTasks + '</td>' +
-          '<td class="num">' + r.week + ' h<small class="load-sub">实际 ' + r.weekActual + ' · 剩余 ' + r.weekRemaining + '</small></td>' +
+          '<td class="num">' + r.week.toFixed(1) + '</td>' +
+          '<td class="num">' + r.weekActual.toFixed(1) + '</td>' +
+          '<td class="num">' + r.weekRemaining.toFixed(1) + '</td>' +
           '<td><div class="load-cell"><b>' + r.weekRate + '%</b><i style="--v:' + Math.min(100, r.weekRate) + '%"></i></div></td>' +
-          '<td class="num">' + r.month + ' h<small class="load-sub">实际 ' + r.monthActual + ' · 剩余 ' + r.monthRemaining + '</small></td>' +
+          '<td class="num">' + r.month.toFixed(1) + '</td>' +
+          '<td class="num">' + r.monthActual.toFixed(1) + '</td>' +
+          '<td class="num">' + r.monthRemaining.toFixed(1) + '</td>' +
           '<td><div class="load-cell"><b>' + r.monthRate + '%</b><i style="--v:' + Math.min(100, r.monthRate) + '%"></i></div></td>' +
           '<td>' + U().badge(state.label, state.tone) + '</td>' +
         '</tr>';
       }).join('');
       return U().pageHead({
         title: '工时负载',
-        sub: '当前周 ' + model.period.weekStart + ' 至 ' + model.period.weekEnd + ' · 周容量 40h / 月容量 160h · 负荷 = 已记录工时 + 剩余计划工时 + 值班工时（8h/天）',
+        sub: '当前周 ' + model.period.weekStart + ' 至 ' + model.period.weekEnd + ' · 周容量 40h / 月容量 160h · 值班待命不计，出勤按天 8h 计入',
         actions: ''
       }) +
       U().taskTabs('workload') +
@@ -498,13 +509,30 @@
         { icon: 'users', value: rows.length, label: '统计人员' },
         { icon: 'chart', value: avgWeek + '%', label: '平均周负载', tone: 'blue' },
         { icon: 'alert', value: overloaded, label: '超载人员', tone: overloaded ? 'red' : 'green' },
-        { icon: 'clock', value: rows.reduce(function (n, r) { return n + r.month; }, 0) + ' h', label: '本月负载工时' }
+        { icon: 'clock', value: rows.reduce(function (n, r) { return n + r.month; }, 0).toFixed(1) + ' h', label: '本月负载工时' }
       ]) +
       '<div class="toolbar" style="margin-bottom:12px"><div class="filters">' +
         '<select class="select" id="workloadGroup"><option value="">全部专业组</option>' + U().groupOptions(groupFilter) + '</select>' +
-      '</div><span class="table-note">含常规任务、专项任务与值班工时</span></div>' +
-      '<section class="card table-card"><div class="table-wrap"><table class="data-table"><thead><tr><th>人员</th><th>专业组</th><th>本周任务</th><th>本周工时</th><th>周负载</th><th>本月工时</th><th>月负载</th><th>状态</th></tr></thead><tbody>' +
-        (body || '<tr><td colspan="8">' + U().emptyState('暂无负载数据', '任务或值班排班后自动计算', 'chart') + '</td></tr>') +
+      '</div><span class="table-note">含常规任务、专项任务与值班出勤</span></div>' +
+      '<section class="card table-card"><div class="table-wrap"><table class="data-table workload-table">' +
+        '<colgroup>' +
+          '<col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:7%">' +
+          '<col style="width:7%"><col style="width:7%"><col style="width:7%">' +
+          '<col style="width:10%">' +
+          '<col style="width:7%"><col style="width:7%"><col style="width:7%">' +
+          '<col style="width:10%"><col style="width:7%">' +
+        '</colgroup>' +
+        '<thead>' +
+          '<tr>' +
+            '<th rowspan="2">人员</th><th rowspan="2">UID</th><th rowspan="2">专业组</th><th rowspan="2">本周任务数</th>' +
+            '<th colspan="3" class="group-head">本周工时（h）</th>' +
+            '<th rowspan="2">周负载</th>' +
+            '<th colspan="3" class="group-head">本月工时（h）</th>' +
+            '<th rowspan="2">月负载</th><th rowspan="2">状态</th>' +
+          '</tr>' +
+          '<tr><th>计划</th><th>实际</th><th>剩余</th><th>计划</th><th>实际</th><th>剩余</th></tr>' +
+        '</thead><tbody>' +
+        (body || '<tr><td colspan="13">' + U().emptyState('暂无负载数据', '任务或值班排班后自动计算', 'chart') + '</td></tr>') +
       '</tbody></table></div></section>';
     },
 

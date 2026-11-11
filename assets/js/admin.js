@@ -8,7 +8,7 @@
 
   window.ITO = window.ITO || {};
   const D = window.ITO_DATA;
-  const BUILD_VERSION = '20261112n';
+  const BUILD_VERSION = '20261112z22';
   const DATA_SOURCE = window.ITO_DATA_SOURCE;
   const PERSIST_KEYS = [
     'tasks', 'personalArchive', 'messages', 'logs', 'staff', 'groups', 'auths',
@@ -241,7 +241,8 @@
     '已完成': 'green', '完成': 'green', '正常': 'green', '启用': 'green', '有效': 'green',
     '超期': 'red', '异常': 'red', '已过期': 'red', '紧急': 'red', '高风险作业': 'red',
     '临期': 'yellow', '重要': 'yellow', '一般': 'gray', '停用': 'gray', '已撤销': 'gray',
-    '待处理': 'yellow', '计划中': 'gray', '草稿': 'gray',
+    '待处理': 'yellow', '计划中': 'blue', '草稿': 'gray',
+    '待交接': 'yellow', '待接班确认': 'purple',
     '待汇总': 'yellow', '已通过': 'green', '已驳回': 'red', '审批驳回': 'red'
   };
 
@@ -402,7 +403,7 @@
 
   function exportPreview(opts) {
     const rows = opts.rows || [];
-    const limit = 50;
+    const limit = Math.min(Math.max(0, rows.length - 1), 300);
     const head = rows.length ? rows[0] : [];
     const body = rows.slice(1, limit + 1);
     const total = Math.max(0, rows.length - 1);
@@ -412,11 +413,12 @@
     const filename = opts.filename || ('ITO导出-' + D.meta.today + (isHtml ? '.html' : '.csv'));
     modal({
       title: opts.title || '导出预览',
-      sub: opts.sub || (isHtml ? '预览确认后下载 HTML' : '共 ' + total + ' 行 · 预览前 ' + Math.min(total, limit) + ' 行'),
+      sub: opts.sub || (isHtml ? '预览确认后下载 HTML'
+        : (total > limit ? '共 ' + total + ' 行 · 预览前 ' + limit + ' 行' : '共 ' + total + ' 行 · 全部预览')),
       wide: true,
       body: isHtml
         ? '<iframe class="report-frame export-preview-frame" title="导出预览"></iframe>'
-        : '<div class="export-preview-wrap"><table class="export-preview-table"><thead><tr>' +
+        : '<div class="export-preview-wrap" tabindex="0" role="region" aria-label="导出数据预览"><table class="export-preview-table"><thead><tr>' +
             head.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') +
           '</tr></thead><tbody>' +
             (body.length ? body.map(function (r) {
@@ -477,14 +479,14 @@
       active[0].remove();
       active = Array.from(root.querySelectorAll('.notify-card:not(.leaving)'));
     }
-    const card = document.createElement('article');
+    const card = document.createElement('div');
     card.className = 'notify-card';
     card.setAttribute('role', 'status');
     card.innerHTML =
       '<div class="notify-icon">' + icon(notifyIcon(n.type)) + '</div>' +
       '<div class="notify-main">' +
         '<div class="notify-head"><span>' + esc(n.type || '消息') + '</span><time>' + esc(n.time || '') + '</time></div>' +
-        '<h3>' + esc(n.title || '新的消息') + '</h3>' +
+        '<strong class="notify-title">' + esc(n.title || '新的消息') + '</strong>' +
         (n.body ? '<p>' + esc(n.body) + '</p>' : '') +
         '<div class="notify-foot">' +
           '<span class="notify-timer">6 秒后收起</span>' +
@@ -545,6 +547,8 @@
 
   function showEntryMessages() {
     if (!state.user || !state.role) return;
+    /* 系统管理员界面不提供站内消息入口，也不再弹出消息卡。 */
+    if (state.role === 'admin') return;
     if (state.entryNotified[state.role]) { flushNotifications(); return; }
     state.entryNotified[state.role] = true;
     const unread = state.messages.filter((m) => !m.read).slice(0, NOTIFY_MAX);
@@ -590,6 +594,22 @@
   /* ── overlays ────────────────────────────── */
   function lockScroll(on) {
     document.body.style.overflow = on ? 'hidden' : '';
+  }
+
+  let overlayDepth = 0;
+  function setAppInert(on) {
+    const app = document.getElementById('appView');
+    if (!app) return;
+    if (on) app.setAttribute('inert', '');
+    else app.removeAttribute('inert');
+  }
+  function pushOverlay() {
+    overlayDepth += 1;
+    setAppInert(true);
+  }
+  function popOverlay() {
+    overlayDepth = Math.max(0, overlayDepth - 1);
+    if (!overlayDepth) setAppInert(false);
   }
 
   const modalStack = [];
@@ -652,6 +672,7 @@
       if (idx > -1) modalStack.splice(idx, 1);
       backdrop.remove();
       closeAllSelects();
+      popOverlay();
       if (!modalStack.length) {
         lockScroll(false);
         document.removeEventListener('keydown', onModalKey);
@@ -663,6 +684,7 @@
     };
     entry.close = close;
     modalStack.push(entry);
+    pushOverlay();
 
     backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
     $('.modal-close', backdrop).addEventListener('click', close);
@@ -672,6 +694,18 @@
     if (window.ITO && ITO.mountCustomFields) ITO.mountCustomFields(backdrop);
     enhanceSelects(backdrop);
     enhanceFormDates(backdrop);
+    ensureFormLabels(backdrop);
+    ensureControlNames(backdrop);
+    ensureTableA11y(backdrop);
+    ensureRowKeyboard(backdrop);
+    ensureHeadingOrder(backdrop);
+    setTimeout(function () {
+      ensureFormLabels(backdrop);
+      ensureControlNames(backdrop);
+      ensureTableA11y(backdrop);
+      ensureRowKeyboard(backdrop);
+      ensureHeadingOrder(backdrop);
+    }, 450);
     const focusTarget = backdrop.querySelector('.modal-body input:not([type="hidden"]), .modal-body select, .modal-body textarea, .modal-foot .btn-primary') ||
       backdrop.querySelector('.modal-close');
     if (focusTarget) {
@@ -710,15 +744,33 @@
   function drawer(o) {
     const root = $('#drawerRoot');
     const previouslyFocused = document.activeElement;
+    let closed = false;
     const close = () => {
+      if (closed) return;
+      closed = true;
       root.innerHTML = '';
       lockScroll(false);
       document.removeEventListener('keydown', onKey);
+      popOverlay();
       if (previouslyFocused && previouslyFocused.focus && document.contains(previouslyFocused)) {
         try { previouslyFocused.focus(); } catch (e) { /* noop */ }
       }
     };
-    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { close(); return; }
+      if (e.key !== 'Tab') return;
+      const list = modalFocusables(backdrop);
+      if (!list.length) return;
+      const first = list[0];
+      const last = list[list.length - 1];
+      if (e.shiftKey && (document.activeElement === first || !backdrop.contains(document.activeElement))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || !backdrop.contains(document.activeElement))) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
 
     root.innerHTML =
       '<div class="drawer-backdrop">' +
@@ -737,7 +789,22 @@
     $('.modal-close', backdrop).addEventListener('click', close);
     document.addEventListener('keydown', onKey);
     lockScroll(true);
+    pushOverlay();
     if (typeof o.onMount === 'function') o.onMount(close, backdrop);
+    enhanceSelects(backdrop);
+    enhanceFormDates(backdrop);
+    ensureFormLabels(backdrop);
+    ensureControlNames(backdrop);
+    ensureTableA11y(backdrop);
+    ensureRowKeyboard(backdrop);
+    ensureHeadingOrder(backdrop);
+    setTimeout(function () {
+      ensureFormLabels(backdrop);
+      ensureControlNames(backdrop);
+      ensureTableA11y(backdrop);
+      ensureRowKeyboard(backdrop);
+      ensureHeadingOrder(backdrop);
+    }, 450);
     const focusTarget = backdrop.querySelector('.drawer-body input, .drawer-body select, .drawer-body textarea, .drawer-foot .btn-primary, .modal-close');
     if (focusTarget) setTimeout(function () { try { focusTarget.focus(); } catch (e) { /* noop */ } }, 0);
     return close;
@@ -753,10 +820,18 @@
   }
 
   /* ── charts ──────────────────────────────── */
+  const PREFERS_REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   function chart(id, option) {
     const node = document.getElementById(id);
     if (!node || !window.echarts) return null;
+    if (PREFERS_REDUCED) {
+      option.animation = false;
+      option.animationDuration = 0;
+    }
+    if (!node.hasAttribute('role')) node.setAttribute('role', 'img');
+    if (!node.hasAttribute('aria-label')) node.setAttribute('aria-label', id + ' 图表');
     const inst = window.echarts.init(node, null, { renderer: 'canvas' });
+    option.aria = Object.assign({ enabled: true, decal: { show: false } }, option.aria || {});
     inst.setOption(option);
     state.charts.push(inst);
     return inst;
@@ -817,14 +892,38 @@
     dictionary: '字典配置', alerts: '预警规则', roles: '角色权限', tags: '属性勋章', logs: '操作日志'
   };
 
+  /* 同一路由在不同身份下使用不同名称，页面标题与侧边栏必须保持一致。 */
+  function routeTitle(route) {
+    if (route === 'mine' && state.role === 'leader') return '团队任务';
+    if (route === 'personal') {
+      return state.role === 'leader' ? '运营统计' : state.role === 'manager' ? '团队统计' : '个人统计';
+    }
+    return ROUTE_TITLE[route] || route;
+  }
+
   function can(route) {
     const fn = ACCESS[route];
     return fn ? fn() : false;
   }
 
   function defaultRoute() {
-    if (state.role === 'admin') return 'groups';
+    if (state.role === 'admin') return 'dictionary';
     return 'mine';
+  }
+
+  function hashParams() {
+    const raw = (location.hash || '').replace(/^#\/?/, '');
+    const q = raw.indexOf('?');
+    const out = {};
+    if (q < 0) return out;
+    raw.slice(q + 1).split('&').forEach(function (pair) {
+      if (!pair) return;
+      const i = pair.indexOf('=');
+      const k = i > -1 ? pair.slice(0, i) : pair;
+      const v = i > -1 ? pair.slice(i + 1) : '';
+      try { out[decodeURIComponent(k)] = decodeURIComponent(v); } catch (e) { out[k] = v; }
+    });
+    return out;
   }
 
   function parseHash() {
@@ -837,8 +936,14 @@
     if (!can(route)) { toast('当前身份无权访问该模块', 'warn'); return; }
     state.routeParams = params || {};
     if (route === 'tasks' && params && params.q != null) state.pendingQuery = params.q;
-    if (location.hash === '#/' + route) render();
-    else location.hash = '#/' + route;
+    const qs = params ? Object.keys(params).filter(function (k) {
+      return params[k] != null && params[k] !== '';
+    }).map(function (k) {
+      return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+    }).join('&') : '';
+    const hash = '#/' + route + (qs ? '?' + qs : '');
+    if (location.hash === hash) render();
+    else location.hash = hash;
   }
 
   function refresh() {
@@ -857,6 +962,10 @@
       type: type || '操作'
     });
     persistState();
+    /* 业务动作后顺带跑一次规则检测，命中只写站内消息与日志。 */
+    if (window.ITO_ALERT_ENGINE && !window.ITO_ALERT_ENGINE.running) {
+      window.ITO_ALERT_ENGINE.schedule(700);
+    }
   }
 
   /* ── nav ─────────────────────────────────── */
@@ -926,11 +1035,11 @@
         head +
         '<div class="nav-items">' + items.map((it) => {
           const count = it.count ? it.count() : 0;
-          const name = esc(it.id === 'auth' && state.role === 'employee' ? '我的授权' : it.name);
+          const name = esc(it.id === 'auth' && state.role === 'employee' ? '我的授权' : routeTitle(it.id));
           const content = group.standalone
             ? '<span>' + name + '</span>'
             : icon(it.icon) + '<span>' + name + '</span>';
-          return '<a class="nav-item' + (isActive(it) ? ' active' : '') + '" href="#/' + it.id + '" data-route="' + it.id + '">' +
+          return '<a class="nav-item' + (isActive(it) ? ' active' : '') + '" href="#/' + it.id + '" data-route="' + it.id + '"' + (isActive(it) ? ' aria-current="page"' : '') + '>' +
             content +
             (count ? '<b class="nav-count">' + count + '</b>' : '') +
             '</a>';
@@ -968,6 +1077,9 @@
       '<div><b>' + esc(u.name) + '</b><span>' + esc(u.role === u.name ? u.title : u.role) + '</span></div>';
     const screenLink = document.querySelector('.appbar-right .screen-link');
     if (screenLink) screenLink.style.display = state.role === 'admin' ? 'none' : '';
+    /* 系统管理员界面以配置为主，不提供站内消息入口。 */
+    const bell = document.getElementById('bellBtn');
+    if (bell) bell.style.display = state.role === 'admin' ? 'none' : '';
     updateDevDock();
     const dateObj = parseDate(D.meta.today);
     const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][dateObj.getDay()];
@@ -986,6 +1098,179 @@
   }
 
   /* ── routing ─────────────────────────────── */
+  /* ── accessibility helpers ───────────────── */
+  function ensureFormLabels(root) {
+    const scope = root || document;
+    Array.prototype.forEach.call(scope.querySelectorAll('.form-field'), function (field) {
+      const label = field.querySelector(':scope > label');
+      if (!label) return;
+      const controls = Array.prototype.filter.call(
+        field.querySelectorAll('input:not([type="hidden"]), select, textarea'),
+        function (el) { return !el.closest('label'); }
+      );
+      if (controls.length !== 1) return;
+      const control = controls[0];
+      if (!control.id) control.id = 'ff-auto-' + (++formFieldSeq);
+      if (!label.id) label.id = control.id + '-label';
+      if (!label.hasAttribute('for')) label.setAttribute('for', control.id);
+      if (label.querySelector('em') && control.getAttribute('aria-required') !== 'true') control.setAttribute('aria-required', 'true');
+      const wrap = control.closest('.sel-wrap');
+      const trigger = wrap && wrap.querySelector('.sel-trigger');
+      if (trigger && !trigger.getAttribute('aria-labelledby')) trigger.setAttribute('aria-labelledby', label.id);
+      if (trigger && control.getAttribute('aria-describedby') && !trigger.getAttribute('aria-describedby')) {
+        trigger.setAttribute('aria-describedby', control.getAttribute('aria-describedby'));
+      }
+      if (trigger && control.getAttribute('aria-required') === 'true') {
+        const labelText = trigger.getAttribute('aria-label') || '';
+        if (labelText && labelText.indexOf('必填') === -1) trigger.setAttribute('aria-label', labelText + '，必填');
+      }
+    });
+  }
+
+  function ensureControlNames(root) {
+    const scope = root || document;
+    Array.prototype.forEach.call(scope.querySelectorAll('input:not([type="hidden"]):not([type="button"]), select, textarea'), function (control) {
+      if (control.labels && control.labels.length) return;
+      if (control.getAttribute('aria-label') || control.getAttribute('aria-labelledby')) return;
+      if (control.type === 'checkbox' || control.type === 'radio' || control.type === 'file') return;
+      let name = '';
+      const cell = control.closest('td');
+      const table = control.closest('table');
+      if (cell && table) {
+        const row = cell.parentElement;
+        const index = Array.prototype.indexOf.call(row.children, cell);
+        const heads = table.querySelectorAll('thead tr:last-child th');
+        const head = heads[index] || table.querySelectorAll('thead th')[index];
+        if (head) name = head.textContent.trim();
+      }
+      if (!name) name = control.getAttribute('placeholder') || control.getAttribute('title') || '';
+      if (!name) return;
+      control.setAttribute('aria-label', name.replace(/\s+/g, ' ').trim());
+      const wrap = control.closest('.sel-wrap');
+      const trigger = wrap && wrap.querySelector('.sel-trigger');
+      if (trigger) trigger.setAttribute('aria-label', name.replace(/\s+/g, ' ').trim() + '：' + (trigger.textContent || '').trim());
+    });
+  }
+
+  function ensureTableA11y(root) {
+    const scope = root || document;
+    Array.prototype.forEach.call(scope.querySelectorAll('table'), function (table) {
+      if (!table.hasAttribute('aria-label') && !table.querySelector('caption')) {
+        const card = table.closest('.table-card, .card, .detail-section, .cf-preview-card');
+        const head = card && card.querySelector('h2, h3, h4');
+        if (head) table.setAttribute('aria-label', head.textContent.trim());
+      }
+      Array.prototype.forEach.call(table.querySelectorAll('thead th'), function (th) {
+        if (!th.hasAttribute('scope')) th.setAttribute('scope', 'col');
+      });
+    });
+    Array.prototype.forEach.call(scope.querySelectorAll('.table-wrap'), function (wrap) {
+      const scrollable = wrap.scrollWidth > wrap.clientWidth + 1 || wrap.scrollHeight > wrap.clientHeight + 1;
+      if (scrollable) {
+        wrap.setAttribute('tabindex', '0');
+        wrap.setAttribute('data-a11y-scroll', '1');
+        if (!wrap.hasAttribute('role')) wrap.setAttribute('role', 'region');
+        if (!wrap.hasAttribute('aria-label')) {
+          const card = wrap.closest('.table-card, .card, .detail-section');
+          const head = card && card.querySelector('h2, h3, h4');
+          wrap.setAttribute('aria-label', (head ? head.textContent.trim() : '数据表格') + '，可滚动');
+        }
+      } else if (wrap.getAttribute('data-a11y-scroll') === '1') {
+        wrap.removeAttribute('tabindex');
+        wrap.removeAttribute('role');
+        wrap.removeAttribute('data-a11y-scroll');
+        wrap.removeAttribute('aria-label');
+      }
+    });
+    Array.prototype.forEach.call(scope.querySelectorAll('.modal-body, .drawer-body'), function (body) {
+      const scrollable = body.scrollHeight > body.clientHeight + 1 || body.scrollWidth > body.clientWidth + 1;
+      const hasFocusable = !!body.querySelector('a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+      if (scrollable && !hasFocusable) {
+        body.setAttribute('tabindex', '0');
+        body.setAttribute('role', 'region');
+        if (!body.hasAttribute('aria-label')) body.setAttribute('aria-label', '弹窗内容，可滚动');
+      } else if (body.getAttribute('data-a11y-scroll') === '1') {
+        body.removeAttribute('tabindex');
+        body.removeAttribute('role');
+        body.removeAttribute('aria-label');
+        body.removeAttribute('data-a11y-scroll');
+      }
+      if (scrollable && !hasFocusable) body.setAttribute('data-a11y-scroll', '1');
+    });
+  }
+
+  function ensureRowKeyboard(root) {
+    const scope = root || document;
+    Array.prototype.forEach.call(scope.querySelectorAll('tr[data-detail], tr[data-detail-task], tr[data-auth-person], tr[data-duty-week]'), function (row) {
+      if (row.getAttribute('data-a11y-row') === '1' || row.hasAttribute('tabindex')) return;
+      if (row.querySelector('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])')) {
+        if (row.querySelector('[data-act="detail"], .task-name-text, [data-a11y-cell]')) return;
+        const cells = Array.prototype.slice.call(row.querySelectorAll('td'));
+        const cell = cells.find(function (td) {
+          return !td.querySelector('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        });
+        if (!cell) return;
+        cell.setAttribute('data-a11y-cell', '1');
+        cell.setAttribute('tabindex', '0');
+        cell.setAttribute('role', 'button');
+        const label = cell.textContent.replace(/\s+/g, ' ').trim().slice(0, 60);
+        cell.setAttribute('aria-label', (label ? label + '，' : '') + '查看详情');
+        cell.addEventListener('keydown', function (event) {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          row.click();
+        });
+        return;
+      }
+      row.setAttribute('data-a11y-row', '1');
+      row.setAttribute('tabindex', '0');
+      const first = row.querySelector('td, th');
+      const label = (first ? first.textContent : '').replace(/\s+/g, ' ').trim().slice(0, 60);
+      row.setAttribute('aria-label', (label ? label + '，' : '') + '按 Enter 查看详情');
+      row.addEventListener('keydown', function (event) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        row.click();
+      });
+    });
+  }
+
+  function ensureHeadingOrder(root) {
+    const scope = root || document;
+    Array.prototype.forEach.call(scope.querySelectorAll('.table-head h3, h3.chart-title'), function (heading) {
+      if (heading.getAttribute('data-a11y-heading') === '1') return;
+      const h2 = document.createElement('h2');
+      h2.className = heading.className;
+      h2.setAttribute('data-a11y-heading', '1');
+      while (heading.firstChild) h2.appendChild(heading.firstChild);
+      heading.replaceWith(h2);
+    });
+    if (!scope.querySelector('h2')) {
+      const firstLower = scope.querySelector('h3, h4');
+      if (firstLower) {
+        const h2 = document.createElement('h2');
+        h2.className = 'sr-only';
+        h2.textContent = '页面内容';
+        firstLower.parentNode.insertBefore(h2, firstLower);
+      }
+    }
+    if (!scope.querySelector('h3')) {
+      const firstH4 = scope.querySelector('h4');
+      if (firstH4) {
+        const h3 = document.createElement('h3');
+        h3.className = 'sr-only';
+        h3.textContent = '详细内容';
+        firstH4.parentNode.insertBefore(h3, firstH4);
+      }
+    }
+  }
+
+  function announceRoute(route) {
+    document.title = routeTitle(route) + ' · ITO 运维管理平台';
+    const ann = document.getElementById('routeAnnouncer');
+    if (ann) ann.textContent = routeTitle(route) + '页面已加载';
+  }
+
   function render(options) {
     if (!state.role) return;
     const opts = options || {};
@@ -1001,6 +1286,7 @@
     }
 
     state.route = route;
+    state.routeParams = hashParams();
     disposeCharts();
     if (!opts.preservePager) ITO.pagerState = {};
     closeOverlays();
@@ -1019,6 +1305,24 @@
     if (typeof def.after === 'function') def.after();
     enhanceSelects(root);
     enhanceFormDates(root);
+    ensureFormLabels(root);
+    ensureControlNames(root);
+    ensureTableA11y(root);
+    ensureRowKeyboard(root);
+    ensureHeadingOrder(root);
+
+    const routeChanged = state.__a11yRoute && state.__a11yRoute !== route;
+    state.__a11yRoute = route;
+    if (routeChanged) {
+      announceRoute(route);
+      const heading = root.querySelector('.page-head h1');
+      if (heading) {
+        heading.setAttribute('tabindex', '-1');
+        setTimeout(function () {
+          try { heading.focus({ preventScroll: true }); } catch (e) { /* noop */ }
+        }, 0);
+      }
+    }
 
     if (opts.preserveScroll) {
       const y = Number(opts.scrollY) || 0;
@@ -1073,6 +1377,7 @@
     if (location.hash === hash) render();
     else location.hash = hash;
     setTimeout(showEntryMessages, 420);
+    if (window.ITO_ALERT_ENGINE) window.ITO_ALERT_ENGINE.start();
   }
 
   function logout() {
@@ -1098,7 +1403,7 @@
     task.canceled = task.canceled || null;
     task.summaryRework = !!task.summaryRework;
     task.leaderApproval = task.leaderApproval || null;
-    task.source = task.source || (task.initiator === '张总' ? 'leader' : task.initiator === '系统' ? 'system' : 'self');
+    task.source = task.source || (task.initiator === '张经理' ? 'leader' : task.initiator === '系统' ? 'system' : 'self');
 
     task.subs = (task.subs || []).map((sub) => {
       if (sub.status === '待派发') sub.status = '待分发';
@@ -1206,6 +1511,46 @@
     };
     (st.inspectionPlans || []).forEach(function (plan) { add(plan, 'inspection'); });
     (st.maintenancePlans || []).forEach(function (plan) { add(plan, 'maintenance'); });
+
+    /* 值班作为常规任务：当前周 + 未来 2 周，出勤写入实际工时。 */
+    if (st.duty && st.duty.weeks && st.duty.weeks.length) {
+      const duty = st.duty;
+      const ci = duty.weeks.findIndex(function (w) { return w.key === duty.currentKey; });
+      const ROLE_CODE = { '应急': 'YJ', '线路': 'XL', '网络': 'WL', '桌面': 'ZM' };
+      duty.weeks.forEach(function (w, wi) {
+        if (ci < 0 || wi < ci || wi > ci + 2) return;
+        (w.dutyRoster || []).forEach(function (row) {
+          if (!row.post || row.post.indexOf('通信值班-') !== 0) return;
+          const role = row.post.replace('通信值班-', '');
+          const code = ROLE_CODE[role] || role;
+          const planId = 'DUTY-' + w.key + '-' + code;
+          const calls = (duty.calls || []).filter(function (c) {
+            return c.weekKey === w.key && c.role === role && c.person === row.name;
+          });
+          const actual = calls.reduce(function (n, c) { return n + (Number(c.hours) || 0); }, 0);
+          const data = {
+            planId: planId,
+            planType: 'duty',
+            name: '通信值班 · 第' + w.weekNo + '周 · ' + role,
+            group: 'comm',
+            owner: '赵主管',
+            executor: row.name,
+            due: w.end + ' 20:00',
+            hours: 8,
+            source: '值班',
+            tags: ['值班', role],
+            status: wi === ci ? '进行中' : '计划中',
+            actualHours: actual,
+            attendances: calls
+          };
+          const existing = (st.planTasks || []).find(function (task) { return task.id === 'PT-' + planId; });
+          if (existing) Object.assign(existing, data);
+          else st.planTasks.push(Object.assign({ id: 'PT-' + planId, createdAt: D.meta.demoNow, createdBy: '系统' }, data));
+          pending.push(existing || st.planTasks[st.planTasks.length - 1]);
+        });
+      });
+    }
+
     const wanted = {};
     pending.forEach(function (task) { wanted[task.id] = true; });
     st.planTasks = (st.planTasks || []).filter(function (task) {
@@ -1243,9 +1588,9 @@
     state.inspectionRecords = clone(D.inspectionRecords);
     state.maintenancePlans = clone(D.maintenancePlans);
     state.maintenanceRecords = clone(D.maintenanceRecords);
+    state.duty = clone(D.duty);
     state.planTasks = [];
     syncPlanTasks();
-    state.duty = clone(D.duty);
     state.permissions = clone(D.permissions);
     state.metrics = clone(D.dashboard);
     state.trend = clone(D.trend);
@@ -1258,12 +1603,69 @@
     state.__restoredSnapshot = !!restored;
     if (restored) {
       restoreSnapshot(restored);
+      /* 旧快照缺少新追加的常规计划时，补入默认计划，保留原有任务与记录。 */
+      const mergePlans = function (target, defaults) {
+        (defaults || []).forEach(function (plan) {
+          if (!target.some(function (x) { return x.id === plan.id; })) target.push(clone(plan));
+        });
+      };
+      mergePlans(state.inspectionPlans || (state.inspectionPlans = []), D.inspectionPlans);
+      mergePlans(state.maintenancePlans || (state.maintenancePlans = []), D.maintenancePlans);
       syncPlanTasks();
     }
 
     /* 旧快照可能缺少新版权限键，按默认值补齐。 */
     Object.keys(D.permissions || {}).forEach(function (role) {
       state.permissions[role] = Object.assign({}, D.permissions[role], state.permissions[role] || {});
+    });
+    /* 变更单号已由顶部模糊搜索覆盖：列表列移除，详情与导出保留。 */
+    (state.fieldDefs || []).forEach(function (f) {
+      if (f.id === 'CF-TASK-CHANGE') {
+        f.list = false;
+        f.filter = false;
+      }
+    });
+    /* 业务系统统一使用任务标签：移除旧的自定义字段，并把旧值迁入标签。 */
+    state.fieldDefs = (state.fieldDefs || []).filter(function (f) { return f.id !== 'CF-TASK-IMPACT'; });
+    const officialSystems = {};
+    (D.systemGroups || []).forEach(function (group) {
+      (group.systems || []).forEach(function (name) { officialSystems[name] = true; });
+    });
+    const tagRenames = {
+      '终端': '移动终端设备',
+      '视频会议系统': '视频会议',
+      '卫星电话系统': '卫星电话',
+      '厂房通信系统': '厂房通信'
+    };
+    const normalizeTags = function (tags) {
+      const out = [];
+      (tags || []).forEach(function (tag) {
+        const name = tagRenames[tag] || tag;
+        if (out.indexOf(name) === -1) out.push(name);
+      });
+      return out;
+    };
+    state.tasks.forEach(function (task) {
+      task.tags = normalizeTags(task.tags);
+      (task.subs || []).forEach(function (sub) { sub.tags = normalizeTags(sub.tags); });
+      if (!task.extra || task.extra.impactSystem == null || task.extra.impactSystem === '') return;
+      const values = String(task.extra.impactSystem).split(/[、,，]/).map(function (v) { return v.trim(); }).filter(Boolean);
+      const additions = [];
+      values.forEach(function (value) {
+        const normalized = tagRenames[value] || value;
+        if (officialSystems[normalized]) additions.push(normalized);
+        else {
+          const group = (D.systemGroups || []).find(function (g) { return g.name === normalized; });
+          if (group) (group.systems || []).forEach(function (name) { additions.push(name); });
+        }
+      });
+      if (additions.length) {
+        task.tags = (task.tags || []).slice();
+        additions.forEach(function (name) {
+          if (task.tags.indexOf(name) === -1) task.tags.push(name);
+        });
+      }
+      delete task.extra.impactSystem;
     });
 
     /* 统一“新建内容置顶、历史内容倒序”的展示顺序 */
@@ -1376,9 +1778,23 @@
       });
     }
 
+    const skip = document.querySelector('.skip-link');
+    if (skip) {
+      skip.addEventListener('click', function (event) {
+        event.preventDefault();
+        const main = $('#pageRoot');
+        if (main) {
+          main.focus({ preventScroll: false });
+          main.scrollIntoView({ block: 'start' });
+        }
+      });
+    }
+
     $('#menuBtn').addEventListener('click', () => {
-      $('#sidebar').classList.add('open');
-      $('#sidebarScrim').classList.add('on');
+      const opening = !$('#sidebar').classList.contains('open');
+      $('#sidebar').classList.toggle('open', opening);
+      $('#sidebarScrim').classList.toggle('on', opening);
+      $('#menuBtn').setAttribute('aria-expanded', String(opening));
     });
     $('#sidebarScrim').addEventListener('click', closeMobileNav);
 
@@ -1388,6 +1804,8 @@
   function closeMobileNav() {
     $('#sidebar').classList.remove('open');
     $('#sidebarScrim').classList.remove('on');
+    const menu = $('#menuBtn');
+    if (menu) menu.setAttribute('aria-expanded', 'false');
   }
 
   function boot() {
@@ -1414,6 +1832,9 @@
     const params = new URLSearchParams(location.search);
     if (params.get('still') === '1') document.documentElement.classList.add('still');
     devMode = /^(localhost|127\.0\.0\.1|::1|\[::1\])$/.test(location.hostname) || params.get('dev') === '1';
+
+    /* 进入界面前先跑一次规则检测，保证列表里的“最近触发”是最新一轮结果。 */
+    if (window.ITO_ALERT_ENGINE) window.ITO_ALERT_ENGINE.check({ auto: true, boot: true });
 
     renderLogin();
     bindShell();
@@ -1520,6 +1941,7 @@
   ITO.renderShell = renderShell;
   ITO.logout = logout;
   ITO.routes = ROUTE_TITLE;
+  ITO.routeName = routeTitle;
   ITO.syncPlanTasks = syncPlanTasks;
   ITO.completePlanTask = completePlanTask;
   ITO.getGroup = groupById;
@@ -1639,6 +2061,7 @@
 
   /* ── custom select / person picker ─────────── */
   let activeSelectPopup = null;
+  let selectSeq = 0;
 
   function closeAllSelects() {
     if (!activeSelectPopup) return;
@@ -1646,6 +2069,7 @@
     activeSelectPopup = null;
     current.pop.remove();
     current.trigger.classList.remove('is-open');
+    current.trigger.setAttribute('aria-expanded', 'false');
   }
 
   function enhanceSelect(select) {
@@ -1661,10 +2085,13 @@
     trigger.type = 'button';
     trigger.className = 'sel-trigger';
     trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.setAttribute('aria-expanded', 'false');
     const pop = document.createElement('div');
     pop.className = 'sel-pop';
+    pop.id = 'sel-pop-' + (++selectSeq);
+    trigger.setAttribute('aria-controls', pop.id);
     pop.hidden = true;
-    pop.innerHTML = '<div class="sel-search"><input type="search" placeholder="搜索姓名 / 专业组" aria-label="搜索选项"></div><div class="sel-list" role="listbox"></div>';
+    pop.innerHTML = '<div class="sel-search"><input type="search" placeholder="搜索选项" aria-label="搜索选项"></div><div class="sel-list" role="listbox" aria-label="可选项"></div>';
     wrap.appendChild(trigger);
 
     const search = pop.querySelector('.sel-search');
@@ -1689,9 +2116,13 @@
     function syncTrigger() {
       const option = select.options[select.selectedIndex];
       const isEmpty = !select.value;
-      trigger.innerHTML = '<span class="sel-value' + (isEmpty ? ' is-placeholder' : '') + '">' + esc(isEmpty ? placeholder() : labelOf(option)) + '</span><i class="sel-arrow"></i>';
+      const valueText = isEmpty ? placeholder() : labelOf(option);
+      trigger.innerHTML = '<span class="sel-value' + (isEmpty ? ' is-placeholder' : '') + '">' + esc(valueText) + '</span><i class="sel-arrow"></i>';
       trigger.disabled = !!select.disabled;
       trigger.classList.toggle('is-disabled', !!select.disabled);
+      const fieldLabel = select.dataset.fieldLabel || select.getAttribute('aria-label') || '';
+      const required = select.getAttribute('aria-required') === 'true' ? '，必填' : '';
+      if (fieldLabel) trigger.setAttribute('aria-label', fieldLabel + '：' + valueText + required);
     }
 
     function realOptions() {
@@ -1706,7 +2137,9 @@
       const q = String(query || '').trim().toLowerCase();
       const options = realOptions();
       const isPerson = options.some(function (o) { return !!o.dataset.group; });
-      search.hidden = !(isPerson || options.length > 10 || select.dataset.search === '1');
+      const allowSearch = select.dataset.search !== '0';
+      search.hidden = !allowSearch || !(isPerson || options.length > 10 || select.dataset.search === '1');
+      searchInput.placeholder = isPerson ? '搜索姓名 / 专业组' : '搜索' + (select.getAttribute('aria-label') || '选项');
       list.innerHTML = '';
       if (!options.length) {
         list.innerHTML = '<div class="sel-empty">暂无可选项</div>';
@@ -1732,6 +2165,7 @@
         row.type = 'button';
         row.className = 'sel-option' + (option.value === select.value ? ' is-selected' : '');
         row.setAttribute('role', 'option');
+        row.setAttribute('aria-selected', option.value === select.value ? 'true' : 'false');
         row.innerHTML = '<span class="so-main"><b>' + esc(label) + '</b>' +
           (meta ? '<small>' + esc(meta) + '</small>' : '') + '</span>' +
           (role ? '<span class="so-role">' + esc(role) + '</span>' : '') +
@@ -1757,6 +2191,8 @@
       const rect = trigger.getBoundingClientRect();
       const width = Math.max(rect.width, 260);
       pop.hidden = false;
+      list.setAttribute('aria-label', (select.dataset.fieldLabel || select.getAttribute('aria-label') || '请选择') + '选项');
+      trigger.setAttribute('aria-expanded', 'true');
       pop.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)) + 'px';
       pop.style.top = (rect.bottom + 4) + 'px';
       pop.style.width = width + 'px';
@@ -1765,6 +2201,10 @@
       searchInput.value = '';
       renderList('');
       if (!search.hidden) setTimeout(function () { searchInput.focus(); }, 20);
+      else setTimeout(function () {
+        const first = list.querySelector('.sel-option');
+        if (first) first.focus();
+      }, 20);
     }
 
     trigger.addEventListener('click', function (event) {
@@ -1777,6 +2217,34 @@
 
     searchInput.addEventListener('input', function () { renderList(searchInput.value); });
     pop.addEventListener('click', function (event) { event.stopPropagation(); });
+    pop.addEventListener('keydown', function (event) {
+      const options = Array.prototype.slice.call(list.querySelectorAll('.sel-option'));
+      if (!options.length) return;
+      const idx = options.indexOf(document.activeElement);
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        (options[idx + 1] || options[0]).focus();
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        (options[idx - 1] || options[options.length - 1]).focus();
+      } else if (event.key === 'Home') {
+        event.preventDefault();
+        options[0].focus();
+      } else if (event.key === 'End') {
+        event.preventDefault();
+        options[options.length - 1].focus();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        closeAllSelects();
+        trigger.focus();
+      }
+    });
+    trigger.addEventListener('keydown', function (event) {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        openPop();
+      }
+    });
     select.addEventListener('change', syncTrigger);
     new MutationObserver(function () {
       syncTrigger();
@@ -1828,10 +2296,34 @@
   }, true);
   window.addEventListener('resize', closeAllSelects);
 
+  let formFieldSeq = 0;
   function formRow(o) {
+    let control = o.control || '';
+    const open = /^\s*<(input|select|textarea)\b([^>]*)>/i.exec(control);
+    let id = '';
+    if (open) {
+      const tagName = open[1].toLowerCase();
+      let attrs = open[2];
+      const idMatch = /\bid="([^"]+)"/i.exec(attrs);
+      id = idMatch ? idMatch[1] : '';
+      if (!id) {
+        id = 'ff-' + (++formFieldSeq);
+        attrs = ' id="' + id + '"' + attrs;
+      }
+      if (o.label && tagName === 'select' && !/\bdata-field-label=/i.test(attrs)) {
+        attrs = ' data-field-label="' + esc(o.label) + '"' + attrs;
+      }
+      if (o.required && !/\baria-required=/i.test(attrs)) {
+        attrs = ' aria-required="true"' + attrs;
+      }
+      if (o.hint && !/\baria-describedby=/i.test(attrs)) {
+        attrs = ' aria-describedby="' + id + '-hint"' + attrs;
+      }
+      control = control.replace(open[0], '<' + tagName + attrs + '>');
+    }
     return '<div class="form-field' + (o.full ? ' full' : '') + (o.span2 ? ' span-2' : '') + '">' +
-      '<label' + (o.required ? '' : '') + '>' + o.label + (o.required ? ' <em>*</em>' : '') + '</label>' +
-      o.control + (o.hint ? '<span class="form-hint">' + esc(o.hint) + '</span>' : '') +
+      '<label' + (id ? ' for="' + id + '"' : '') + '>' + o.label + (o.required ? ' <em aria-hidden="true">*</em>' : '') + '</label>' +
+      control + (o.hint ? '<span class="form-hint"' + (id ? ' id="' + id + '-hint"' : '') + '>' + esc(o.hint) + '</span>' : '') +
       '</div>';
   }
 
@@ -1844,9 +2336,19 @@
     if (!err) {
       err = document.createElement('span');
       err.className = 'field-error';
+      err.id = 'err-' + Date.now().toString(36) + '-' + Math.floor(Math.random() * 1000);
+      err.setAttribute('role', 'alert');
       field.appendChild(err);
     }
     err.textContent = message;
+    control.setAttribute('aria-invalid', 'true');
+    control.setAttribute('aria-describedby', err.id);
+    const wrap = control.closest('.sel-wrap');
+    const trigger = wrap && wrap.querySelector('.sel-trigger');
+    if (trigger) {
+      trigger.setAttribute('aria-invalid', 'true');
+      trigger.setAttribute('aria-describedby', err.id);
+    }
   }
 
   function clearFieldError(control) {
@@ -1854,6 +2356,14 @@
     const field = control.closest('.form-field') || control.closest('td') || control.parentElement;
     if (!field) return;
     field.classList.remove('has-error');
+    control.removeAttribute('aria-invalid');
+    control.removeAttribute('aria-describedby');
+    const wrap = control.closest('.sel-wrap');
+    const trigger = wrap && wrap.querySelector('.sel-trigger');
+    if (trigger) {
+      trigger.removeAttribute('aria-invalid');
+      trigger.removeAttribute('aria-describedby');
+    }
     const err = field.querySelector('.field-error');
     if (err) err.remove();
   }

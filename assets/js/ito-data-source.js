@@ -38,6 +38,21 @@
           return null;
         }
       },
+      /* 大屏只校验演示日期，不绑定后台构建版本，用于读取后台当前快照。 */
+      loadLatest: function (meta) {
+        let raw = readStorage();
+        if (!raw && memorySnapshot) raw = JSON.stringify(memorySnapshot);
+        if (!raw) return null;
+        try {
+          const payload = JSON.parse(raw);
+          const expected = meta || {};
+          if (expected.today && payload.today !== expected.today) return null;
+          if (expected.demoOverride != null && !!payload.demoOverride !== !!expected.demoOverride) return null;
+          return payload.data || null;
+        } catch (e) {
+          return null;
+        }
+      },
       save: function (data, meta) {
         const payload = {
           version: (meta || {}).version || '',

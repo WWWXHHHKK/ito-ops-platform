@@ -45,7 +45,7 @@
     return {
       hint: d.readOnlyHint || '系统流程固定，不开放配置',
       route: route,
-      routeName: route && ITO.routes ? ITO.routes[route] : '',
+      routeName: route && ITO.routeName ? ITO.routeName(route) : (route && ITO.routes ? ITO.routes[route] : ''),
       accessible: !!(route && ITO.can && ITO.can(route))
     };
   }
@@ -90,8 +90,9 @@
     }
     if (dict.id === 'authType') return rows(st.auths).filter(function (a) { return a.type === name; }).length;
     if (dict.id === 'dutyStatus') {
-      const hs = ITO.dutyHandovers ? ITO.dutyHandovers() : [];
-      return rows(hs).filter(function (h) { return h.status === name; }).length;
+      return ((st.duty && st.duty.weeks) || []).filter(function (w) {
+        return (w.dutyStatus || '正常') === name;
+      }).length;
     }
     if (dict.id === 'messageType') return rows(st.messages).filter(function (m) { return m.type === name; }).length;
     return 0;
@@ -213,6 +214,18 @@
 
   function selectedValues(value) {
     return String(value == null ? '' : value).split(/[、,，]/).map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+
+  function expandFieldValues(f, value) {
+    const values = selectedValues(value);
+    const out = values.slice();
+    if (f && f.aliases) {
+      Object.keys(f.aliases).forEach(function (group) {
+        const aliases = Array.isArray(f.aliases[group]) ? f.aliases[group] : [];
+        if (aliases.some(function (alias) { return values.indexOf(alias) > -1; })) out.push(group);
+      });
+    }
+    return out.filter(function (v, i, list) { return list.indexOf(v) === i; });
   }
 
   function fmtFieldValue(f, value) {
@@ -570,7 +583,7 @@
       const text = String(v == null ? '' : v);
       let hit = false;
       if (f.type === 'multiselect') {
-        const selected = selectedValues(v);
+        const selected = expandFieldValues(f, v);
         hit = wants.some(function (want) { return selected.indexOf(want) > -1; });
       } else if (optionFilter) {
         hit = wants.some(function (want) { return text === want; });

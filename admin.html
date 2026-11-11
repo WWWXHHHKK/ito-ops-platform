@@ -6,14 +6,14 @@
 <title>ITO 运维管理平台 · 管理后台</title>
 <meta name="description" content="ITO 运维管理平台 · 任务、巡检、值班与运维运营管理后台">
 <link rel="icon" type="image/svg+xml" href="assets/img/logo-mark-orange.svg">
-<link rel="stylesheet" href="assets/css/admin.css?v=20261112n">
+<link rel="stylesheet" href="assets/css/admin.css?v=20261112z22">
 </head>
 <body>
 
 <!-- ============ 登录 / 身份选择 ============ -->
 <div id="loginView" class="login">
   <div class="login-atmosphere" aria-hidden="true"></div>
-  <div class="login-shell">
+  <main class="login-shell">
     <section class="login-brand">
       <div class="login-lockup">
         <div class="login-logo-mark"><img class="brand-logo" src="assets/img/logo-mark-orange.svg" alt=""></div>
@@ -70,12 +70,13 @@
         <span>→</span>
       </a>
     </section>
-  </div>
+  </main>
 </div>
 
 <!-- ============ 应用 ============ -->
 <div id="appView" class="app" hidden>
   <header class="appbar">
+    <a class="skip-link" href="#pageRoot">跳到主内容</a>
     <div class="appbar-left">
       <div class="appbar-brand">
         <div class="brand-plate">
@@ -85,7 +86,7 @@
           </div>
         </div>
       </div>
-      <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="打开菜单">
+      <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="打开菜单" aria-expanded="false" aria-controls="sidebar">
         <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
     </div>
@@ -112,12 +113,12 @@
     </div>
   </header>
 
-  <aside class="sidebar" id="sidebar">
+  <aside class="sidebar" id="sidebar" aria-label="侧边栏">
     <nav class="side-nav" id="sideNav" aria-label="主导航"></nav>
   </aside>
 
   <div class="app-body">
-    <main class="page" id="pageRoot"></main>
+    <main class="page" id="pageRoot" tabindex="-1"></main>
   </div>
 
   <div class="sidebar-scrim" id="sidebarScrim"></div>
@@ -127,8 +128,9 @@
 <div id="drawerRoot"></div>
 <div id="previewRoot"></div>
 <div id="notifyRoot" class="notify-root" aria-live="polite"></div>
+<div id="routeAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 <div id="toastRoot" class="toast-root" aria-live="polite"></div>
-<div id="devDock" class="dev-dock" hidden>
+<div id="devDock" class="dev-dock" role="region" aria-label="开发角色切换" hidden>
   <span class="dev-dock-label">DEV</span>
   <button type="button" data-dev-role="leader">领导</button>
   <button type="button" data-dev-role="manager">主管</button>
@@ -143,20 +145,21 @@
 <script src="vendor/docx-preview.min.js"></script>
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/pptx-preview.umd.js"></script>
-<script src="assets/js/ito-data.js?v=20261112n"></script>
-<script src="assets/js/ito-data-source.js?v=20261112n"></script>
-<script src="assets/js/admin.js?v=20261112n"></script>
-<script src="assets/js/deliverable-store.js?v=20261112n"></script>
-<script src="assets/js/deliverable-preview.js?v=20261112n"></script>
-<script src="assets/js/admin-pages-personal.js?v=20261112n"></script>
-<script src="assets/js/admin-pages-workload.js?v=20261112n"></script>
-<script src="assets/js/admin-pages-tasks.js?v=20261112n"></script>
-<script src="assets/js/admin-pages-dispatch.js?v=20261112n"></script>
-<script src="assets/js/admin-pages-ops.js?v=20261112n"></script>
-<script src="assets/js/admin-pages-duty.js?v=20261112n"></script>
-<script src="assets/js/admin-pages-auth-matrix.js?v=20261112n"></script>
-<script src="assets/js/admin-pages-messages.js?v=20261112n"></script>
-<script src="assets/js/admin-pages-config.js?v=20261112n"></script>
-<script src="assets/js/admin-pages-dictionary.js?v=20261112n"></script>
+<script src="assets/js/ito-data.js?v=20261112z22"></script>
+<script src="assets/js/ito-data-source.js?v=20261112z22"></script>
+<script src="assets/js/admin.js?v=20261112z22"></script>
+<script src="assets/js/admin-alerts.js?v=20261112z22"></script>
+<script src="assets/js/deliverable-store.js?v=20261112z22"></script>
+<script src="assets/js/deliverable-preview.js?v=20261112z22"></script>
+<script src="assets/js/admin-pages-personal.js?v=20261112z22"></script>
+<script src="assets/js/admin-pages-workload.js?v=20261112z22"></script>
+<script src="assets/js/admin-pages-tasks.js?v=20261112z22"></script>
+<script src="assets/js/admin-pages-dispatch.js?v=20261112z22"></script>
+<script src="assets/js/admin-pages-ops.js?v=20261112z22"></script>
+<script src="assets/js/admin-pages-duty.js?v=20261112z22"></script>
+<script src="assets/js/admin-pages-auth-matrix.js?v=20261112z22"></script>
+<script src="assets/js/admin-pages-messages.js?v=20261112z22"></script>
+<script src="assets/js/admin-pages-config.js?v=20261112z22"></script>
+<script src="assets/js/admin-pages-dictionary.js?v=20261112z22"></script>
 </body>
 </html>

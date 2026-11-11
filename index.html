@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>ITO 智能运维管理平台 · 运维驾驶舱</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%23EB612A'/><text x='50' y='69' font-size='54' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'>I</text></svg>">
-<link rel="stylesheet" href="assets/css/style.css?v=20261112n" />
+<link rel="stylesheet" href="assets/css/style.css?v=20261112z22" />
 </head>
 <body>
 <div class="stage-shell">
@@ -51,16 +51,15 @@
       <div class="topbar-right">
         <span class="live-chip" id="liveChip"><i></i><em id="liveLabel">任务态势</em></span>
         <span class="env-badge"><b>DEMO</b>演示环境</span>
-        <span class="topbar-meta">华东区 · SHA-01</span>
         <a class="admin-link" href="admin.html" title="进入运维管理后台">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3M7 9h4M7 13h7"/></svg>
           <span>管理后台</span>
         </a>
         <div class="ctrl-group">
-          <button class="ctrl" id="liveToggle" type="button" aria-pressed="true" title="暂停 / 恢复实时数据">
+          <button class="ctrl" id="liveToggle" type="button" aria-pressed="true" aria-label="暂停实时数据" title="暂停 / 恢复实时数据">
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="6" width="3.2" height="12"/><rect x="13.8" y="6" width="3.2" height="12"/></svg>
           </button>
-          <button class="ctrl" id="fsBtn" type="button" title="全屏显示">
+          <button class="ctrl" id="fsBtn" type="button" aria-label="全屏显示" title="全屏显示">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
           </button>
         </div>
@@ -127,7 +126,7 @@
             <span class="head-total">4 / 5 启用</span>
           </div>
           <div class="panel-body inspection-body" id="inspectionList"></div>
-          <div class="panel-foot"><span>近 7 天应检 <b id="inspPlanCount">16</b> 次</span><span>异常 <b id="inspAbnormalCount">2</b> 项 · 整改 100%</span></div>
+          <div class="panel-foot"><span>近 7 天应检 <b id="inspPlanCount">16</b> 次</span><span>累计异常 <b id="inspAbnormalCount">3</b> 项 · 整改 100%</span></div>
         </section>
       </section>
 
@@ -140,49 +139,51 @@
         <section class="panel panel-sla">
           <div class="panel-head">
             <div class="ph-left"><i class="ph-idx">09</i><h2>任务 SLA</h2><span class="ph-en">TASK SLA</span></div>
-            <span class="head-tag tag-ok"><i class="dot-teal"></i>达标</span>
+            <span class="head-tag tag-ok"><i class="dot-teal"></i>近 30 天</span>
           </div>
           <div class="panel-body sla-body">
-            <div class="sla-gauge">
-              <svg viewBox="0 0 150 150" aria-hidden="true">
-                <defs>
-                  <linearGradient id="slaGrad" x1="0" y1="1" x2="1" y2="0">
-                    <stop offset="0%" stop-color="#1aa8ff"/>
-                    <stop offset="55%" stop-color="#35e0ff"/>
-                    <stop offset="100%" stop-color="#8ffcff"/>
-                  </linearGradient>
-                  <filter id="slaGlow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="2" result="b"/>
-                    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-                  </filter>
-                </defs>
-                <circle class="gauge-deco" cx="75" cy="75" r="68" stroke-dasharray="2 6"/>
-                <circle class="gauge-deco inner" cx="75" cy="75" r="42"/>
-                <g id="gaugeTicks"></g>
-                <circle class="gauge-track" cx="75" cy="75" r="54" transform="rotate(135 75 75)"/>
-                <circle class="gauge-value" cx="75" cy="75" r="54" transform="rotate(135 75 75)" stroke="url(#slaGrad)" filter="url(#slaGlow)" style="stroke-dasharray:244.82 339.29"/>
-              </svg>
-              <div class="gauge-center">
-                <strong>96.2</strong><span>%</span>
-                <small>任务 SLA</small>
+            <div class="sla-gauge-wrap">
+              <div class="sla-gauge">
+                <svg viewBox="0 0 150 150" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="slaGrad" x1="0" y1="1" x2="1" y2="0">
+                      <stop offset="0%" stop-color="#1aa8ff"/>
+                      <stop offset="55%" stop-color="#35e0ff"/>
+                      <stop offset="100%" stop-color="#8ffcff"/>
+                    </linearGradient>
+                    <filter id="slaGlow" x="-50%" y="-50%" width="200%" height="200%">
+                      <feGaussianBlur stdDeviation="2" result="b"/>
+                      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                    </filter>
+                  </defs>
+                  <circle class="gauge-deco" cx="75" cy="75" r="68" stroke-dasharray="2 6"/>
+                  <circle class="gauge-deco inner" cx="75" cy="75" r="42"/>
+                  <g id="gaugeTicks"></g>
+                  <circle class="gauge-track" cx="75" cy="75" r="54" transform="rotate(135 75 75)"/>
+                  <circle class="gauge-value" cx="75" cy="75" r="54" transform="rotate(135 75 75)" stroke="url(#slaGrad)" filter="url(#slaGlow)" style="stroke-dasharray:234.11 339.29"/>
+                </svg>
+                <div class="gauge-center" title="SLA 综合得分 = 按期闭环率×60% + 超期控制率×25% + 时效达成率×15%">
+                  <strong>92.0</strong><span>分</span>
+                </div>
               </div>
+              <div class="sla-grade">综合得分 · A 级</div>
             </div>
             <div class="sla-metrics">
               <div class="sla-metric" data-drill="tasks" tabindex="0" role="link"><span>按期闭环率</span><b>89.0%</b><em class="up-good">+2.1%</em></div>
               <div class="sla-metric" data-drill="tasks" tabindex="0" role="link"><span>平均闭环时长</span><b>6h 12m</b><em class="down">-0.4h</em></div>
-              <div class="sla-metric" data-drill="tasks" data-query="status=超期" tabindex="0" role="link"><span>超期率</span><b>5.5%</b><em class="down">-0.8%</em></div>
+              <div class="sla-metric" data-drill="tasks" data-query="status=超期" tabindex="0" role="link" title="超期率按近 30 天已闭环与在办口径计算"><span>超期率 · 30天</span><b>5.5%</b><em class="down">-0.8%</em></div>
             </div>
           </div>
-          <div class="panel-foot"><span><i class="dot-teal"></i>月度目标 95.0%</span><span>高于目标 1.2pp</span></div>
+          <div class="panel-foot"><span><i class="dot-teal"></i>综合目标 90 分</span><span>近 30 天 · 高于目标 2.0 分</span></div>
         </section>
 
         <section class="panel panel-res">
           <div class="panel-head">
             <div class="ph-left"><i class="ph-idx">10</i><h2>维保计划</h2><span class="ph-en">MAINTENANCE</span></div>
-            <span class="head-refresh"><b id="maintEnabled">3</b> / 4 启用</span>
+            <span class="head-refresh"><b id="maintEnabled">5</b> / <b id="maintTotal">6</b> 启用</span>
           </div>
           <div class="panel-body maint-body" id="maintenanceList"></div>
-          <div class="panel-foot"><span>下次维保 <b id="maintNext">11-06</b></span><span>厂商 3 家</span></div>
+          <div class="panel-foot"><span>下次维保 <b id="maintNext">11-06</b></span><span>厂商 <b id="maintVendors">4</b> 家</span></div>
         </section>
 
         <section class="panel panel-oncall">
@@ -201,7 +202,7 @@
       <div class="ticker-label"><i></i>运维快讯<em>OPS WIRE</em></div>
       <div class="ticker-viewport">
         <div class="ticker-track" id="tickerTrack">
-          <span>T10023-01 防火墙策略评审超期，已升级通信组</span><b>◆</b>
+          <span>T10027-03 UPS 电池组测试超期，已升级基础设施组</span><b>◆</b>
           <span>IR-1026 网络设备日检发现 2 项异常，已生成整改任务</span><b>◆</b>
           <span data-ticker="duty">本周值班：李工 · 下周值班：陈工 · 周一 08:00 交接</span><b>◆</b>
           <span>吴工工作班成员授权已过期，请及时续期</span><b>◆</b>
@@ -217,10 +218,11 @@
 <div class="topo-tip" id="topoTip" role="tooltip" aria-hidden="true"></div>
 
 <script src="vendor/echarts.min.js"></script>
-<script src="assets/js/ito-data.js?v=20261112n"></script>
-<script src="assets/js/platform-panels.js?v=20261112n"></script>
-<script src="assets/js/app.js?v=20261112n"></script>
-<script src="assets/js/center-demo.js?v=20261112n"></script>
+<script src="assets/js/ito-data.js?v=20261112z22"></script>
+<script src="assets/js/ito-data-source.js?v=20261112z22"></script>
+<script src="assets/js/platform-panels.js?v=20261112z22"></script>
+<script src="assets/js/app.js?v=20261112z22"></script>
+<script src="assets/js/center-demo.js?v=20261112z22"></script>
 </body>
 </html>
 

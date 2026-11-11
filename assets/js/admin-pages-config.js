@@ -12,7 +12,7 @@
   function U() { return ITO.ui; }
 
   const ROLES = [
-    { key: 'leader', name: '领导层', person: '张总', tone: 'leader' },
+    { key: 'leader', name: '领导层', person: '张经理', tone: 'leader' },
     { key: 'manager', name: '主管层', person: '王主管', tone: 'manager' },
     { key: 'employee', name: '员工层', person: '李工', tone: 'employee' },
     { key: 'admin', name: '系统管理员', person: '平台管理员', tone: 'admin' }
@@ -43,7 +43,7 @@
       const roleCards = ROLES.map(function (r) {
         return '<div class="role-mini ' + r.tone + '">' +
           '<span class="role-mini-icon">' + U().icon(r.key === 'leader' ? 'chart' : r.key === 'manager' ? 'users' : r.key === 'employee' ? 'user' : 'shield') + '</span>' +
-          '<div><b>' + r.name + '</b><span>' + r.person + ' · ' + permCount(r.key) + ' 个模块</span></div>' +
+          '<div><b>' + r.name + '</b><span>' + permCount(r.key) + ' 个模块</span></div>' +
         '</div>';
       }).join('');
 
@@ -51,7 +51,7 @@
         const cells = ROLES.map(function (r) {
           const on = !!st.permissions[r.key][p.key];
           const locked = r.key === 'admin' || (r.key === 'leader' && p.key === 'config');
-          return '<td><button class="check' + (on ? ' on' : '') + '" data-role="' + r.key + '" data-perm="' + p.key + '" type="button"' +
+          return '<td><button class="check' + (on ? ' on' : '') + '" data-role="' + r.key + '" data-perm="' + p.key + '" type="button" aria-label="' + U().esc(r.name + ' · ' + p.name + '权限') + '"' +
             (locked ? ' disabled title="系统保护项，不可修改"' : ' aria-pressed="' + on + '"') + '>' +
             U().icon('check') + '</button></td>';
         }).join('');
@@ -227,9 +227,12 @@
   TAG.detail = function (tag) {
     if (!tag) return;
     const isPerson = tag.type === '人员标签';
+    const usage = tagUsage(tag);
     const rows = [
       ['标签名称', U().esc(tag.name)],
       ['标签类型', U().esc(tag.type)],
+      [isPerson ? '持有人数' : '使用任务数', '<b>' + usage.count + '</b> ' + usage.unit],
+      ['最近使用', U().esc(usage.last)],
       ['解锁条件', U().esc(tag.unlock || (isPerson ? '完成对应标签任务并累计提升星级' : '完成对应任务'))],
       ['创建', U().esc((tag.createdAt || '—') + ' · ' + (tag.createdBy || '—'))],
       ['最近更新', U().esc((tag.updatedAt || '—') + ' · ' + (tag.updatedBy || '—'))]
@@ -247,6 +250,12 @@
       body: '<div class="tag-detail-list">' + rows.map(function (row) {
         return '<div class="tag-detail-row"><span>' + row[0] + '</span><div>' + row[1] + '</div></div>';
       }).join('') + '</div>' +
+        (usage.names.length
+          ? '<div class="detail-section"><h4>' + (isPerson ? '持有人' : '关联任务') + '（' + usage.count + '）</h4><div>' +
+            usage.names.slice(0, 8).map(function (n) { return '<span class="tag-inline">' + U().esc(n) + '</span>'; }).join('') +
+            (usage.names.length > 8 ? '<span class="tag-inline">等 ' + usage.names.length + ' 个</span>' : '') +
+            '</div></div>'
+          : '') +
         ((tag.audit || []).length ? '<div class="detail-section"><h4>操作记录</h4><div class="timeline">' +
           tag.audit.slice().reverse().map(function (a) {
             return '<div class="timeline-item"><b>' + U().esc(a.action) + ' · ' + U().esc(a.actor) + '</b><span>' + U().esc(a.time) + '</span></div>';
@@ -456,6 +465,32 @@
     });
   };
 
+  function tagUsage(tag) {
+    const st = S();
+    if (tag.type === '人员标签') {
+      const holders = (st.personAchievements || []).filter(function (a) {
+        return a.name === tag.name && a.type === '人员标签';
+      });
+      const dates = holders.map(function (a) { return a.firstClaimed; }).filter(Boolean).sort();
+      return {
+        count: holders.length,
+        unit: '人',
+        last: dates.length ? dates[dates.length - 1] : '—',
+        names: holders.map(function (a) { return a.person; })
+      };
+    }
+    const tasks = (st.tasks || []).filter(function (t) {
+      return (t.tags || []).indexOf(tag.name) > -1;
+    });
+    const dates = tasks.map(function (t) { return t.completedAt || t.due; }).filter(Boolean).sort();
+    return {
+      count: tasks.length,
+      unit: '个任务',
+      last: dates.length ? String(dates[dates.length - 1]).slice(0, 10) : '—',
+      names: tasks.map(function (t) { return t.name; })
+    };
+  }
+
   function personWallCard(person) {
     const group = ITO.getGroup(person.group) || {};
     const tags = (S().personAchievements || []).filter(function (a) {
@@ -487,10 +522,12 @@
     const solid = tagSolid(tag);
     const soft = softOf(solid);
     const isPerson = tag.type === '人员标签';
+    const usage = tagUsage(tag);
     return '<button class="wall-card" type="button" data-wall-name="' + U().esc(tag.name) + '" data-wall-type="' + U().esc(tag.type) + '" data-search="' + U().esc((tag.name + ' ' + tag.type + ' ' + (tag.desc || '')).toLowerCase()) + '">' +
       '<span class="wall-icon" style="--tag-color:' + solid + ';--tag-soft:' + soft + '"><span>' + U().esc(wallAbbr(tag.name)) + '</span></span>' +
       '<b>' + U().esc(tag.name) + '</b>' +
       (isPerson ? '<span class="wall-card-stars">' + (tag.source === '授权' ? '<span class="auth-mark">授权</span>' : '<span class="wall-star-range">1–3 星</span>') + '</span>' : '') +
+      '<span class="wall-card-usage"><b>' + usage.count + '</b> ' + (isPerson ? '人持有' : '个任务使用') + '</span>' +
       '<small>' + U().esc(tag.type) + '</small>' +
     '</button>';
   }
@@ -510,11 +547,22 @@
       const personTags = st.wallTags.filter(function (t) { return t.type === '人员标签'; });
       const taskTags = st.wallTags.filter(function (t) { return t.type === '任务标签'; });
       const canEdit = st.role !== 'employee';
+      const staffNames = new Set((st.staff || []).map(function (p) { return p.name; }));
+      const linkedPeople = new Set((st.personAchievements || []).filter(function (a) {
+        return staffNames.has(a.person);
+      }).map(function (a) { return a.person; })).size;
+      const unusedTags = st.wallTags.filter(function (t) { return tagUsage(t).count === 0; }).length;
 
       return U().pageHead({
         title: '属性勋章',
         sub: '系统勋章字典 · 授权属性、人员标签与任务标签'
       }) +
+      '<div class="summary-grid wall-stats">' +
+        '<div class="summary-chip"><span class="icon">' + U().icon('award') + '</span><div><b>' + personTags.length + '</b><span>人员标签</span></div></div>' +
+        '<div class="summary-chip"><span class="icon blue">' + U().icon('task') + '</span><div><b>' + taskTags.length + '</b><span>任务标签</span></div></div>' +
+        '<div class="summary-chip"><span class="icon green">' + U().icon('users') + '</span><div><b>' + linkedPeople + '</b><span>已关联人员</span></div></div>' +
+        '<div class="summary-chip"><span class="icon yellow">' + U().icon('alert') + '</span><div><b>' + unusedTags + '</b><span>当前未使用</span></div></div>' +
+      '</div>' +
       '<div class="wall-toolbar">' +
         '<label class="search-field wall-search">' + U().icon('search') + '<input id="wallSearch" type="search" placeholder="搜索标签名称 / 类型..."></label>' +
         '<span class="wall-total">' + personTags.length + ' 个人标签 · ' + taskTags.length + ' 个任务标签</span>' +
@@ -608,7 +656,7 @@
       '</div>' +
 
       '<section class="card table-card">' +
-        '<div class="table-wrap"><table class="data-table"><thead><tr><th>时间</th><th>操作人</th><th>操作</th><th>对象</th><th>类型</th></tr></thead>' +
+        '<div class="table-wrap"><table class="data-table config-table"><thead><tr><th>时间</th><th>操作人</th><th>操作</th><th>对象</th><th>类型</th></tr></thead>' +
         '<tbody id="logTbody">' + rows + '</tbody></table></div>' +
       '</section>';
     },

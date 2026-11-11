@@ -472,7 +472,7 @@
             return customFilterControl(cf, planCustom[cf.key], 'data-ip-plan-cf');
           }).join('') : '') +
           '<button class="btn btn-ghost btn-sm" id="ipPlanExportBtn" type="button">' + U().icon('download') + '导出计划</button></div></div>' +
-        '<div class="table-wrap"><table class="data-table"><thead><tr><th>编号</th><th>计划</th><th>专业组</th><th>周期</th><th>负责人</th><th>执行人</th><th>标准工时</th><th>下次执行</th><th>状态</th>' +
+        '<div class="table-wrap"><table class="data-table ops-table ops-plan-table"><thead><tr><th>编号</th><th>计划</th><th>专业组</th><th>周期</th><th>负责人</th><th>执行人</th><th>标准工时</th><th>下次执行</th><th>状态</th>' +
           planCustomHeaders.map(function (h) { return '<th>' + U().esc(h) + '</th>'; }).join('') +
           '<th style="text-align:right">操作</th></tr></thead>' +
         '<tbody>' + (planRows || '<tr><td colspan="' + (10 + planCustomHeaders.length) + '">' + U().emptyState('暂无巡检计划', '新建计划后会出现在这里', 'clipboard') + '</td></tr>') + '</tbody></table></div>' +
@@ -485,7 +485,7 @@
             (ITO.customFieldFilters ? ITO.customFieldFilters('inspectionRecord').map(function (cf) {
               return customFilterControl(cf, recordCustom[cf.key], 'data-ip-record-cf');
             }).join('') : '') + '</div></div>' +
-        '<div class="table-wrap"><table class="data-table"><thead><tr><th>编号</th><th>计划</th><th>专业组</th><th>执行人</th><th>实际工时</th><th>执行时间</th><th>结果</th><th>检查项</th><th>异常项</th><th>说明</th>' +
+        '<div class="table-wrap"><table class="data-table ops-table ops-record-table"><thead><tr><th>编号</th><th>计划</th><th>专业组</th><th>执行人</th><th>实际工时</th><th>执行时间</th><th>结果</th><th>检查项</th><th>异常项</th><th>说明</th>' +
           recordCustomHeaders.map(function (h) { return '<th>' + U().esc(h) + '</th>'; }).join('') +
           '</tr></thead>' +
         '<tbody>' + (recordRows || '<tr><td colspan="' + (10 + recordCustomHeaders.length) + '">' + U().emptyState('暂无巡检记录', '执行一次巡检后记录会出现在这里', 'clipboard') + '</td></tr>') + '</tbody></table></div>' +
@@ -811,7 +811,7 @@
             return customFilterControl(cf, planCustom[cf.key], 'data-mp-plan-cf');
           }).join('') : '') +
           '<button class="btn btn-ghost btn-sm" id="mpPlanExportBtn" type="button">' + U().icon('download') + '导出计划</button></div></div>' +
-        '<div class="table-wrap"><table class="data-table"><thead><tr><th>编号</th><th>计划</th><th>专业组</th><th>周期</th><th>厂商</th><th>负责人</th><th>执行人</th><th>标准工时</th><th>下次执行</th><th>状态</th>' +
+        '<div class="table-wrap"><table class="data-table ops-table ops-plan-table"><thead><tr><th>编号</th><th>计划</th><th>专业组</th><th>周期</th><th>厂商</th><th>负责人</th><th>执行人</th><th>标准工时</th><th>下次执行</th><th>状态</th>' +
           planCustomHeaders.map(function (h) { return '<th>' + U().esc(h) + '</th>'; }).join('') +
           '<th style="text-align:right">操作</th></tr></thead>' +
         '<tbody>' + (planRows || '<tr><td colspan="' + (11 + planCustomHeaders.length) + '">' + U().emptyState('暂无维保计划', '新建计划后会出现在这里', 'wrench') + '</td></tr>') + '</tbody></table></div>' +
@@ -824,7 +824,7 @@
             (ITO.customFieldFilters ? ITO.customFieldFilters('maintenanceRecord').map(function (cf) {
               return customFilterControl(cf, recordCustom[cf.key], 'data-mp-record-cf');
             }).join('') : '') + '</div></div>' +
-        '<div class="table-wrap"><table class="data-table"><thead><tr><th>编号</th><th>计划</th><th>专业组</th><th>厂商</th><th>执行人</th><th>实际工时</th><th>执行时间</th><th>结果</th><th>说明</th>' +
+        '<div class="table-wrap"><table class="data-table ops-table ops-record-table"><thead><tr><th>编号</th><th>计划</th><th>专业组</th><th>厂商</th><th>执行人</th><th>实际工时</th><th>执行时间</th><th>结果</th><th>说明</th>' +
           recordCustomHeaders.map(function (h) { return '<th>' + U().esc(h) + '</th>'; }).join('') +
           '</tr></thead>' +
         '<tbody>' + (recordRows || '<tr><td colspan="' + (9 + recordCustomHeaders.length) + '">' + U().emptyState('暂无维保记录', '登记一次维保后记录会出现在这里', 'wrench') + '</td></tr>') + '</tbody></table></div>' +

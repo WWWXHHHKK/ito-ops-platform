@@ -29,7 +29,10 @@
   const dateEl = $('#date');
 
   function tickClock() {
-    const now = new Date();
+    const demoNow = window.ITO_DATA && ITO_DATA.meta && ITO_DATA.meta.demoOverride
+      ? String(ITO_DATA.meta.demoNow || '').replace(/-/g, '/')
+      : '';
+    const now = demoNow ? new Date(demoNow) : new Date();
     clockEl.textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
     dateEl.textContent = `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(now.getDate())} ${WEEK[now.getDay()]}`;
   }

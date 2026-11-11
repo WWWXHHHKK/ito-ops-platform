@@ -38,20 +38,26 @@ window.ITO_DATA = (() => {
 
   function buildDutyWeeks(todayStr, cfg) {
     const monday = mondayOf(parseDay(todayStr));
-    const anchorMonday = mondayOf(parseDay(cfg.anchorMonday));
-    const offsetWeeks = Math.round((monday - anchorMonday) / (7 * 86400000));
-    const rotation = cfg.rotation;
+    const pool = cfg.pool || cfg.rotation || [];
+    const externalPool = cfg.externalPool || [];
     const weeks = [];
     for (let i = -cfg.before; i <= cfg.after; i += 1) {
       const start = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i * 7);
       const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
-      const idx = ((cfg.anchorIndex + offsetWeeks + i) % rotation.length + rotation.length) % rotation.length;
+      const team = pool.length ? [0, 1, 2, 3].map(function (k) {
+        const idx = ((i * 4 + k) % pool.length + pool.length) % pool.length;
+        return pool[idx];
+      }) : [];
+      const external = externalPool.length
+        ? externalPool[((i % externalPool.length) + externalPool.length) % externalPool.length]
+        : null;
       weeks.push({
         key: dayKey(start),
         start: dayKey(start),
         end: dayKey(end),
         weekNo: isoWeek(start),
-        person: rotation[idx],
+        team: team,
+        external: external,
         note: ''
       });
     }
@@ -75,7 +81,10 @@ window.ITO_DATA = (() => {
   const OFFSET_DAYS = Math.round((anchorDay.getTime() - baseAnchor.getTime()) / 86400000);
   const IS_OVERRIDE = !!overrideDay;
   const TODAY = dayKey(anchorDay);
-  const DEMO_NOW = TODAY + ' ' + DEMO_TIME;
+  /* 自动演示跟随系统时钟；?demo= 固定日期时保留 20:56，便于回归截图。 */
+  const DEMO_NOW = TODAY + ' ' + (IS_OVERRIDE
+    ? DEMO_TIME
+    : pad2(realNow.getHours()) + ':' + pad2(realNow.getMinutes()));
 
   const groups = [
     { id: 'app',    name: '应用组',     code: 'APP',    manager: '王主管', leader: '李工', fullStrength: 13, color: '#9F2936', desc: '业务系统、接口与版本发布' },
@@ -146,8 +155,8 @@ window.ITO_DATA = (() => {
     closed: 342,
     onTimeRate: 89.0,
     overdue: 7,
-    sla: 96.2,
-    slaDelta: '+2.1%',
+    sla: 92.0,
+    slaDelta: '+1.8',
     openingBacklog: 86,
     newTasks: 384,
     groupActive: { app: 42, comm: 33, online: 29, infra: 24 },
@@ -175,13 +184,13 @@ window.ITO_DATA = (() => {
 
   const tasks = [
     {
-      id: 'T10027', name: '核心机房季度巡检与整改', group: 'infra', owner: '刘工', initiator: '张总',
+      id: 'T10027', name: '核心机房季度巡检与整改', group: 'infra', owner: '刘工', initiator: '张经理',
       level: '紧急', type: '巡检', due: '2026-11-04 18:00', tags: ['机房', '季度巡检'],
       desc: '覆盖核心机房环境、空调、UPS 与消防系统，输出整改闭环清单。',
       subs: [
-        { id: 'T10027-01', name: '核心机房环境巡检', group: 'infra', owner: '刘工', initiator: '张总', level: '重要', type: '巡检', status: '执行中', due: '2026-10-31 18:00', hours: 8,  progress: 75, auth: '工作负责人授权', ticket: true },
-        { id: 'T10027-02', name: '机房空调系统检测', group: 'infra', owner: '郑工', initiator: '张总', level: '一般', type: '维保', status: '待分发', due: '2026-11-03 17:00', hours: 4,  progress: 0,  auth: '无需授权', ticket: false },
-        { id: 'T10027-03', name: 'UPS 电池组测试',    group: 'infra', owner: '郑工', initiator: '张总', level: '紧急', type: '试验', status: '审批中', due: '2026-10-27 20:00', hours: 6,  progress: 100, auth: '高风险作业授权', ticket: true, submittedAt: '2026-10-28 09:00', approval: { level: 1, approver: '刘主管', status: '待审批', submittedAt: '2026-10-28 09:00', dueAt: '2026-10-31 09:00', decidedAt: '', comment: '' } }
+        { id: 'T10027-01', name: '核心机房环境巡检', group: 'infra', owner: '刘工', initiator: '张经理', level: '重要', type: '巡检', status: '执行中', due: '2026-10-31 18:00', hours: 8,  progress: 75, auth: '工作负责人授权', ticket: true },
+        { id: 'T10027-02', name: '机房空调系统检测', group: 'infra', owner: '郑工', initiator: '张经理', level: '一般', type: '维保', status: '待分发', due: '2026-11-03 17:00', hours: 4,  progress: 0,  auth: '无需授权', ticket: false },
+        { id: 'T10027-03', name: 'UPS 电池组测试',    group: 'infra', owner: '郑工', initiator: '张经理', level: '紧急', type: '试验', status: '审批中', due: '2026-10-27 20:00', hours: 6,  progress: 100, auth: '高风险作业授权', ticket: true, submittedAt: '2026-10-28 09:00', approval: { level: 1, approver: '刘主管', status: '待审批', submittedAt: '2026-10-28 09:00', dueAt: '2026-10-31 09:00', decidedAt: '', comment: '' } }
       ]
     },
     {
@@ -194,12 +203,12 @@ window.ITO_DATA = (() => {
       ]
     },
     {
-      id: 'T10025', name: '通信网络割接', group: 'comm', owner: '赵工', initiator: '张总',
+      id: 'T10025', name: '通信网络割接', group: 'comm', owner: '赵工', initiator: '张经理',
       level: '紧急', type: '操作', due: '2026-11-02 23:00', tags: ['厂房通信', '割接'],
       desc: '核心链路割接与回退验证，保障生产网络零中断。',
       subs: [
-        { id: 'T10025-01', name: '割接方案评审',         group: 'comm', owner: '赵工', initiator: '张总', level: '紧急', type: '操作', status: '执行中', due: '2026-10-28 12:00', hours: 4, progress: 50, auth: 'RP1 授权', ticket: true },
-        { id: 'T10025-02', name: '割接实施与回退验证',   group: 'comm', owner: '周工', initiator: '张总', level: '紧急', type: '操作', status: '待分发', due: '2026-11-02 23:00', hours: 6, progress: 0,  auth: 'RP1 授权', ticket: true }
+        { id: 'T10025-01', name: '割接方案评审',         group: 'comm', owner: '赵工', initiator: '张经理', level: '紧急', type: '操作', status: '执行中', due: '2026-10-28 12:00', hours: 4, progress: 50, auth: 'RP1 授权', ticket: true },
+        { id: 'T10025-02', name: '割接实施与回退验证',   group: 'comm', owner: '周工', initiator: '张经理', level: '紧急', type: '操作', status: '待分发', due: '2026-11-02 23:00', hours: 6, progress: 0,  auth: 'RP1 授权', ticket: true }
       ]
     },
     {
@@ -212,11 +221,11 @@ window.ITO_DATA = (() => {
       ]
     },
     {
-      id: 'T10023', name: '防火墙策略变更', group: 'comm', owner: '赵工', initiator: '张总',
+      id: 'T10023', name: '防火墙策略变更', group: 'comm', owner: '赵工', initiator: '张经理',
       level: '紧急', type: '变更', due: '2026-11-02 22:00', tags: ['防火墙', '策略'],
       desc: '按最小权限原则收敛互联网出口策略，完成审批后实施。',
       subs: [
-        { id: 'T10023-01', name: '策略评审与审批', group: 'comm', owner: '周工', initiator: '张总', level: '紧急', type: '变更', status: '审批中', due: '2026-11-02 18:00', hours: 2, progress: 100, auth: '高风险作业授权', ticket: true, submittedAt: '2026-11-01 10:00', approval: { level: 1, approver: '赵主管', status: '待审批', submittedAt: '2026-11-01 10:00', dueAt: '2026-11-04 10:00', decidedAt: '', comment: '' } }
+        { id: 'T10023-01', name: '策略评审与审批', group: 'comm', owner: '周工', initiator: '张经理', level: '紧急', type: '变更', status: '审批中', due: '2026-11-02 18:00', hours: 2, progress: 100, auth: '高风险作业授权', ticket: true, submittedAt: '2026-11-01 10:00', approval: { level: 1, approver: '赵主管', status: '待审批', submittedAt: '2026-11-01 10:00', dueAt: '2026-11-04 10:00', decidedAt: '', comment: '' } }
       ]
     },
     {
@@ -229,12 +238,12 @@ window.ITO_DATA = (() => {
       ]
     },
     {
-      id: 'T10021', name: 'UPS 电池组半年检', group: 'infra', owner: '刘工', initiator: '张总',
+      id: 'T10021', name: 'UPS 电池组半年检', group: 'infra', owner: '刘工', initiator: '张经理',
       level: '一般', type: '巡检', due: '2026-11-07 10:00', tags: ['UPS', '动力环境'],
       desc: '完成电池组放电测试、内阻检测与容量评估。',
-      leaderApproval: { status: '审批中', approver: '张总', submittedAt: '2026-10-31 09:00', dueAt: '2026-11-03 09:00', decidedAt: '', comment: '' },
+      leaderApproval: { status: '审批中', approver: '张经理', submittedAt: '2026-10-31 09:00', dueAt: '2026-11-03 09:00', decidedAt: '', comment: '' },
       subs: [
-        { id: 'T10021-01', name: '电池组放电测试', group: 'infra', owner: '郑工', initiator: '张总', level: '一般', type: '巡检', status: '已完成', due: '2026-11-07 10:00', hours: 6, progress: 100, auth: '无需授权', ticket: false, completedAt: '2026-10-31 08:30' }
+        { id: 'T10021-01', name: '电池组放电测试', group: 'infra', owner: '郑工', initiator: '张经理', level: '一般', type: '巡检', status: '已完成', due: '2026-11-07 10:00', hours: 6, progress: 100, auth: '无需授权', ticket: false, completedAt: '2026-10-31 08:30' }
       ]
     },
     {
@@ -246,11 +255,11 @@ window.ITO_DATA = (() => {
       ]
     },
     {
-      id: 'T10019', name: '核心交换机固件升级', group: 'comm', owner: '赵工', initiator: '张总',
+      id: 'T10019', name: '核心交换机固件升级', group: 'comm', owner: '赵工', initiator: '张经理',
       level: '重要', type: '变更', due: '2026-11-08 23:00', tags: ['交换机', '固件'],
       desc: '升级核心交换机固件并完成双机倒换验证。',
       subs: [
-        { id: 'T10019-01', name: '固件兼容性验证', group: 'comm', owner: '赵工', initiator: '张总', level: '重要', type: '变更', status: '待分发', due: '2026-11-06 18:00', hours: 4, progress: 0, auth: '无需授权', ticket: false }
+        { id: 'T10019-01', name: '固件兼容性验证', group: 'comm', owner: '赵工', initiator: '张经理', level: '重要', type: '变更', status: '待分发', due: '2026-11-06 18:00', hours: 4, progress: 0, auth: '无需授权', ticket: false }
       ]
     },
     {
@@ -271,22 +280,22 @@ window.ITO_DATA = (() => {
       ]
     },
     {
-      id: 'T10016', name: '监测数据补录与核对', group: 'online', owner: '孙工', initiator: '张总',
+      id: 'T10016', name: '监测数据补录与核对', group: 'online', owner: '孙工', initiator: '张经理',
       level: '一般', type: '操作', due: '2026-11-03 18:00', tags: ['监测', '数据质量'],
       desc: '补录 10 月缺失监测数据，完成跨系统一致性核对。',
       subs: [
-        { id: 'T10016-01', name: '10 月缺失数据补录', group: 'online', owner: '孙工', initiator: '张总', level: '一般', type: '操作', status: '已完成', due: '2026-10-31 18:00', hours: 4, progress: 100, auth: '—', ticket: false, completedAt: '2026-10-31 17:20' },
-        { id: 'T10016-02', name: '数据一致性核对',     group: 'online', owner: '吴工', initiator: '张总', level: '一般', type: '操作', status: '执行中', due: '2026-11-03 18:00', hours: 3, progress: 0,   auth: '—', ticket: false }
+        { id: 'T10016-01', name: '10 月缺失数据补录', group: 'online', owner: '孙工', initiator: '张经理', level: '一般', type: '操作', status: '已完成', due: '2026-10-31 18:00', hours: 4, progress: 100, auth: '—', ticket: false, completedAt: '2026-10-31 17:20' },
+        { id: 'T10016-02', name: '数据一致性核对',     group: 'online', owner: '吴工', initiator: '张经理', level: '一般', type: '操作', status: '执行中', due: '2026-11-03 18:00', hours: 3, progress: 0,   auth: '—', ticket: false }
       ]
     },
     {
-      id: 'T10029', name: '核心交换机巡检报告汇总', group: 'comm', owner: '赵工', initiator: '张总',
+      id: 'T10029', name: '核心交换机巡检报告汇总', group: 'comm', owner: '赵工', initiator: '张经理',
       level: '重要', type: '综合', due: '2026-10-30 18:00', tags: ['交换机', '巡检报告'],
       desc: '汇总核心交换机巡检结果并提交领导审批。',
-      leaderApproval: { status: '审批中', approver: '张总', submittedAt: '2026-10-29 09:00', dueAt: '2026-11-01 09:00', decidedAt: '', comment: '' },
+      leaderApproval: { status: '审批中', approver: '张经理', submittedAt: '2026-10-29 09:00', dueAt: '2026-11-01 09:00', decidedAt: '', comment: '' },
       subs: [
-        { id: 'T10029-01', name: '交换机日志巡检', group: 'comm', owner: '周工', initiator: '张总', level: '重要', type: '巡检', status: '已完成', due: '2026-10-29 18:00', hours: 4, progress: 100, auth: '无需授权', ticket: false, completedAt: '2026-10-29 16:50' },
-        { id: 'T10029-02', name: '端口流量核对', group: 'comm', owner: '赵工', initiator: '张总', level: '一般', type: '巡检', status: '已完成', due: '2026-10-30 18:00', hours: 3, progress: 100, auth: '无需授权', ticket: false, completedAt: '2026-10-30 17:40' }
+        { id: 'T10029-01', name: '交换机日志巡检', group: 'comm', owner: '周工', initiator: '张经理', level: '重要', type: '巡检', status: '已完成', due: '2026-10-29 18:00', hours: 4, progress: 100, auth: '无需授权', ticket: false, completedAt: '2026-10-29 16:50' },
+        { id: 'T10029-02', name: '端口流量核对', group: 'comm', owner: '赵工', initiator: '张经理', level: '一般', type: '巡检', status: '已完成', due: '2026-10-30 18:00', hours: 3, progress: 100, auth: '无需授权', ticket: false, completedAt: '2026-10-30 17:40' }
       ]
     },
     {
@@ -405,7 +414,9 @@ window.ITO_DATA = (() => {
     { id: 'MP-001', name: '机房空调季度维保', group: 'infra', cycle: '每季度', owner: '刘工', executor: '郑工', hours: 8, vendor: '维保厂商 A', next: '2026-11-06 09:00', status: '启用', scope: '滤网、冷媒、排水、压缩机' },
     { id: 'MP-002', name: 'UPS 电池组半年检', group: 'infra', cycle: '每半年', owner: '郑工', executor: '郑工', hours: 6, vendor: '维保厂商 B', next: '2026-11-12 10:00', status: '启用', scope: '放电测试、内阻检测、容量评估' },
     { id: 'MP-003', name: '核心交换机固件维保', group: 'comm', cycle: '每年', owner: '赵工', executor: '周工', hours: 10, vendor: '原厂服务', next: '2026-12-01 22:00', status: '启用', scope: '固件评估、升级、倒换验证' },
-    { id: 'MP-004', name: '消防系统年检', group: 'infra', cycle: '每年', owner: '刘工', executor: '刘工', hours: 4, vendor: '维保厂商 C', next: '2026-11-20 14:00', status: '停用', scope: '烟感、喷淋、联动测试' }
+    { id: 'MP-004', name: '消防系统年检', group: 'infra', cycle: '每年', owner: '刘工', executor: '刘工', hours: 4, vendor: '维保厂商 C', next: '2026-11-20 14:00', status: '停用', scope: '烟感、喷淋、联动测试' },
+    { id: 'MP-005', name: '应用服务器季度维保', group: 'app', cycle: '每季度', owner: '王主管', executor: '李工', hours: 6, vendor: '原厂服务', next: '2026-11-19 10:00', status: '启用', scope: '主机健康检查、补丁评估、日志清理' },
+    { id: 'MP-006', name: '中间件与数据库巡检', group: 'app', cycle: '每月', owner: '王主管', executor: '陈工', hours: 5, vendor: '维保厂商 B', next: '2026-11-24 09:00', status: '启用', scope: '连接池、慢查询、备份有效性' }
   ];
 
   [inspectionPlans, maintenancePlans].forEach(function (list) {
@@ -428,26 +439,36 @@ window.ITO_DATA = (() => {
     anchorIndex: 0,
     before: 6,
     after: 6,
-    rotation: ['赵工', '周工', '郭工', '孙工', '吴工', '刘工', '郑工', '袁工'],
+    /* 值班授权池：通信组 10 人（含值班主管赵主管） */
+    authPool: ['赵主管', '郭工', '赵工', '周工', '罗工', '梁工', '宋工', '唐工', '许工', '邓工'],
+    /* 值班轮换池：通信组除赵主管外的 9 人 */
+    pool: ['郭工', '赵工', '周工', '罗工', '梁工', '宋工', '唐工', '许工', '邓工'],
+    rotation: ['郭工', '赵工', '周工', '罗工', '梁工', '宋工', '唐工', '许工', '邓工'],
+    externalPool: [
+      { name: '吴工（工程公司）', phone: '13800001209' },
+      { name: '沈工（工程公司）', phone: '13800001210' },
+      { name: '韩工（工程公司）', phone: '13800001211' }
+    ],
     currentKey: '',
     nextKey: '',
+    calls: [],
     weeks: []
   };
 
   const dutyRoster = [
     { post: '通信助理', code: 'TX-ZL', name: '赵主管', phone: '13900001203' },
-    { post: '通信值班-应急', code: 'TX-YJ', name: '李工', phone: '13800001201' },
+    { post: '通信值班-应急', code: 'TX-YJ', name: '郭工', phone: '13800001220' },
     { post: '通信值班-线路', code: 'TX-XL', name: '赵工', phone: '13800001203' },
     { post: '通信值班-网络', code: 'TX-WL', name: '周工', phone: '13800001205' },
-    { post: '通信值班-桌面', code: 'TX-ZM', name: '孙工', phone: '13800001206' },
-    { post: '工程公司项目部通讯技术助理', code: '', name: '吴工', phone: '13800001207', external: true }
+    { post: '通信值班-桌面', code: 'TX-ZM', name: '罗工', phone: '13800001221' },
+    { post: '工程公司项目部通讯技术助理', code: '', name: '吴工（工程公司）', phone: '13800001209', external: true }
   ];
 
   const dutyTypes = [
-    { id: 'emergency', name: '值班-应急', assistant: '李工', phone: '13800001201', statuses: ['正常', '正常', '正常', '异常', '正常', '正常', '正常'] },
+    { id: 'emergency', name: '值班-应急', assistant: '郭工', phone: '13800001220', statuses: ['正常', '正常', '正常', '异常', '正常', '正常', '正常'] },
     { id: 'line',      name: '值班-线路', assistant: '赵工', phone: '13800001203', statuses: ['正常', '正常', '正常', '正常', '正常', '异常', '正常'] },
     { id: 'network',   name: '值班-网络', assistant: '周工', phone: '13800001205', statuses: ['正常', '异常', '正常', '正常', '正常', '正常', '正常'] },
-    { id: 'desktop',   name: '值班-桌面', assistant: '孙工', phone: '13800001206', statuses: ['正常', '正常', '正常', '正常', '正常', '正常', '正常'] }
+    { id: 'desktop',   name: '值班-桌面', assistant: '罗工', phone: '13800001221', statuses: ['正常', '正常', '正常', '正常', '正常', '正常', '正常'] }
   ];
 
   const auths = [
@@ -475,19 +496,55 @@ window.ITO_DATA = (() => {
 
   const messages = [
     { id: 'MSG-001', type: '审批', title: '高风险作业授权待审批', body: 'T10027-03「UPS 电池组测试」已提交高风险作业授权，请尽快完成审批。', time: '2026-11-02 18:20', read: false },
-    { id: 'MSG-002', type: '超期', title: '防火墙策略评审已超期', body: 'T10023-01「策略评审与审批」已超过截止时间近 3 小时，请关注。', time: '2026-11-02 20:00', read: false },
+    { id: 'MSG-002', type: '超期', title: 'UPS 电池组测试已超期', body: 'T10027-03「UPS 电池组测试」已超过截止时间 5 天，请优先处置。', time: '2026-11-02 20:00', read: false },
     { id: 'MSG-003', type: '巡检', title: '网络设备日检发现 2 项异常', body: '核心交换机 2 个端口错包增长，系统已自动生成整改任务。', time: '2026-10-31 07:40', read: false },
     { id: 'MSG-004', type: '值班', title: '每周值班交接提醒', body: '下周一 08:00 进行周值班交接，请提前完成未闭环任务、在途变更与告警确认。', time: '2026-11-01 18:00', read: true },
     { id: 'MSG-005', type: '发布', title: '业务系统 v3.6.2 发布完成', body: 'KNS 业务系统 v3.6.2 已于 22:10 完成发布，回归验证通过。', time: '2026-10-30 22:10', read: true },
     { id: 'MSG-006', type: '报表', title: '最近一期运维月报已生成', body: '最近一期个人月报已生成，可在「个人统计」中预览并导出。', time: '2026-10-31 09:00', read: true }
   ];
 
+  /* 预警规则：condition 由 type + threshold 生成，引擎按 type 真实判定。 */
   const alertRules = [
-    { id: 'R-01', name: '任务超期提醒', condition: '超期 > 2 小时', channel: '站内 + 短信', enabled: true },
-    { id: 'R-02', name: '高风险作业审批超时', condition: '未审批 > 30 分钟', channel: '站内 + 企业微信', enabled: true },
-    { id: 'R-03', name: '巡检异常', condition: '异常项 ≥ 1', channel: '站内', enabled: true },
-    { id: 'R-04', name: 'SLA 达成率预警', condition: '达成率 < 97%', channel: '站内 + 邮件', enabled: true },
-    { id: 'R-05', name: '值班交接超时', condition: '周一 08:15 未确认交接', channel: '站内', enabled: false }
+    {
+      id: 'R-01', name: '任务超期提醒', type: 'taskOverdue', threshold: 2, unit: '小时',
+      scope: 'all', severity: '警告', condition: '未完成且超期 > 2 小时', channel: '站内',
+      dedupeMinutes: 30, enabled: true,
+      createdAt: '2026-09-01 09:00', createdBy: '系统',
+      updatedAt: '2026-09-01 09:00', updatedBy: '系统',
+      lastFiredAt: '', fireCount: 0, lastSignature: ''
+    },
+    {
+      id: 'R-02', name: '高风险作业审批超时', type: 'approvalTimeout', threshold: 30, unit: '分钟',
+      scope: 'all', severity: '严重', condition: '高风险审批未处理 > 30 分钟', channel: '站内',
+      dedupeMinutes: 30, enabled: true,
+      createdAt: '2026-09-02 09:00', createdBy: '系统',
+      updatedAt: '2026-09-02 09:00', updatedBy: '系统',
+      lastFiredAt: '', fireCount: 0, lastSignature: ''
+    },
+    {
+      id: 'R-03', name: '巡检异常', type: 'inspectionException', threshold: 1, unit: '项',
+      scope: 'all', severity: '警告', condition: '近 7 天巡检异常项 ≥ 1', channel: '站内',
+      dedupeMinutes: 30, enabled: true,
+      createdAt: '2026-09-03 09:00', createdBy: '系统',
+      updatedAt: '2026-09-03 09:00', updatedBy: '系统',
+      lastFiredAt: '', fireCount: 0, lastSignature: ''
+    },
+    {
+      id: 'R-04', name: 'SLA 达成率预警', type: 'slaThreshold', threshold: 97, unit: '%',
+      scope: 'all', severity: '严重', condition: 'SLA 达成率 < 97%', channel: '站内',
+      dedupeMinutes: 30, enabled: true,
+      createdAt: '2026-09-04 09:00', createdBy: '系统',
+      updatedAt: '2026-09-04 09:00', updatedBy: '系统',
+      lastFiredAt: '', fireCount: 0, lastSignature: ''
+    },
+    {
+      id: 'R-05', name: '值班交接超时', type: 'dutyHandover', threshold: 15, unit: '分钟',
+      scope: 'all', severity: '警告', condition: '周一 08:15 未确认交接', channel: '站内',
+      dedupeMinutes: 30, enabled: true,
+      createdAt: '2026-09-05 09:00', createdBy: '系统',
+      updatedAt: '2026-09-05 09:00', updatedBy: '系统',
+      lastFiredAt: '', fireCount: 0, lastSignature: ''
+    }
   ];
 
   const logs = [
@@ -520,9 +577,9 @@ window.ITO_DATA = (() => {
     { person: '李工', name: '机房', type: '任务标签', stars: 0, count: 8,  firstClaimed: '2025-09-06', desc: '核心机房巡检与动力环境保障' },
     { person: '李工', name: 'DTT',  type: '任务标签', stars: 0, count: 2,  firstClaimed: '2026-02-11', desc: '监测数据质量专项' },
     { person: '王主管', name: 'KCC', type: '人员标签', stars: 2, count: 9,  firstClaimed: '2025-09-02', desc: '核心业务系统变更与发布' },
-    { person: '张总', name: 'KCC', type: '人员标签', stars: 1, count: 3, firstClaimed: '2025-10-21', desc: '核心业务系统变更与发布' },
-    { person: '张总', name: '巡检', type: '任务标签', stars: 0, count: 5, firstClaimed: '2025-11-27', desc: '季度巡检与整改闭环' },
-    { person: '张总', name: '变更', type: '任务标签', stars: 0, count: 4, firstClaimed: '2026-02-03', desc: '高风险变更与割接审批' },
+    { person: '张经理', name: 'KCC', type: '人员标签', stars: 1, count: 3, firstClaimed: '2025-10-21', desc: '核心业务系统变更与发布' },
+    { person: '张经理', name: '巡检', type: '任务标签', stars: 0, count: 5, firstClaimed: '2025-11-27', desc: '季度巡检与整改闭环' },
+    { person: '张经理', name: '变更', type: '任务标签', stars: 0, count: 4, firstClaimed: '2026-02-03', desc: '高风险变更与割接审批' },
     { person: '陈工', name: 'KCC', type: '人员标签', stars: 2, count: 7, firstClaimed: '2025-10-12', desc: '核心业务系统变更与发布' },
     { person: '陈工', name: '机房', type: '人员标签', stars: 1, count: 3, firstClaimed: '2026-01-08', desc: '核心机房巡检与动力环境保障' },
     { person: '赵工', name: '割接', type: '人员标签', stars: 3, count: 11, firstClaimed: '2025-07-21', desc: '核心网络割接与回退验证' },
@@ -562,14 +619,14 @@ window.ITO_DATA = (() => {
     leader:   { task: true,  inspect: true,  duty: true,  maintain: true,  overhaul: true, group: true,  auth: true,  message: true,  dictionary: false, config: false },
     manager:  { task: true,  inspect: true,  duty: true,  maintain: true,  overhaul: true, group: true,  auth: true,  message: true,  dictionary: false, config: false },
     employee: { task: true,  inspect: false, duty: true,  maintain: false, overhaul: true, group: false, auth: true,  message: true,  dictionary: false, config: false },
-    admin:    { task: false, inspect: false, duty: false, maintain: false, overhaul: true, group: true,  auth: false, message: true,  dictionary: true,  config: true  },
+    admin:    { task: false, inspect: false, duty: false, maintain: false, overhaul: false, group: true,  auth: false, message: false, dictionary: true,  config: true  },
     super:    { task: true,  inspect: true,  duty: true,  maintain: true,  overhaul: true, group: true,  auth: true,  message: true,  dictionary: true,  config: true  }
   };
 
   const roleInfo = {
-    leader:   { name: '张总',       role: '领导层',     avatar: '领', title: '运营负责人', desc: '领导审批、任务编辑与个人月报' },
+    leader:   { name: '张经理',       role: '领导层',     avatar: '领', title: '运营负责人', desc: '领导审批、任务编辑与个人月报' },
     manager:  { name: '王主管',     role: '主管层',     avatar: '主', title: '应用组主管', desc: '任务拆分、派发审批与日常管理' },
-    employee: { name: '李工',       role: '员工层',     avatar: '员', title: '高级工程师', desc: '执行任务、提交交付与个人授权' },
+    employee: { name: '赵工',       role: '员工层',     avatar: '赵', title: '高级工程师', desc: '通信组值班、任务执行与个人授权' },
     admin:    { name: '系统管理员', role: '系统管理员', avatar: '管', title: '平台管理员', desc: '平台配置、组织架构与审计' },
     super:    { name: '全局管理员', role: '超级管理员', avatar: '全', title: '全部模块与操作', desc: '开发调试：全模块可见、全操作可用' }
   };
@@ -801,14 +858,14 @@ window.ITO_DATA = (() => {
     },
     {
       id: 'dutyStatus', name: '值班状态', group: '系统枚举', code: 'DUTY_STATUS', builtin: true, readOnly: true,
-      desc: '值班交接状态由流程控制，字典页只读。',
-      readOnlyHint: '值班管理 · 交接流程', sourceRoute: 'duty',
-      values: ['待交接', '待接班确认', '已完成'].map(function (v, i) { return { name: v, code: 'D' + (i + 1), sort: i + 1, enabled: true }; })
+      desc: '值班运行状态由排班记录维护，字典页只读。',
+      readOnlyHint: '值班管理 · 排班状态', sourceRoute: 'duty',
+      values: ['正常', '异常'].map(function (v, i) { return { name: v, code: 'D' + (i + 1), sort: i + 1, enabled: true }; })
     },
     {
       id: 'messageType', name: '消息类型', group: '系统枚举', code: 'MESSAGE_TYPE', builtin: true, readOnly: true,
-      desc: '站内消息类型由消息中心维护，字典页只读。',
-      readOnlyHint: '站内消息 · 消息中心', sourceRoute: 'messages',
+      desc: '站内消息类型由站内消息模块维护，字典页只读。',
+      readOnlyHint: '站内消息 · 消息类型', sourceRoute: 'messages',
       values: ['审批', '超期', '巡检', '值班', '发布', '报表', '任务'].map(function (v, i) { return { name: v, code: 'M' + (i + 1), sort: i + 1, enabled: true }; })
     }
   ];
@@ -856,13 +913,7 @@ window.ITO_DATA = (() => {
     {
       id: 'CF-TASK-CHANGE', module: 'task', label: '变更单号', key: 'changeNo',
       type: 'text', source: 'none', required: false, placeholder: '例如：BG-2026-001',
-      group: '扩展信息', sort: 1, width: 1, list: true, filter: true, export: true,
-      editableRoles: ['employee', 'manager', 'leader', 'admin'], enabled: true
-    },
-    {
-      id: 'CF-TASK-IMPACT', module: 'task', label: '影响系统', key: 'impactSystem',
-      type: 'multiselect', source: 'options', options: 'KNS\nKCC\nKDN\n终端', required: false,
-      group: '扩展信息', sort: 2, width: 1, list: false, filter: true, export: false,
+      group: '扩展信息', sort: 1, width: 1, list: false, filter: false, export: true,
       editableRoles: ['employee', 'manager', 'leader', 'admin'], enabled: true
     },
     {
@@ -921,18 +972,74 @@ window.ITO_DATA = (() => {
       editableRoles: ['employee', 'manager', 'leader', 'admin'], enabled: true
     },
     {
-      id: 'CF-DUTY-BY', module: 'duty', label: '交接确认人', key: 'handoverBy',
-      type: 'person', source: 'none', required: false,
-      group: '值班信息', sort: 1, width: 1, list: false, filter: false, export: false,
-      editableRoles: ['employee', 'manager', 'leader', 'admin'], enabled: true
-    },
-    {
       id: 'CF-DUTY-NOTE', module: 'duty', label: '值班备注', key: 'dutyNote',
       type: 'textarea', source: 'none', required: false,
       group: '值班信息', sort: 2, width: 3, list: false, filter: false, export: false,
       editableRoles: ['employee', 'manager', 'leader', 'admin'], enabled: true
     }
   ];
+
+  /* 业务系统分组：任务标签即业务系统，筛选项按系统组展示。 */
+  const systemGroups = [
+    { key: 'ics', name: '工控系统', systems: ['KNS', 'KCC', 'KDN', 'KSM'] },
+    { key: 'voice', name: '语音通信系统', systems: ['DTT', 'DTI', 'DTS', 'DTH'] },
+    { key: 'grid', name: '电网通信系统', systems: ['DTK', 'DTD'] },
+    { key: 'emergency', name: '应急通信及授时系统', systems: ['DTA', 'DTP', 'DTC'] },
+    { key: 'video', name: '视频监控系统', systems: ['DTL', 'DTM'] },
+    { key: 'facility', name: '机房及电源', systems: ['DTJ', '机房', '机房动环', '通信电源', '弱电日常', '门禁'] },
+    { key: 'line', name: '线路通信系统', systems: ['DTX', 'DTG', 'DTW', '卫星电话', '桌面电话', '厂房通信', 'AP'] },
+    { key: 'meeting', name: '会议系统', systems: ['视频会议'] },
+    { key: 'network', name: '网络系统', systems: ['DTF网络设备', 'DTW系统网络设备', 'AC'] },
+    { key: 'mobile', name: '移动终端', systems: ['移动终端设备'] },
+    { key: 'appsys', name: '应用系统', systems: ['宜搭平台', 'RPA', 'AI智能体'] },
+    { key: 'publish', name: '信息发布系统', systems: ['信息发布LED屏系统'] }
+  ];
+
+  const systemAliases = {
+    '移动终端设备': ['终端'],
+    '视频会议': ['视频会议系统'],
+    '卫星电话': ['卫星电话系统'],
+    '厂房通信': ['厂房通信系统'],
+    'DTF网络设备': ['DTF']
+  };
+
+  /* 业务系统统一纳入任务标签字典；已有别名时不再重复生成同义标签。 */
+  (function extendTaskTagRegistry() {
+    systemGroups.forEach(function (group) {
+      (group.systems || []).forEach(function (name) {
+        if (taskTags.indexOf(name) > -1) return;
+        const aliases = systemAliases[name] || [];
+        if (aliases.some(function (alias) { return taskTags.indexOf(alias) > -1; })) return;
+        taskTags.push(name);
+        if (!taskTagMeta.some(function (meta) { return meta.name === name; })) {
+          taskTagMeta.push({ name: name, count: 0, firstClaimed: '', desc: group.name + '业务系统' });
+        }
+      });
+    });
+    taskTags.forEach(function (name) {
+      if (achievementWall.some(function (tag) { return tag.type === '任务标签' && tag.name === name; })) return;
+      const meta = taskTagMeta.find(function (m) { return m.name === name; }) || {};
+      achievementWall.push({
+        name: name, type: '任务标签', count: meta.count || 0,
+        stars: 0, star2: 0, star3: 0,
+        desc: meta.desc || '完成对应任务后累计',
+        unlock: '完成对应任务'
+      });
+    });
+  })();
+
+  /* 近 5 个月团队闭环趋势，按专业组存放，用于领导 / 主管视图。 */
+  const teamTrend = {
+    app: [36, 42, 39, 46, 44],
+    comm: [28, 32, 31, 35, 33],
+    online: [20, 24, 22, 27, 26],
+    infra: [17, 19, 18, 22, 21]
+  };
+
+  const roleTrend = {
+    '张经理': [2, 3, 2, 4, 3],
+    '王主管': [3, 4, 3, 5, 4]
+  };
 
   /* 个人闭环趋势的历史归档演示数据，仅用于趋势与月份下钻，不进入当前任务台账。 */
   const personalArchive = [
@@ -974,7 +1081,7 @@ window.ITO_DATA = (() => {
       demoNow: DEMO_NOW,
       today: TODAY
     },
-    groups, groupHistory, staff, dashboard, trend, tasks, personalArchive, activity,
+    groups, groupHistory, staff, dashboard, trend, tasks, personalArchive, activity, systemGroups, systemAliases, teamTrend, roleTrend,
     inspectionPlans, inspectionRecords, inspectionWeek,
     maintenancePlans, maintenanceRecords,
     duty, dutyTypes, dutyRoster, auths, messages, alertRules, logs, achievements,
@@ -995,11 +1102,457 @@ window.ITO_DATA = (() => {
   data.meta.autoDate = !IS_OVERRIDE;
   data.meta.demoOverride = IS_OVERRIDE;
 
+  /* 11 月巡检 / 维保补录：让展示时近 7 天与本月记录不为空。 */
+  (function seedNovemberRecords() {
+    const day = function (n) {
+      const d = parseDay(TODAY);
+      d.setDate(d.getDate() + n);
+      return dayKey(d);
+    };
+    [
+      ['IR-1101', '核心机房周检', 'infra', '刘工', 4, -9, '正常', 12, 0, '温湿度、UPS、消防均正常'],
+      ['IR-1102', '网络设备日检', 'comm', '赵工', 2, -7, '异常', 18, 1, '核心交换机 1 个端口错包增长，已转整改'],
+      ['IR-1103', '应用系统月检', 'app', '陈工', 3, -5, '正常', 14, 0, '应用与数据库日志正常'],
+      ['IR-1104', '在线监测平台巡检', 'online', '孙工', 2, -3, '正常', 9, 0, '采集通道与告警推送正常'],
+      ['IR-1105', '核心机房周检', 'infra', '郑工', 4, -1, '正常', 12, 0, '空调与 UPS 运行正常']
+    ].forEach(function (r) {
+      data.inspectionRecords.push({
+        id: r[0], plan: r[1], group: r[2], owner: r[3], hours: r[4],
+        time: day(r[5]) + ' 09:00', result: r[6], items: r[7], abnormal: r[8], note: r[9]
+      });
+    });
+    data.maintenanceRecords.push(
+      { id: 'MR-302', plan: '机房空调季度维保', group: 'infra', owner: '郑工', hours: 8, time: day(-6) + ' 15:20', result: '完成', vendor: '维保厂商 A', note: '滤网清洗，冷媒压力正常' },
+      { id: 'MR-303', plan: '核心交换机固件维保', group: 'comm', owner: '周工', hours: 10, time: day(-2) + ' 22:40', result: '完成', vendor: '原厂服务', note: '固件升级与倒换验证通过' }
+    );
+  })();
+
+  /* 预置规则触发历史：近 10 天，按规则错峰，供详情时间线展示。 */
+  (function seedAlertTriggers() {
+    const base = parseDay(DEMO_NOW.slice(0, 10));
+    const now = new Date(String(DEMO_NOW).replace(/-/g, '/').replace('T', ' '));
+    const sampleHits = function (rule) {
+      if (rule.type === 'taskOverdue') {
+        const out = [];
+        data.tasks.forEach(function (task) {
+          if (task.canceled || task.draft) return;
+          (task.subs || []).forEach(function (sub) {
+            if (!sub.due || ['已完成', '已取消', '草稿', '待分发'].indexOf(sub.status) > -1) return;
+            if (new Date(String(sub.due).replace(/-/g, '/')) >= now) return;
+            out.push({ key: sub.id, name: sub.name });
+          });
+        });
+        return out.slice(0, 6);
+      }
+      if (rule.type === 'approvalTimeout') {
+        const out = [];
+        data.tasks.forEach(function (task) {
+          if (task.canceled || task.draft) return;
+          (task.subs || []).forEach(function (sub) {
+            if (sub.approval && sub.approval.status === '待审批') out.push({ key: sub.id, name: sub.name });
+          });
+        });
+        return out.slice(0, 6);
+      }
+      if (rule.type === 'inspectionException') {
+        return data.inspectionRecords.filter(function (r) { return (Number(r.abnormal) || 0) > 0; })
+          .slice(0, 6).map(function (r) { return { key: r.id, name: r.plan }; });
+      }
+      if (rule.type === 'slaThreshold') {
+        return [{ key: 'SLA', name: 'SLA 达成率 ' + data.dashboard.sla + '%' }];
+      }
+      if (rule.type === 'dutyHandover') {
+        const wk = isoWeek(parseDay(DEMO_NOW.slice(0, 10)));
+        return [{ key: '第 ' + wk + ' 周', name: '通信值班组 · 第 ' + wk + ' 周' }];
+      }
+      return [];
+    };
+    alertRules.forEach(function (rule) {
+      const rng = seededRandom(hashSeed(rule.id + '|' + rule.type));
+      const hits = sampleHits(rule);
+      const maxCount = Math.max(1, hits.length);
+      const count = 3 + Math.floor(rng() * 3);
+      const list = [];
+      for (let i = count; i >= 1; i -= 1) {
+        const daysAgo = i * 2 + Math.floor(rng() * 2);
+        const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() - daysAgo);
+        const hh = 8 + Math.floor(rng() * 11);
+        const mm = Math.floor(rng() * 60);
+        list.push({ time: dayKey(d) + ' ' + pad2(hh) + ':' + pad2(mm), count: 1 + Math.floor(rng() * maxCount) });
+      }
+      list.sort(function (a, b) { return b.time.localeCompare(a.time); });
+      rule.triggers = list;
+      rule.fireCount = (rule.fireCount || 0) + list.length;
+      rule.lastFiredAt = list[0].time;
+      rule.lastHitCount = list[0].count;
+      rule.lastHits = hits.slice(0, list[0].count);
+      rule.dedupeUntil = '';
+      list.forEach(function (t) {
+        const top = hits.slice(0, Math.min(3, t.count)).map(function (h) { return h.key; }).join('、');
+        const more = t.count > 3 ? ' 等' : '';
+        data.logs.push({
+          time: t.time,
+          actor: '系统',
+          action: '触发预警规则',
+          target: rule.id + ' ' + rule.name + ' · ' + t.count + ' 项' + (top ? '（' + top + more + '）' : ''),
+          type: '预警'
+        });
+      });
+    });
+    data.logs.sort(function (a, b) { return String(b.time).localeCompare(String(a.time)); });
+  })();
+
+  /* 任务标签只保留属性勋章中已注册的标签，避免出现系统里不存在的临时词。 */
+  (function normalizeTaskTags() {
+    const allowed = {};
+    taskTags.forEach(function (name) { allowed[name] = true; });
+    const clean = function (list) {
+      const out = [];
+      (list || []).forEach(function (name) {
+        if (!allowed[name] || out.indexOf(name) > -1) return;
+        out.push(name);
+      });
+      return out;
+    };
+    data.tasks.forEach(function (task) {
+      task.tags = clean(task.tags);
+      (task.subs || []).forEach(function (sub) { sub.tags = clean(sub.tags); });
+      if ((task.id === 'T10026' || task.id === 'T10022') && task.tags.indexOf('KCC') === -1) {
+        task.tags.unshift('KCC');
+      }
+    });
+  })();
+
+  /* 值班历史归档：7 月至本周之前，每周 4 个角色进入闭环趋势与个人统计。 */
+  (function seedDutyArchive() {
+    const pool = data.duty.pool || [];
+    const roles = ['应急', '线路', '网络', '桌面'];
+    if (!pool.length) return;
+    const today = parseDay(TODAY);
+    const currentMonday = mondayOf(today);
+    for (let w = 18; w >= 1; w -= 1) {
+      const monday = new Date(currentMonday.getFullYear(), currentMonday.getMonth(), currentMonday.getDate() - w * 7);
+      const friday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 4);
+      if (friday > today) continue;
+      const offset = -w;
+      roles.forEach(function (role, k) {
+        const idx = ((offset * 4 + k) % pool.length + pool.length) % pool.length;
+        const person = pool[idx];
+        data.personalArchive.push({
+          id: 'AR-DUTY-' + dayKey(monday) + '-' + k,
+          taskId: '',
+          task: '通信值班',
+          name: '通信值班 · 第' + isoWeek(monday) + '周 · ' + role,
+          owner: person,
+          group: 'comm',
+          type: '值班',
+          level: '一般',
+          hours: 8,
+          status: '已完成',
+          completedAt: dayKey(friday) + ' 18:00',
+          due: dayKey(friday) + ' 20:00',
+          initiator: '赵主管',
+          source: '历史归档'
+        });
+      });
+    }
+  })();
+
+  /* 员工层赵工的历史闭环补充：让 5 个月趋势有起伏，不是一条平线。 */
+  (function seedEmployeeArchive() {
+    const today = parseDay(TODAY);
+    const pool = [
+      ['核心交换机巡检', '巡检', '一般', 4],
+      ['通信链路优化', '变更', '重要', 6],
+      ['语音网关版本核对', '操作', '一般', 3],
+      ['端口流量核对', '巡检', '一般', 2],
+      ['路由策略收敛', '变更', '重要', 5]
+    ];
+    for (let i = 0; i < 4; i += 1) {
+      const month = new Date(today.getFullYear(), today.getMonth() - (4 - i), 1);
+      const count = [4, 2, 5, 3][i];
+      for (let k = 0; k < count; k += 1) {
+        const tpl = pool[(i * 2 + k) % pool.length];
+        const day = 4 + k * 6 + (i % 3);
+        const hh = 10 + ((i + k) % 7);
+        const mm = (k * 17 + i * 11) % 60;
+        data.personalArchive.push({
+          id: 'AR-EMP-' + dayKey(month).slice(0, 7) + '-' + k,
+          taskId: '',
+          task: tpl[0],
+          name: tpl[0] + ' ' + pad2(k + 1),
+          owner: '赵工',
+          group: 'comm',
+          type: tpl[1],
+          level: tpl[2],
+          hours: tpl[3],
+          status: '已完成',
+          completedAt: dayKey(new Date(month.getFullYear(), month.getMonth(), day)) + ' ' + pad2(hh) + ':' + pad2(mm),
+          due: dayKey(new Date(month.getFullYear(), month.getMonth(), day)) + ' ' + pad2(Math.min(23, hh + 2)) + ':' + pad2(mm),
+          initiator: '赵主管',
+          source: '历史归档'
+        });
+      }
+    }
+  })();
+
+  /* 历史闭环归档：按 teamTrend 生成近 5 个月归档，保证趋势下钻、专业组月报和员工月报都有数据。
+     归档只进入趋势 / 月报 / 下钻，不进入当前任务台账，因此不会改变在办与超期口径。 */
+  (function seedTrendArchive() {
+    const monthKeys = [];
+    const base = parseDay(TODAY);
+    for (let i = 4; i >= 0; i -= 1) {
+      const d = new Date(base.getFullYear(), base.getMonth() - i, 1);
+      monthKeys.push(d.getFullYear() + '-' + pad2(d.getMonth() + 1));
+    }
+    const templates = {
+      app: [
+        ['业务系统版本发布', '变更', '重要'],
+        ['核心接口联调验证', '开发', '重要'],
+        ['应用服务健康巡检', '巡检', '一般'],
+        ['数据库慢查询治理', '变更', '重要'],
+        ['生产环境补丁验证', '变更', '一般'],
+        ['日志平台索引维护', '操作', '一般'],
+        ['缓存策略调整', '开发', '重要'],
+        ['批量任务异常处理', '操作', '一般']
+      ],
+      comm: [
+        ['核心交换机巡检', '巡检', '重要'],
+        ['防火墙策略变更', '变更', '紧急'],
+        ['网络链路割接', '操作', '重要'],
+        ['端口流量核对', '操作', '一般'],
+        ['语音网关版本升级', '变更', '一般'],
+        ['无线覆盖优化', '操作', '一般'],
+        ['通信机房环境巡检', '巡检', '一般'],
+        ['路由策略收敛', '变更', '重要']
+      ],
+      online: [
+        ['在线监测平台巡检', '巡检', '一般'],
+        ['终端设备抽检', '巡检', '一般'],
+        ['监测数据补录', '操作', '一般'],
+        ['误报规则收敛', '变更', '重要'],
+        ['数据一致性核对', '操作', '一般'],
+        ['采集链路健康检查', '巡检', '一般'],
+        ['终端策略下发', '变更', '重要'],
+        ['在线率异常处置', '操作', '重要']
+      ],
+      infra: [
+        ['核心机房环境巡检', '巡检', '重要'],
+        ['UPS 电池组测试', '巡检', '重要'],
+        ['机房空调系统检测', '维保', '一般'],
+        ['配电柜巡检', '巡检', '一般'],
+        ['消防联动测试', '维保', '重要'],
+        ['门禁与监控检查', '巡检', '一般'],
+        ['蓄电池内阻检测', '维保', '一般'],
+        ['动力环境告警处置', '操作', '紧急']
+      ]
+    };
+    const actualByGroup = {};
+    const actualByOwner = {};
+    data.tasks.forEach(function (task) {
+      if (task.canceled || task.draft) return;
+      (task.subs || []).forEach(function (sub) {
+        if (sub.status !== '已完成' || !sub.completedAt) return;
+        const groupId = sub.group || task.group;
+        const key = String(sub.completedAt).slice(0, 7) + '|' + groupId;
+        actualByGroup[key] = (actualByGroup[key] || 0) + 1;
+        actualByOwner[key + '|' + (sub.owner || '')] = (actualByOwner[key + '|' + (sub.owner || '')] || 0) + 1;
+      });
+    });
+    const archiveByGroup = {};
+    const archiveByOwner = {};
+    data.personalArchive.forEach(function (item) {
+      const key = String(item.completedAt || '').slice(0, 7) + '|' + item.group;
+      archiveByGroup[key] = (archiveByGroup[key] || 0) + 1;
+      archiveByOwner[key + '|' + (item.owner || '')] = (archiveByOwner[key + '|' + (item.owner || '')] || 0) + 1;
+    });
+
+    data.groups.forEach(function (group, groupIndex) {
+      const pool = data.staff.filter(function (p) { return p.group === group.id; });
+      if (!pool.length) return;
+      const manager = group.manager;
+      const managerTrend = roleTrend[manager] || [];
+      const hasManagerTrend = managerTrend.length > 0;
+      const others = pool.filter(function (p) { return p.name !== manager; });
+      const fallback = hasManagerTrend && others.length ? others : pool;
+      const list = templates[group.id] || templates.app;
+
+      monthKeys.forEach(function (monthKey, monthIndex) {
+        const target = (teamTrend[group.id] || [])[monthIndex] || 0;
+        const actualKey = monthKey + '|' + group.id;
+        const need = Math.max(0, target - (actualByGroup[actualKey] || 0) - (archiveByGroup[actualKey] || 0));
+        const managerActual = actualByOwner[actualKey + '|' + manager] || 0;
+        const managerArchived = archiveByOwner[actualKey + '|' + manager] || 0;
+        const managerNeed = Math.max(0, Math.min(need, (managerTrend[monthIndex] || 0) - managerActual - managerArchived));
+
+        for (let i = 0; i < need; i += 1) {
+          const seq = (archiveByGroup[actualKey] || 0) + i + 1;
+          const template = list[(seq + monthIndex * 3 + groupIndex) % list.length];
+          const day = 1 + ((seq * 5 + monthIndex * 7 + groupIndex * 3) % 27);
+          const hour = 9 + ((seq * 3 + groupIndex) % 9);
+          const minute = (seq * 17 + monthIndex * 11) % 60;
+          const owner = i < managerNeed
+            ? manager
+            : fallback[(i - managerNeed) % fallback.length].name;
+          const completedAt = monthKey + '-' + pad2(day) + ' ' + pad2(hour) + ':' + pad2(minute);
+          const due = monthKey + '-' + pad2(day) + ' ' + pad2(Math.min(23, hour + 2)) + ':' + pad2(minute);
+          data.personalArchive.push({
+            id: 'ARH-' + monthKey.replace('-', '') + '-' + group.code + '-' + String(seq).padStart(3, '0'),
+            taskId: '',
+            task: template[0],
+            name: template[0] + ' ' + pad2(seq),
+            owner: owner,
+            group: group.id,
+            type: template[1],
+            level: template[2],
+            hours: 2 + ((seq * 3 + monthIndex) % 6),
+            status: '已完成',
+            completedAt: completedAt,
+            due: due,
+            initiator: seq % 4 === 0 ? '张经理' : manager,
+            source: '历史归档'
+          });
+        }
+      });
+    });
+  })();
+
+  /* 演示时钟跟随系统后，避免出现“未来消息”：晚于当前演示时间的消息回拨到当前时间之前。 */
+  (function clampFutureMessages() {
+    const now = parseDay(DEMO_NOW.slice(0, 10));
+    const parts = DEMO_NOW.slice(11, 16).split(':');
+    now.setHours(Number(parts[0]), Number(parts[1]), 0, 0);
+    let changed = false;
+    data.messages.forEach(function (message, index) {
+      const time = String(message.time || '');
+      if (!time || time <= DEMO_NOW) return;
+      const d = new Date(now.getTime() - (8 + index * 9) * 60000);
+      message.time = dayKey(d) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+      changed = true;
+    });
+    if (changed) {
+      data.messages.sort(function (a, b) { return String(b.time).localeCompare(String(a.time)); });
+    }
+  })();
+
+  /* 演示时钟跟随系统后，避免出现“未来日志”：晚于当前演示时间的日志回拨到当前时间之前。 */
+  (function clampFutureLogs() {
+    const now = parseDay(DEMO_NOW.slice(0, 10));
+    const parts = DEMO_NOW.slice(11, 16).split(':');
+    now.setHours(Number(parts[0]), Number(parts[1]), 0, 0);
+    data.logs.forEach(function (log, index) {
+      const time = String(log.time || '');
+      if (!time || time <= DEMO_NOW) return;
+      const d = new Date(now.getTime() - (3 + index * 4) * 60000);
+      log.time = dayKey(d) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    });
+    data.logs.sort(function (a, b) { return String(b.time).localeCompare(String(a.time)); });
+  })();
+
+  /* 驾驶舱当前超期按演示时间实时计算；SLA 仍保留近 30 天口径。 */
+  (function syncCurrentOverdue() {
+    const now = parseDay(DEMO_NOW.slice(0, 10));
+    const clock = DEMO_NOW.slice(11, 16).split(':');
+    now.setHours(Number(clock[0]), Number(clock[1]), 0, 0);
+    let overdue = 0;
+    data.tasks.forEach(function (task) {
+      if (task.canceled || task.draft) return;
+      (task.subs || []).forEach(function (sub) {
+        if (['已完成', '已取消', '草稿'].indexOf(sub.status) > -1) return;
+        const due = new Date(String(sub.due || '').replace(/-/g, '/'));
+        if (!isNaN(due.getTime()) && due < now) overdue += 1;
+      });
+    });
+    data.dashboard.overdue = overdue;
+    data.dashboard.health.overdue = overdue;
+    data.dashboard.health.normal = Math.max(0, data.dashboard.active - data.dashboard.health.dueSoon - overdue);
+  })();
+
   data.duty.weeks = buildDutyWeeks(TODAY, data.duty);
   const dutyMonday = mondayOf(parseDay(TODAY));
   data.duty.currentKey = dayKey(dutyMonday);
   const dutyNextMonday = new Date(dutyMonday.getFullYear(), dutyMonday.getMonth(), dutyMonday.getDate() + 7);
   data.duty.nextKey = dayKey(dutyNextMonday);
+
+  /* 值班表：通信组一套人员，4 个角色按周轮换，外协 3 人轮换。 */
+  (function seedDutyRosters() {
+    const META = [
+      { key: '应急', post: '通信值班-应急', code: 'TX-YJ' },
+      { key: '线路', post: '通信值班-线路', code: 'TX-XL' },
+      { key: '网络', post: '通信值班-网络', code: 'TX-WL' },
+      { key: '桌面', post: '通信值班-桌面', code: 'TX-ZM' }
+    ];
+    data.duty.weeks.forEach(function (w) {
+      const assistant = data.staff.find(function (p) { return p.name === '赵主管'; }) || {};
+      const roster = [{ post: '通信助理', code: 'TX-ZL', name: '赵主管', phone: assistant.phone || '' }];
+      META.forEach(function (meta, k) {
+        const name = (w.team || [])[k];
+        if (!name) return;
+        const person = data.staff.find(function (p) { return p.name === name; }) || {};
+        roster.push({ post: meta.post, code: meta.code, name: name, phone: person.phone || '' });
+      });
+      if (w.external) {
+        roster.push({
+          post: '工程公司项目部通讯技术助理', code: '',
+          name: w.external.name, phone: w.external.phone, external: true
+        });
+      }
+      w.dutyRoster = roster;
+      delete w.team;
+      delete w.external;
+    });
+  })();
+
+  /* 值班出勤：待命不计，出勤按天 8h；本周只生成今天及以前。 */
+  (function seedDutyCalls() {
+    const currentIdx = data.duty.weeks.findIndex(function (w) { return w.key === data.duty.currentKey; });
+    const roles = ['应急', '线路', '网络', '桌面'];
+    const reasons = [
+      '核心交换机端口异常，现场处置',
+      '主干链路告警，现场排查',
+      '机房空调告警，现场复位',
+      '视频会议终端故障，现场支持',
+      'UPS 电池组告警，现场确认',
+      '无线覆盖异常，现场优化'
+    ];
+    const today = parseDay(TODAY);
+    let seq = 0;
+    data.duty.weeks.forEach(function (w, wi) {
+      if (wi > currentIdx) return;
+      const isCurrent = wi === currentIdx;
+      const maxDay = isCurrent ? Math.max(0, Math.round((today - parseDay(w.start)) / 86400000)) : 6;
+      const dayPool = [0, 1, 2, 3, 4, 5, 6].filter(function (d) { return d <= maxDay; });
+      const count = isCurrent ? Math.min(2, dayPool.length) : 4 + ((wi % 3 + 3) % 3);
+      dayPool.slice(0, count).forEach(function (d, k) {
+        const role = roles[(k + ((wi % 4) + 4) % 4) % 4];
+        const row = (w.dutyRoster || []).find(function (r) { return r.post.indexOf('通信值班-' + role) > -1; });
+        if (!row) return;
+        const base = parseDay(w.start);
+        const date = dayKey(new Date(base.getFullYear(), base.getMonth(), base.getDate() + d));
+        seq += 1;
+        data.duty.calls.push({
+          id: 'DC-' + String(seq).padStart(3, '0'),
+          weekKey: w.key,
+          date: date,
+          person: row.name,
+          role: role,
+          reason: reasons[(seq + wi) % reasons.length],
+          hours: 8
+        });
+      });
+    });
+  })();
+
+  /* 值班交接按 R-05 口径默认已完成；页面不再提供交接区块。 */
+  (function seedDutyHandover() {
+    data.duty.weeks.forEach(function (w) {
+      w.handover = {
+        status: '已完成', note: '', tasks: [],
+        submittedAt: w.start + ' 08:00', submittedBy: '赵主管',
+        confirmedAt: w.start + ' 08:06', confirmedBy: '赵主管'
+      };
+    });
+  })();
 
   /* 自定义字段演示值：列表型字段全部填满，详情型字段保留部分填写。 */
   (function seedFieldDemo() {
@@ -1043,10 +1596,6 @@ window.ITO_DATA = (() => {
         });
       });
     });
-    (data.tasks || []).slice(0, 24).forEach(function (task, i) {
-      const impacts = [['KNS', 'KCC'], ['KDN'], ['终端', 'KNS'], ['KCC', 'KDN']][i % 4];
-      task.extra = Object.assign({}, task.extra, { impactSystem: impacts.join('、') });
-    });
     (data.inspectionPlans || []).forEach(function (plan, i) {
       plan.extra = Object.assign({}, plan.extra, { pointNo: 'IP-A-' + String(i + 1).padStart(2, '0') });
     });
@@ -1064,9 +1613,6 @@ window.ITO_DATA = (() => {
     });
     (data.maintenanceRecords || []).slice(0, 3).forEach(function (record, i) {
       record.extra = Object.assign({}, record.extra, { recheckDate: addDays(30 + i * 15) });
-    });
-    (data.duty.weeks || []).forEach(function (week, i) {
-      week.extra = Object.assign({}, week.extra, { handoverBy: week.person || (data.staff[i % data.staff.length] || {}).name || '值班主管' });
     });
     (data.duty.weeks || []).slice(0, 3).forEach(function (week, i) {
       week.extra = Object.assign({}, week.extra, {
@@ -1104,6 +1650,10 @@ window.ITO_DATA = (() => {
     if (!sub || !sub.id) return;
     const budget = Number(sub.hours) || 0;
     if (!budget || sub.status === '已取消') { sub.workLogs = []; return; }
+    if (Array.isArray(sub.workLogs) && sub.workLogs.length) {
+      sub.actualHours = Math.round(sub.workLogs.reduce(function (n, l) { return n + (Number(l.hours) || 0); }, 0) * 2) / 2;
+      return;
+    }
     const rng = seededRandom(hashSeed(sub.id + '|' + (sub.owner || '')));
     const progress = Math.min(100, Math.max(0, Number(sub.progress) || 0));
     const done = sub.status === '已完成';
@@ -1147,9 +1697,157 @@ window.ITO_DATA = (() => {
     sub.actualHours = Math.round(sub.workLogs.reduce(function (n, l) { return n + l.hours; }, 0) * 2) / 2;
   }
 
+  /* 工时补齐：给当前没有任务的实际执行人补一条组内任务子项，避免工时表整行为 0。 */
+  (function seedIdleStaffTasks() {
+    const plan = [
+      { taskId: 'T10024', id: 'T10024-03', name: '在线监测终端抽检', group: 'online', owner: '田工', hours: 6, progress: 60, days: 2 },
+      { taskId: 'T10024', id: 'T10024-04', name: '采集链路健康检查', group: 'online', owner: '董工', hours: 6, progress: 70, days: 2 },
+      { taskId: 'T10027', id: 'T10027-04', name: '机房环境巡检记录补录', group: 'infra', owner: '蔡工', hours: 5, progress: 80, days: 3 },
+      { taskId: 'T10027', id: 'T10027-05', name: 'UPS 电池组内阻检测协助', group: 'infra', owner: '余工', hours: 8, progress: 50, days: 3 },
+      { taskId: 'T10027', id: 'T10027-06', name: '配电柜标识核对与整改', group: 'infra', owner: '杜工', hours: 4, progress: 100, days: 4 },
+      { taskId: 'T10027', id: 'T10027-07', name: '消防联动测试记录复核', group: 'infra', owner: '叶工', hours: 6, progress: 40, days: 4 }
+    ];
+    const today = parseDay(TODAY);
+    plan.forEach(function (p) {
+      const task = data.tasks.find(function (t) { return t.id === p.taskId; });
+      if (!task || (task.subs || []).some(function (s) { return s.id === p.id; })) return;
+      const dueDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + p.days);
+      const sub = {
+        id: p.id, name: p.name, group: p.group, owner: p.owner, initiator: task.initiator,
+        level: '一般', type: '操作', status: p.progress >= 100 ? '已完成' : '执行中',
+        due: dayKey(dueDate) + ' 18:00', hours: p.hours, progress: p.progress,
+        auth: '无需授权', ticket: false
+      };
+      const total = Math.round(p.hours * p.progress / 100 * 2) / 2;
+      if (total > 0) {
+        const logs = [];
+        const parts = total > 4 ? 2 : 1;
+        for (let i = 0; i < parts; i += 1) {
+          const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (i + 1));
+          logs.push({ date: dayKey(d), hours: Math.round(total / parts * 2) / 2 });
+        }
+        sub.workLogs = logs;
+        sub.actualHours = Math.round(logs.reduce(function (n, l) { return n + l.hours; }, 0) * 2) / 2;
+        if (sub.status === '已完成') sub.completedAt = logs[0].date + ' 17:30';
+      }
+      task.subs.push(sub);
+    });
+  })();
+
   data.tasks.forEach(function (task) {
     (task.subs || []).forEach(seedWorkLogs);
   });
+
+  /* 工时重排：按人补齐任务子项，把周 / 月负载拉到可展示区间。 */
+  (function rebalanceWorkload() {
+    const today = parseDay(TODAY);
+    const dow = (today.getDay() + 6) % 7;
+    const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - dow);
+    const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6);
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const ws = dayKey(weekStart), we = dayKey(weekEnd);
+    const inWeek = function (d) { return d && d >= ws && d <= we; };
+    const inMonth = function (d) { return d && String(d).slice(0, 7) === TODAY.slice(0, 7); };
+    const templates = {
+      app: ['应用系统巡检', '接口联调验证', '版本回归测试', '权限与账号核对'],
+      comm: ['通信链路巡检', '设备配置备份', '割接前准备', '语音网关检查'],
+      online: ['监测终端抽检', '采集链路检查', '告警规则核对', '监测数据补录'],
+      infra: ['机房环境巡检', 'UPS 电池组检查', '空调系统维护', '配电柜核对']
+    };
+    const loadOf = function (person) {
+      let week = 0, month = 0;
+      data.tasks.forEach(function (task) {
+        (task.subs || []).forEach(function (sub) {
+          if (sub.owner !== person.name) return;
+          const logs = sub.workLogs || [];
+          logs.forEach(function (log) {
+            if (inWeek(log.date)) week += Number(log.hours) || 0;
+            if (inMonth(log.date)) month += Number(log.hours) || 0;
+          });
+          if (sub.status !== '已完成') {
+            const rem = Math.max(0, (Number(sub.hours) || 0) - logs.reduce(function (n, l) { return n + (Number(l.hours) || 0); }, 0));
+            if (inWeek(sub.due)) week += rem;
+            if (inMonth(sub.due)) month += rem;
+          }
+        });
+      });
+      return { week: week, month: month };
+    };
+    const addSub = function (person, templateIndex, hours, dueDate, logDates) {
+      const candidates = data.tasks.filter(function (t) {
+        return !t.canceled && !t.draft && t.group === person.group;
+      });
+      if (!candidates.length) return;
+      const task = candidates[(templateIndex + person.uid.length) % candidates.length];
+      const tpl = templates[person.group] || templates.app;
+      const seq = task.subs.filter(function (s) { return s.id.indexOf('AUTO-' + person.uid) === 0; }).length + 1;
+      const total = Math.max(1, Math.round(hours));
+      const logs = [];
+      const parts = logDates.length;
+      if (parts) {
+        const per = Math.round(total * 0.55 / parts * 2) / 2;
+        logDates.forEach(function (d) { logs.push({ date: dayKey(d), hours: per }); });
+        const diff = Math.round((total - per * parts) * 2) / 2;
+        if (diff > 0) logs[logs.length - 1].hours = Math.round((logs[logs.length - 1].hours + diff) * 2) / 2;
+      }
+      const actual = logs.reduce(function (n, l) { return n + l.hours; }, 0);
+      const sub = {
+        id: 'AUTO-' + person.uid + '-' + seq,
+        name: tpl[(templateIndex + seq) % tpl.length] + ' ' + pad2(seq),
+        group: person.group,
+        owner: person.name,
+        initiator: task.initiator || '赵主管',
+        level: '一般',
+        type: '操作',
+        status: '执行中',
+        due: dayKey(dueDate) + ' 18:00',
+        hours: total,
+        progress: Math.round(actual / total * 100),
+        auth: '无需授权',
+        ticket: false,
+        workLogs: logs,
+        actualHours: actual
+      };
+      task.subs.push(sub);
+    };
+
+    data.staff.forEach(function (person, index) {
+      let cur = loadOf(person);
+      const targetWeek = 22 + (index % 3) * 3;
+      const targetMonth = (index % 17 === 0) ? 158 : 95 + (index % 5) * 5;
+
+      /* 本周补齐：due 落在本周，工时流水也落在本周。 */
+      const weekNeed = Math.max(0, targetWeek - cur.week);
+      if (weekNeed >= 4) {
+        const logDates = [];
+        const y = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+        const day1 = y >= weekStart ? y : today;
+        logDates.push(day1);
+        if (dayKey(day1) !== dayKey(today)) logDates.push(today);
+        addSub(person, index, weekNeed, weekEnd, logDates);
+        cur = loadOf(person);
+      }
+
+      /* 月度补齐：due 放在下周或本月内，工时流水放在本月、尽量避开本周。 */
+      const monthNeed = Math.max(0, targetMonth - cur.month);
+      if (monthNeed >= 6) {
+        const due = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate() + 7);
+        const finalDue = due <= monthEnd ? due : monthEnd;
+        const latest = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - 1);
+        const logDates = [];
+        if (latest >= monthStart) {
+          const span = Math.max(1, Math.round((latest - monthStart) / 86400000));
+          logDates.push(new Date(monthStart.getFullYear(), monthStart.getMonth(), monthStart.getDate() + Math.floor(span * 0.3)));
+          logDates.push(new Date(monthStart.getFullYear(), monthStart.getMonth(), monthStart.getDate() + Math.floor(span * 0.7)));
+        } else {
+          const y = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+          if (y >= monthStart) logDates.push(y);
+        }
+        addSub(person, index + 1, monthNeed, finalDue, logDates);
+      }
+    });
+  })();
 
   const ITO = window.ITO = window.ITO || {};
   ITO.authStatus = function (validTo) {
