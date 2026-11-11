@@ -93,6 +93,21 @@
     return task.subs;
   }
 
+  function taskOverdue(task) {
+    if (!task.subs.length) return U().isOverdue(task);
+    return visibleSubs(task).some(function (s) { return U().isOverdue(s); });
+  }
+
+  function taskLateClosed(task) {
+    if (!task.subs.length) return U().isLateClosed(task);
+    return visibleSubs(task).some(function (s) { return U().isLateClosed(s); });
+  }
+
+  function taskAgeBucket(task) {
+    if (!task.subs.length) return overdueBucket(task);
+    return visibleSubs(task).map(function (s) { return overdueBucket(s); });
+  }
+
   function overdueBucket(sub) {
     if (!U().isOverdue(sub)) return '';
     const hours = (new Date(D.meta.demoNow.replace(/-/g, '/')) - new Date(String(sub.due).replace(/-/g, '/'))) / 3600000;
@@ -109,6 +124,9 @@
 
     if (st.role === 'employee') {
       list = list.filter(function (t) {
+        if (!t.subs.length) {
+          return t.owner === st.user.name && !t.draft && !t.canceled && t.status !== '已取消';
+        }
         return t.subs.some(function (s) {
           return s.owner === st.user.name && ['草稿', '待分发', '已取消'].indexOf(s.status) === -1;
         });
@@ -121,9 +139,7 @@
     if (f.status === '草稿') {
       list = list.filter(function (t) { return t.draft; });
     } else if (f.status === '超期') {
-      list = list.filter(function (t) {
-        return visibleSubs(t).some(function (s) { return U().isOverdue(s) || U().isLateClosed(s); });
-      });
+      list = list.filter(function (t) { return taskOverdue(t) || taskLateClosed(t); });
     } else if (f.status) {
       list = list.filter(function (t) { return U().displayStatus(t) === f.status; });
     }
@@ -135,7 +151,8 @@
     }
     if (f.age) {
       list = list.filter(function (t) {
-        return visibleSubs(t).some(function (s) { return overdueBucket(s) === f.age; });
+        const buckets = taskAgeBucket(t);
+        return Array.isArray(buckets) ? buckets.indexOf(f.age) > -1 : buckets === f.age;
       });
     }
     if (ITO.customFieldMatch && f.custom && Object.keys(f.custom).some(function (k) { return !!f.custom[k]; })) {
@@ -166,11 +183,16 @@
       if (ds === '已完成') completed += 1;
       if (ds === '审批中') approval += 1;
       if (ds === '已挂起') hung += 1;
-      visibleSubs(t).forEach(function (s) {
-        subs += 1;
-        if (U().isOverdue(s)) overdue += 1;
-        if (U().isLateClosed(s)) late += 1;
-      });
+      if (!t.subs.length) {
+        if (taskOverdue(t)) overdue += 1;
+        if (taskLateClosed(t)) late += 1;
+      } else {
+        visibleSubs(t).forEach(function (s) {
+          subs += 1;
+          if (U().isOverdue(s)) overdue += 1;
+          if (U().isLateClosed(s)) late += 1;
+        });
+      }
     });
     return { main: list.length, subs: subs, overdue: overdue, late: late, allOverdue: overdue + late, approval: approval, hung: hung, drafts: drafts, canceled: canceled, completed: completed };
   }
@@ -282,6 +304,7 @@
   function editAction(task) {
     const st = S();
     if (!st.user) return '';
+    if (!task.subs.length) return '';
     if (ITO.roleIs('leader', 'manager')) {
       if (U().mainStatus(task) === '已完成') return '';
       const enabled = canEditTask(task);
@@ -706,7 +729,7 @@
         foot += '<button class="btn btn-primary" data-draft-edit type="button">编辑草稿</button>';
       }
     } else {
-      if (canEditTask(t) && !closedView) {
+      if (canEditTask(t) && t.subs.length && !closedView) {
         foot += '<button class="btn btn-soft" data-edit-task type="button">编辑任务</button>';
       }
       if (t.mode === 'single' && U().isTaskEditable(t) && t.subs[0] && ['待分发', '执行中'].indexOf(t.subs[0].status) > -1 && canManage(t)) {
@@ -1297,7 +1320,7 @@
           const proceed = function () {
           const cf = ITO.readCustomFields ? ITO.readCustomFields(root, 'task', editing ? editing.extra : null) : { values: {}, errors: [] };
           if (cf.errors.length) { U().toast(cf.errors[0], 'warn'); return; }
-          const baseId = editing ? editing.id : 'T' + (st.taskSeq++);
+          const baseId = editing ? editing.id : ITO.nextTaskId();
           let subs;
           if (currentMode === 'single') {
             const existing = editing && editing.subs[0];
@@ -2433,6 +2456,19 @@
     const rows = [['主任务编号', '主任务', '模式', '任务编号', '任务', '专业组', '发起人', '任务来源', '负责人', '执行人', '等级', '状态', '完成时间', '审批状态', '审批意见', '授权', '需要开票', '标签', '截止时间', '成果物数量', '成果物文件', '提交说明', '提交版本', '汇总附件数量', '汇总附件', '汇总说明'].concat(customHeaders)];
     list.forEach(function (t) {
       const summaryRec = window.DeliverableStore ? window.DeliverableStore.getLatestSummary(t.id) : null;
+      if (!t.subs.length) {
+        rows.push([
+          t.id, t.name, modeLabel(t), t.id, t.name, (ITO.getGroup(t.group) || {}).name,
+          t.initiator || '', sourceLabel(t), t.owner, t.owner, t.level, U().displayStatus(t),
+          t.completedAt || '—', '—', '—', '—', '否',
+          (t.tags || []).join(' / '), t.due,
+          summaryRec ? summaryRec.files.length : 0,
+          summaryRec ? summaryRec.files.map(function (f) { return f.name; }).join(' / ') : '',
+          summaryRec ? summaryRec.note : ''
+        ].concat(ITO.customFieldExport ? ITO.customFieldExport('task', t) : [])
+          .concat(ITO.customFieldExport ? ITO.customFieldExport('task', t, 'sub') : []));
+        return;
+      }
       visibleSubs(t).forEach(function (s) {
         const rec = window.DeliverableStore ? window.DeliverableStore.getLatestSubmission(s.id) : null;
         rows.push([

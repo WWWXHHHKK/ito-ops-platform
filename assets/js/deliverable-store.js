@@ -9,7 +9,7 @@
 
   const DB_NAME = 'ito-deliverables-v3';
   const DB_VERSION = 1;
-  const SEED_VERSION = '2026-11-04-v3';
+  const SEED_VERSION = '2026-11-12-v4';
   const SAMPLE_BASE = 'assets/samples/deliverables/';
 
   const state = {
@@ -335,11 +335,14 @@
 
   async function seedSamples() {
     let failures = 0;
+    const idMap = window.ITO_TASK_ID_MAP || {};
     for (let i = 0; i < SEEDS.length; i += 1) {
       const item = SEEDS[i];
+      const taskId = idMap[item.taskId] || item.taskId;
+      const subId = item.subId ? (idMap[item.subId] || item.subId) : '';
       if (item.summary) {
-        if (state.summaries.has(item.taskId)) continue;
-      } else if (state.submissions.has(item.subId)) {
+        if (state.summaries.has(taskId)) continue;
+      } else if (state.submissions.has(subId)) {
         continue;
       }
       try {
@@ -366,8 +369,8 @@
           submittedAt: item.submittedAt,
           files: blobs
         };
-        if (item.summary) await saveSummary(item.taskId, payload);
-        else await saveSubmission(item.subId, item.taskId, payload);
+        if (item.summary) await saveSummary(taskId, payload);
+        else await saveSubmission(subId, taskId, payload);
       } catch (err) {
         failures += 1;
         if (window.console && console.warn) console.warn('[deliverables] seed skipped:', err.message);

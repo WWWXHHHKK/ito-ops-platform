@@ -8,7 +8,7 @@
 
   window.ITO = window.ITO || {};
   const D = window.ITO_DATA;
-  const BUILD_VERSION = '20261112z23';
+  const BUILD_VERSION = '20261112z25';
   const DATA_SOURCE = window.ITO_DATA_SOURCE;
   const PERSIST_KEYS = [
     'tasks', 'personalArchive', 'messages', 'logs', 'staff', 'groups', 'auths',
@@ -284,7 +284,7 @@
     if (task.canceled) return '已取消';
     if (task.draft) return '草稿';
     if (task.summaryRework) return '执行中';
-    if (!subs.length) return '待分发';
+    if (!subs.length) return task.status || '待分发';
     if (subs.every((s) => s.status === '已取消')) return '已取消';
     if (subs.every((s) => s.status === '已完成')) return '已完成';
     if (subs.some((s) => s.status === '已挂起')) return '已挂起';
@@ -296,7 +296,7 @@
   }
 
   function mainProgress(task) {
-    if (!task.subs.length) return 0;
+    if (!task.subs.length) return Number(task.progress) || 0;
     return Math.round(task.subs.reduce((n, s) => n + (s.progress || 0), 0) / task.subs.length);
   }
 
@@ -1471,6 +1471,16 @@
     return list;
   }
 
+  function nextTaskId() {
+    const prefix = 'TS-' + String(D.meta.today || '').slice(0, 7).replace('-', '') + '-';
+    let max = 0;
+    state.tasks.forEach(function (t) {
+      if (String(t.id).indexOf(prefix) !== 0) return;
+      max = Math.max(max, Number(String(t.id).slice(prefix.length)) || 0);
+    });
+    return prefix + String(max + 1).padStart(4, '0');
+  }
+
   function ensureAudit(obj, at, by, label) {
     if (!obj) return;
     obj.createdAt = obj.createdAt || at;
@@ -1670,10 +1680,7 @@
 
     /* 统一“新建内容置顶、历史内容倒序”的展示顺序 */
     state.tasks.sort(function (a, b) {
-      const aInactive = !!(a.canceled || a.draft);
-      const bInactive = !!(b.canceled || b.draft);
-      if (aInactive !== bInactive) return aInactive ? 1 : -1;
-      return idNum(b.id, 'T') - idNum(a.id, 'T');
+      return String(b.id).localeCompare(String(a.id));
     });
     sortNewest(state.messages, function (m) { return m.time; });
     sortNewest(state.logs, function (l) { return l.time; });
@@ -1915,6 +1922,7 @@
     leaderApprovalOf, isLeaderApprovalPending, normalizeApprovals, groupManagerName
   };
   ITO.go = go;
+  ITO.nextTaskId = nextTaskId;
   ITO.refresh = refresh;
   ITO.log = log;
   ITO.persistState = persistState;

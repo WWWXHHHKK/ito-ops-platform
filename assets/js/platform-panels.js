@@ -45,9 +45,14 @@
 
   const shortDate = value => String(value || '').slice(5, 10).replace('-', '/');
 
-  const pending = D.tasks.reduce((n, task) => n + task.subs.filter(sub =>
-    sub.status === '待分发' || sub.status === '审批中' || sub.status === '已挂起'
-  ).length, 0) + D.tasks.filter(task =>
+  const pending = D.tasks.reduce((n, task) => {
+    if (!task.subs.length) {
+      return n + (['待分发', '审批中', '已挂起'].indexOf(task.status) > -1 ? 1 : 0);
+    }
+    return n + task.subs.filter(sub =>
+      sub.status === '待分发' || sub.status === '审批中' || sub.status === '已挂起'
+    ).length;
+  }, 0) + D.tasks.filter(task =>
     task.leaderApproval && (task.leaderApproval.status === '审批中' || task.leaderApproval.status === '已挂起')
   ).length;
 

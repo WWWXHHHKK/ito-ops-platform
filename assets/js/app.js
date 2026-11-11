@@ -87,6 +87,29 @@
     }
   }
 
+  /* ── SLA metrics ───────────────────────────── */
+  const SLA = window.ITO_DATA && window.ITO_DATA.dashboard && window.ITO_DATA.dashboard.slaMetrics;
+  if (SLA) {
+    const setSlaText = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    };
+    const score = Number(SLA.score) || 0;
+    const delta = Number(SLA.delta) || 0;
+    setSlaText('slaScore', score.toFixed(1));
+    setSlaText('slaGrade', '综合得分 · ' + (SLA.grade || '—') + ' 级');
+    setSlaText('slaOnTime', Number(SLA.onTimeRate || 0).toFixed(1) + '%');
+    setSlaText('slaAvg', SLA.avgClosureText || '6h 12m');
+    setSlaText('slaOverdue', Number(SLA.overdueRate || 0).toFixed(1) + '%');
+    setSlaText('slaFootDelta', '11 月 · ' + (delta >= 0 ? '高于目标 ' : '低于目标 ') + Math.abs(delta).toFixed(1) + ' 分');
+    const arc = document.querySelector('.sla-gauge .gauge-value');
+    if (arc) {
+      const circumference = 2 * Math.PI * 54;
+      const arcLength = circumference * 0.75;
+      arc.style.strokeDasharray = (arcLength * Math.max(0, Math.min(100, score)) / 100).toFixed(2) + ' ' + circumference.toFixed(2);
+    }
+  }
+
   /* ── 01 health triage ──────────────────────── */
   const HEALTH = (window.ITO_DATA.dashboard.health) || { normal: 109, dueSoon: 12, overdue: 7 };
   const healthTotal = HEALTH.normal + HEALTH.dueSoon + HEALTH.overdue;
@@ -143,7 +166,7 @@
     return {
       animationDuration: reduceMotion ? 0 : 900,
       animationEasing: 'cubicOut',
-      grid: { left: 40, right: 10, top: 20, bottom: 28 },
+      grid: { left: 40, right: 24, top: 20, bottom: 28 },
       tooltip: {
         trigger: 'axis',
         backgroundColor: 'rgba(3, 18, 36, 0.98)',

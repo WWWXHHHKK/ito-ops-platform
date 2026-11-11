@@ -45,7 +45,7 @@
 
   function autoRectifyTask(group, planName, note, abnormal) {
     const st = S();
-    const id = 'T' + (st.taskSeq++);
+    const id = ITO.nextTaskId();
     const staff = st.staff.filter(function (p) { return p.group === group; });
     const owner = (staff.find(function (p) { return p.tags.indexOf('核心岗') > -1; }) || staff[0] || {}).name || '待指派';
     st.tasks.unshift({

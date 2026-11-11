@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>ITO 智能运维管理平台 · 运维驾驶舱</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%23EB612A'/><text x='50' y='69' font-size='54' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'>I</text></svg>">
-<link rel="stylesheet" href="assets/css/style.css?v=20261112z23" />
+<link rel="stylesheet" href="assets/css/style.css?v=20261112z25" />
 </head>
 <body>
 <div class="stage-shell">
@@ -33,9 +33,9 @@
           <time class="dt-time" id="clock">00:00:00</time>
         </div>
         <div class="ts-row">
-          <span class="ts" data-drill="tasks" tabindex="0" role="link"><i class="dot-green"></i>在办任务 <b id="tsActive">128</b></span>
-          <span class="ts" data-drill="tasks" data-query="status=超期" tabindex="0" role="link"><i class="dot-yellow"></i>超期 <b id="tsOverdue">7</b></span>
-          <span class="ts" data-drill="dispatch" tabindex="0" role="link"><i class="dot-red"></i>待处理 <b id="tsPending">9</b></span>
+          <span class="ts" data-drill="tasks" tabindex="0" role="link"><i class="dot-green"></i>在办任务 <b id="tsActive">238</b></span>
+          <span class="ts" data-drill="tasks" data-query="status=超期" tabindex="0" role="link"><i class="dot-yellow"></i>超期 <b id="tsOverdue">13</b></span>
+          <span class="ts" data-drill="dispatch" tabindex="0" role="link"><i class="dot-red"></i>待处理 <b id="tsPending">18</b></span>
         </div>
       </div>
 
@@ -79,20 +79,20 @@
           </div>
           <div class="panel-body health-body">
             <div class="health-hero" data-drill="tasks" tabindex="0" role="link">
-              <div class="hero-value"><strong id="healthDue">12</strong><em>项</em></div>
+              <div class="hero-value"><strong id="healthDue">8</strong><em>项</em></div>
               <div class="hero-copy"><b>24 小时内到期</b><span>DUE SOON · 优先安排</span></div>
             </div>
             <div class="health-band" aria-hidden="true">
-              <i class="hb-ok" id="hbOk" style="flex:109"></i>
-              <i class="hb-warn" id="hbWarn" style="flex:12"></i>
-              <i class="hb-bad" id="hbBad" style="flex:7"></i>
+              <i class="hb-ok" id="hbOk" style="flex:217"></i>
+              <i class="hb-warn" id="hbWarn" style="flex:8"></i>
+              <i class="hb-bad" id="hbBad" style="flex:13"></i>
             </div>
             <div class="health-legend">
-              <div class="hl-ok" data-drill="tasks" tabindex="0" role="link"><b id="healthNormal">109</b><span>正常</span></div>
-              <div class="hl-warn" data-drill="tasks" tabindex="0" role="link"><b id="healthDueLegend">12</b><span>临期</span></div>
-              <div class="hl-bad" data-drill="tasks" data-query="status=超期" tabindex="0" role="link"><b id="healthOverdue">7</b><span>超期</span></div>
+              <div class="hl-ok" data-drill="tasks" tabindex="0" role="link"><b id="healthNormal">217</b><span>正常</span></div>
+              <div class="hl-warn" data-drill="tasks" tabindex="0" role="link"><b id="healthDueLegend">8</b><span>临期</span></div>
+              <div class="hl-bad" data-drill="tasks" data-query="status=超期" tabindex="0" role="link"><b id="healthOverdue">13</b><span>超期</span></div>
             </div>
-            <div class="health-note"><i class="dot-teal"></i>健康率 <b id="healthRate">85.2%</b> · 较昨日 <b class="up-good">+2</b></div>
+            <div class="health-note"><i class="dot-teal"></i>健康率 <b id="healthRate">91.2%</b> · 较昨日 <b class="up-good">+2</b></div>
           </div>
           <div class="panel-foot"><span>判定窗口 24h</span><span>覆盖 4 个专业组</span></div>
         </section>
@@ -101,15 +101,15 @@
           <div class="panel-head">
             <div class="ph-left"><i class="ph-idx">02</i><h2>任务流量</h2><span class="ph-en">TASK FLOW</span></div>
             <div class="seg" id="trendTabs">
-              <button type="button" class="is-active" data-range="30" aria-pressed="true">近 30 天</button>
+              <button type="button" class="is-active" data-range="30" aria-pressed="true">11 月</button>
               <button type="button" data-range="7" aria-pressed="false">近 7 天</button>
             </div>
           </div>
           <div class="panel-body trend-body">
             <div class="trend-summary">
-              <div data-drill="tasks" tabindex="0" role="link"><span>日均新增</span><b id="trendNew">12.8</b><em class="up">+12.4%</em></div>
-              <div data-drill="tasks" tabindex="0" role="link"><span>日均闭环</span><b id="trendDone">11.4</b><em class="down">-4.1%</em></div>
-              <div data-drill="tasks" tabindex="0" role="link"><span>日均净流入</span><b id="trendNet">+1.4</b><em class="neutral">件 / 天</em></div>
+              <div data-drill="tasks" tabindex="0" role="link"><span>日均新增</span><b id="trendNew">23.3</b><em class="up">+12.4%</em></div>
+              <div data-drill="tasks" tabindex="0" role="link"><span>日均闭环</span><b id="trendDone">15.3</b><em class="down">-4.1%</em></div>
+              <div data-drill="tasks" tabindex="0" role="link"><span>日均净流入</span><b id="trendNet">+7.9</b><em class="neutral">件 / 天</em></div>
             </div>
             <div class="chart-box"><div id="ticketChart" role="img" aria-label="任务新增与闭环趋势折线图"></div></div>
             <div class="chart-legend">
@@ -139,7 +139,7 @@
         <section class="panel panel-sla">
           <div class="panel-head">
             <div class="ph-left"><i class="ph-idx">09</i><h2>任务 SLA</h2><span class="ph-en">TASK SLA</span></div>
-            <span class="head-tag tag-ok"><i class="dot-teal"></i>近 30 天</span>
+            <span class="head-tag tag-ok"><i class="dot-teal"></i>11 月</span>
           </div>
           <div class="panel-body sla-body">
             <div class="sla-gauge-wrap">
@@ -163,18 +163,18 @@
                   <circle class="gauge-value" cx="75" cy="75" r="54" transform="rotate(135 75 75)" stroke="url(#slaGrad)" filter="url(#slaGlow)" style="stroke-dasharray:234.11 339.29"/>
                 </svg>
                 <div class="gauge-center" title="SLA 综合得分 = 按期闭环率×60% + 超期控制率×25% + 时效达成率×15%">
-                  <strong>92.0</strong><span>分</span>
+                  <strong id="slaScore">92.0</strong><span>分</span>
                 </div>
               </div>
-              <div class="sla-grade">综合得分 · A 级</div>
+              <div class="sla-grade" id="slaGrade">综合得分 · A 级</div>
             </div>
             <div class="sla-metrics">
-              <div class="sla-metric" data-drill="tasks" tabindex="0" role="link"><span>按期闭环率</span><b>89.0%</b><em class="up-good">+2.1%</em></div>
-              <div class="sla-metric" data-drill="tasks" tabindex="0" role="link"><span>平均闭环时长</span><b>6h 12m</b><em class="down">-0.4h</em></div>
-              <div class="sla-metric" data-drill="tasks" data-query="status=超期" tabindex="0" role="link" title="超期率按近 30 天已闭环与在办口径计算"><span>超期率 · 30天</span><b>5.5%</b><em class="down">-0.8%</em></div>
+              <div class="sla-metric" data-drill="tasks" tabindex="0" role="link"><span>按期闭环率</span><b id="slaOnTime">89.0%</b><em class="up-good">+2.1%</em></div>
+              <div class="sla-metric" data-drill="tasks" tabindex="0" role="link"><span>平均闭环时长</span><b id="slaAvg">6h 12m</b><em class="down">-0.4h</em></div>
+              <div class="sla-metric" data-drill="tasks" data-query="status=超期" tabindex="0" role="link" title="超期率按近 30 天已闭环与在办口径计算"><span>超期率 · 11月</span><b id="slaOverdue">5.5%</b><em class="down">-0.8%</em></div>
             </div>
           </div>
-          <div class="panel-foot"><span><i class="dot-teal"></i>综合目标 90 分</span><span>近 30 天 · 高于目标 2.0 分</span></div>
+          <div class="panel-foot"><span><i class="dot-teal"></i>综合目标 90 分</span><span id="slaFootDelta">11 月 · 高于目标 2.0 分</span></div>
         </section>
 
         <section class="panel panel-res">
@@ -202,7 +202,7 @@
       <div class="ticker-label"><i></i>运维快讯<em>OPS WIRE</em></div>
       <div class="ticker-viewport">
         <div class="ticker-track" id="tickerTrack">
-          <span>T10027-03 UPS 电池组测试超期，已升级基础设施组</span><b>◆</b>
+          <span>11 月超期任务 13 项，已按等级升级专业组处置</span><b>◆</b>
           <span>IR-1026 网络设备日检发现 2 项异常，已生成整改任务</span><b>◆</b>
           <span data-ticker="duty">本周值班：李工 · 下周值班：陈工 · 周一 08:00 交接</span><b>◆</b>
           <span>吴工工作班成员授权已过期，请及时续期</span><b>◆</b>
@@ -218,11 +218,12 @@
 <div class="topo-tip" id="topoTip" role="tooltip" aria-hidden="true"></div>
 
 <script src="vendor/echarts.min.js"></script>
-<script src="assets/js/ito-data.js?v=20261112z23"></script>
-<script src="assets/js/ito-data-source.js?v=20261112z23"></script>
-<script src="assets/js/platform-panels.js?v=20261112z23"></script>
-<script src="assets/js/app.js?v=20261112z23"></script>
-<script src="assets/js/center-demo.js?v=20261112z23"></script>
+<script src="assets/js/ito-data.js?v=20261112z25"></script>
+<script src="assets/js/task-volume-data.js?v=20261112z25"></script>
+<script src="assets/js/ito-data-source.js?v=20261112z25"></script>
+<script src="assets/js/platform-panels.js?v=20261112z25"></script>
+<script src="assets/js/app.js?v=20261112z25"></script>
+<script src="assets/js/center-demo.js?v=20261112z25"></script>
 </body>
 </html>
 

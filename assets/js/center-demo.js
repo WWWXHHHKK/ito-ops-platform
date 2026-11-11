@@ -19,41 +19,45 @@
   const now = parse(D.meta.demoNow);
 
   /* ── 30-day flow ───────────────────────────── */
+  const flowNumber = function (value, fallback) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+  };
   const FLOW = {
-    opening: Number(D.dashboard.openingBacklog) || 86,
-    created: Number(D.dashboard.newTasks) || 384,
-    closed: Number(D.dashboard.closed) || 342,
-    active: Number(D.dashboard.active) || 128
+    opening: flowNumber(D.dashboard.openingBacklog, 0),
+    created: flowNumber(D.dashboard.newTasks, 0),
+    closed: flowNumber(D.dashboard.closed, 0),
+    active: flowNumber(D.dashboard.active, 0)
+  };
+  const NOV_ACTIVE = (D.tasks || []).filter(function (t) {
+    return t.id.slice(3, 9) === '202611' && !t.draft && t.status !== '已完成' && t.status !== '已取消';
+  });
+  const stageCount = function (name) {
+    return NOV_ACTIVE.filter(function (t) { return (t.status || '') === name; }).length;
   };
   const STAGE = [
-    { name: '待分发', queue: 3, dwell: '1.8h', tone: 'ok' },
-    { name: '审批中', queue: 6, dwell: '3.4h', tone: 'warn' },
-    { name: '执行中', queue: 119, dwell: '6.1h', tone: 'ok' },
-    { name: '待汇总', queue: 0, dwell: '0.8h', tone: 'ok' }
+    { name: '待分发', queue: stageCount('待分发'), dwell: '1.8h', tone: 'ok' },
+    { name: '审批中', queue: stageCount('审批中'), dwell: '3.4h', tone: 'warn' },
+    { name: '执行中', queue: stageCount('执行中'), dwell: '6.1h', tone: 'ok' },
+    { name: '待汇总', queue: stageCount('待汇总'), dwell: '0.8h', tone: 'ok' }
   ];
 
   function stageQueues() {
-    return STAGE.map(function (stage) {
-      return Object.assign({}, stage, {
-        queue: stage.name === '执行中' ? Math.max(0, FLOW.active - 9) : stage.queue
-      });
-    });
+    return STAGE.map(function (stage) { return Object.assign({}, stage); });
   }
 
   /* ── 07 overdue aging ─────────────────────── */
-  const overdueSubs = D.tasks.reduce((list, task) => list.concat(task.subs), [])
-    .filter(sub => sub.status !== '已完成' && sub.status !== '已取消' && parse(sub.due) < now);
-  const overdueAges = overdueSubs.map(sub => (now - parse(sub.due)) / 3600000);
   const AGE_BUCKETS = [
     { key: 'lt1', label: '<1 天', min: 0, max: 24, cls: '' },
     { key: '1to3', label: '1–3 天', min: 24, max: 72, cls: 'a-warn' },
     { key: '3to5', label: '3–5 天', min: 72, max: 120, cls: 'a-orange' },
     { key: 'gte5', label: '≥5 天', min: 120, max: Infinity, cls: 'a-crit' }
   ];
-  const ageCounts = AGE_BUCKETS.map(b => overdueAges.filter(h => h >= b.min && h < b.max).length);
+  const AGING = D.dashboard.aging || { counts: [0, 0, 0, 0], avg: 0, longest: 0 };
+  const ageCounts = (AGING.counts || []).slice(0, AGE_BUCKETS.length);
   const agePeak = Math.max.apply(null, ageCounts.concat([1]));
-  const ageAvg = overdueAges.length ? overdueAges.reduce((a, b) => a + b, 0) / overdueAges.length / 24 : 0;
-  const ageLongest = overdueAges.length ? Math.max.apply(null, overdueAges) / 24 : 0;
+  const ageAvg = Number(AGING.avg) || 0;
+  const ageLongest = Number(AGING.longest) || 0;
 
   /* ── 08 duty & auth ───────────────────────── */
   const dutyNow = D.duty.weeks.find(w => w.key === D.duty.currentKey) || D.duty.weeks[0];
@@ -88,8 +92,8 @@
     },
     {
       id: 'overdue', label: '超期', tone: 'crit', flow: 'crit',
-      title: 'UPS 电池组测试超期',
-      note: 'T10027-03 · 基础设施组 · 高风险作业授权 · 已超期 5 天',
+      title: '高风险任务超期',
+      note: '超期任务 · 高风险作业授权 · 需优先处置',
       route: 'dispatch'
     },
     {
@@ -101,12 +105,22 @@
     {
       id: 'recovered', label: '闭环', tone: 'ok', flow: 'good',
       title: '授权通过，任务恢复',
-      note: 'T10027-03 已闭环 · 其余超期任务继续跟踪',
+      note: '超期任务已闭环 · 其余超期任务继续跟踪',
       route: 'tasks'
     }
   ];
 
-  STATES[0].note = overdueSubs.length + ' 项超期均在处置窗口 · 新增与闭环节奏平稳';
+  STATES[0].note = D.dashboard.overdue + ' 项超期均在处置窗口 · 新增与闭环节奏平稳';
+
+  const focusOverdue = NOV_ACTIVE
+    .filter(function (t) { return parse(t.due) < now; })
+    .sort(function (a, b) { return String(a.due).localeCompare(String(b.due)); })[0];
+  if (focusOverdue) {
+    const overdueDays = ((now - parse(focusOverdue.due)) / 86400000).toFixed(1);
+    STATES[1].title = focusOverdue.name + ' 超期';
+    STATES[1].note = focusOverdue.id + ' · ' + focusOverdue.owner + ' · 已超期 ' + overdueDays + ' 天';
+    STATES[3].note = focusOverdue.id + ' 已闭环 · 其余超期任务继续跟踪';
+  }
 
   let stateIndex = 1;
   const REDUCED_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -175,6 +189,11 @@
     const list = [];
     (D.tasks || []).forEach(function (task) {
       if (task.canceled || task.draft) return;
+      if (!task.subs.length) {
+        if (['已完成', '已取消', '草稿'].indexOf(task.status) > -1) return;
+        list.push({ task: task, sub: task, due: String(task.due || '') });
+        return;
+      }
       (task.subs || []).forEach(function (sub) {
         if (['已完成', '已取消', '草稿'].indexOf(sub.status) > -1) return;
         list.push({ task: task, sub: sub, due: String(sub.due || '') });
@@ -192,13 +211,15 @@
   }
 
   function flowModalData(kind) {
+    const sla = D.dashboard.slaMetrics || {};
+    const novTasks = (D.tasks || []).filter(function (t) { return t.id.slice(3, 9) === '202611'; });
     if (kind === 'opening') return {
-      title: '期初积压 86 项',
-      sub: '30 天起始存量 · 不是当前任务列表',
-      kpis: [['积压总量', '86 项'], ['15 天以上', '14 项'], ['待清理占比', '100%'], ['建议动作', '先清长尾']],
+      title: '期初积压 ' + FLOW.opening + ' 项',
+      sub: '本期起始存量 · 11 月任务从零开始',
+      kpis: [['积压总量', FLOW.opening + ' 项'], ['超期转入', '0 项'], ['待清理占比', '0%'], ['建议动作', '关注本月新增']],
       headers: ['积压任务', '执行人', '截止时间', '状态'],
-      rows: flowTaskRows(4),
-      foot: '积压按停留时长拆分为 30 / 24 / 18 / 14 项；建议优先处理 15 天以上任务。'
+      rows: '<tr><td colspan="4">本期无期初积压</td></tr>',
+      foot: '11 月按 0 期初、' + FLOW.created + ' 新增统计；流入 ' + (FLOW.opening + FLOW.created) + ' = 闭环 ' + FLOW.closed + ' + 在办 ' + FLOW.active + '。'
     };
     if (kind === 'created') {
       const total = FLOW.created;
@@ -209,26 +230,30 @@
         used += count;
         return '<tr><td>' + r[0] + '</td><td>' + count + '</td><td>' + (count / total * 100).toFixed(1) + '%</td></tr>';
       }).join('');
-      const mix = (D.dashboard.typeMix || []).map(function (x) { return x.name + ' ' + Math.round(total * x.value / 128); }).join(' / ');
+      const mixList = D.dashboard.typeMix || [];
+      const mix = mixList.map(function (x) { return x.name + ' ' + x.value; }).join(' / ');
+      const mixTotal = mixList.reduce(function (n, x) { return n + x.value; }, 0);
       return {
         title: '新增任务 ' + total + ' 项',
-        sub: '近 30 天新增 · 来源与类型',
-        kpis: [['新增总量', total + ' 项'], ['高风险作业', '3 项'], ['日均新增', '12.8 项'], ['峰值来源', '手工新建']],
+        sub: '11 月新增 · 来源与类型',
+        kpis: [['新增总量', total + ' 项'], ['高风险作业', D.dashboard.today.highRisk + ' 项'], ['日均新增', (total / 30).toFixed(1) + ' 项'], ['峰值来源', '手工新建']],
         headers: ['来源', '数量', '占比'],
         rows: rows,
-        foot: '类型构成：' + mix + '，合计 ' + total + '。'
+        foot: '在办类型构成：' + mix + '，合计 ' + mixTotal + '；新增 ' + total + ' = 闭环 ' + FLOW.closed + ' + 在办 ' + FLOW.active + '。'
       };
     }
     if (kind === 'closed') {
       const total = FLOW.closed;
-      const onTime = Math.round(total * 0.889);
-      const late = total - onTime;
+      const onTime = Number(sla.onTimeClosed) || 0;
+      const late = Number(sla.lateClosed) || (total - onTime);
+      const avg = sla.avgClosureText || '6h 12m';
+      const rework = novTasks.filter(function (t) { return t.status === '已完成' && t.summaryRework; }).length;
       return {
         title: '已闭环 ' + total + ' 项',
-        sub: '近 30 天闭环 · 时效与质量',
-        kpis: [['按期闭环', onTime + ' 项'], ['晚闭环', late + ' 项'], ['平均闭环', '6h 12m'], ['二次回流', Math.round(total * 0.076) + ' 项']],
+        sub: '11 月闭环 · 时效与质量',
+        kpis: [['按期闭环', onTime + ' 项'], ['晚闭环', late + ' 项'], ['平均闭环', avg], ['二次回流', rework + ' 项']],
         headers: ['指标', '数值', '说明'],
-        rows: [['按期闭环率', (onTime / total * 100).toFixed(1) + '%', onTime + ' ÷ ' + total], ['平均闭环时长', '6h 12m', '优于 8h 目标'], ['晚闭环占比', (late / total * 100).toFixed(1) + '%', late + ' ÷ ' + total], ['回流率', '7.6%', Math.round(total * 0.076) + ' ÷ ' + total]].map(function (r) {
+        rows: [['按期闭环率', (onTime / total * 100).toFixed(1) + '%', onTime + ' ÷ ' + total], ['平均闭环时长', avg, '优于 8h 目标'], ['晚闭环占比', (late / total * 100).toFixed(1) + '%', late + ' ÷ ' + total], ['回流率', (rework / total * 100).toFixed(1) + '%', rework + ' ÷ ' + total]].map(function (r) {
           return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td>' + r[2] + '</td></tr>';
         }).join(''),
         foot: '闭环 ' + total + ' + 在办 ' + FLOW.active + ' = ' + (total + FLOW.active) + '，与流入 ' + (FLOW.opening + FLOW.created) + ' 守恒。'
@@ -236,10 +261,10 @@
     }
     if (kind === 'active') {
       const total = FLOW.active;
-      const reviewing = 4;
-      const suspended = 2;
-      const dispatch = 3;
-      const runningCount = Math.max(0, total - reviewing - suspended - dispatch);
+      const reviewing = NOV_ACTIVE.filter(function (t) { return t.status === '审批中'; }).length;
+      const suspended = NOV_ACTIVE.filter(function (t) { return t.status === '已挂起'; }).length;
+      const dispatch = NOV_ACTIVE.filter(function (t) { return t.status === '待分发'; }).length;
+      const runningCount = NOV_ACTIVE.filter(function (t) { return t.status === '执行中'; }).length;
       return {
         title: '当前在办 ' + total + ' 项',
         sub: '当前处理中 · 阻塞风险',
@@ -252,7 +277,7 @@
     const flowIn = FLOW.opening + FLOW.created;
     const flowOut = FLOW.closed + FLOW.active;
     return {
-      title: '30 天流转 ' + flowIn + ' 项',
+      title: '11 月流转 ' + flowIn + ' 项',
       sub: '流入 = 流出 · 阶段诊断',
       kpis: [['流入合计', flowIn + ' 项'], ['流出合计', flowOut + ' 项'], ['流转率', (FLOW.closed / flowOut * 100).toFixed(1) + '%'], ['当前瓶颈', '审批 3.4h']],
       headers: ['阶段', '当前队列', '平均停留', '判断'],
@@ -323,44 +348,43 @@
             '<path class="flow-line line-active" d="M600,175 C700,175 730,231 830,231"/>' +
           '</svg>' +
           flowNode('flow-src src-open', '期初积压', FLOW.opening, 'OPENING', 'opening') +
-          flowNode('flow-src src-new', '新增任务', FLOW.created, '30 天累计', 'created') +
-          flowNode('flow-mid', '30 天流转', flowIn, '件 · 流入合计', 'total') +
+          flowNode('flow-src src-new', '新增任务', FLOW.created, '11 月累计', 'created') +
+          flowNode('flow-mid', '11 月流转', flowIn, '件 · 流入合计', 'total') +
           flowNode('flow-end end-closed', '已闭环', FLOW.closed, closedPct + '% · 已完成', 'closed') +
           flowNode('flow-end end-active', '当前在办', FLOW.active, activePct + '% · 进行中', 'active') +
         '</div>' +
         flowDiagnosis() +
         '<div class="flow-focus" data-flow-detail="total" tabindex="0" role="button">' +
           '<span class="ff-tag">瓶颈</span>' +
-          '<div class="ff-copy"><b>审批环节积压 6 项</b><span>平均停留 3.4h · 建议优先处理高风险授权</span></div>' +
+          '<div class="ff-copy"><b>审批环节积压 ' + STAGE[1].queue + ' 项</b><span>平均停留 3.4h · 建议优先处理高风险授权</span></div>' +
           '<span class="ff-go">拆解 →</span>' +
         '</div>' +
       '</div>',
       demoControls()
     );
 
-    /* 06 type mix · 与任务中心同一份清单数据 */
-    const OTHER_TYPES = ['试验', '操作', '工单', '综合', '故障'];
-    const taskPool = (window.ITO && ITO.state && ITO.state.tasks) || D.tasks || [];
-    const otherCounts = OTHER_TYPES.map(function (name) {
-      return { name: name, value: taskPool.filter(function (t) { return t.type === name; }).length };
-    }).filter(function (x) { return x.value > 0; });
+    /* 06 type mix · 11 月在办任务，与驾驶舱同一口径 */
+    const MAIN_TYPES = ['巡检', '变更', '开发', '维保'];
+    const otherMap = {};
+    NOV_ACTIVE.forEach(function (t) {
+      if (MAIN_TYPES.indexOf(t.type) > -1) return;
+      otherMap[t.type] = (otherMap[t.type] || 0) + 1;
+    });
+    const otherCounts = Object.keys(otherMap).map(function (name) {
+      return { name: name, value: otherMap[name] };
+    }).sort(function (a, b) { return b.value - a.value; });
     const otherDetail = otherCounts.map(function (x) { return x.name + ' ' + x.value; }).join(' · ');
-    const TYPE_BLOCKS = [
-      { name: '巡检', color: '#35e0ff', match: ['巡检'] },
-      { name: '变更', color: '#b57bff', match: ['变更'] },
-      { name: '开发', color: '#2f8bff', match: ['开发'] },
-      { name: '维保', color: '#ffcf3f', match: ['维保'] },
-      { name: '其他 ' + otherCounts.length + ' 类', query: '其他', color: '#2ff0a8', match: OTHER_TYPES, detail: otherDetail }
-    ];
-    const mix = TYPE_BLOCKS.map(function (block) {
+    const TYPE_BLOCKS = (D.dashboard.typeMix || []).map(function (x) {
+      const isOther = x.name === '其他';
       return {
-        name: block.name,
-        query: block.query || block.name,
-        detail: block.detail || '',
-        color: block.color,
-        value: taskPool.filter(function (t) { return block.match.indexOf(t.type) > -1; }).length
+        name: isOther ? '其他 ' + otherCounts.length + ' 类' : x.name,
+        query: x.name,
+        detail: isOther ? otherDetail : '',
+        color: x.color,
+        value: x.value
       };
     });
+    const mix = TYPE_BLOCKS;
     const mixTotal = mix.reduce((n, x) => n + x.value, 0);
     const mixPick = names => mix.filter(x => names.indexOf(x.name) >= 0).reduce((n, x) => n + x.value, 0);
     const mixBlock = x => '<div class="tm-block" data-drill="tasks" data-query="type=' + encodeURIComponent(x.query) + '" tabindex="0" role="link"' +
@@ -453,7 +477,7 @@
 
   function paintHealth() {
     const health = D.dashboard.health;
-    const total = health.normal + health.dueSoon + health.overdue || 128;
+    const total = health.normal + health.dueSoon + health.overdue || 1;
     const setText = function (id, value) {
       const el = document.getElementById(id);
       if (el) el.textContent = value;
