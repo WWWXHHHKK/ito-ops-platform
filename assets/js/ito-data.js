@@ -914,20 +914,20 @@ window.ITO_DATA = (() => {
       id: 'CF-TASK-CHANGE', module: 'task', label: '变更单号', key: 'changeNo',
       type: 'text', source: 'none', required: false, placeholder: '例如：BG-2026-001',
       group: '扩展信息', sort: 1, width: 1, list: false, filter: false, export: true,
-      editableRoles: ['employee', 'manager', 'leader', 'admin'], enabled: true
+      editableRoles: ['employee', 'manager', 'leader', 'admin'], enabled: false
     },
     {
       id: 'CF-TASK-CHANGE-TYPE', module: 'task', label: '变更类型', key: 'changeType',
       type: 'select', source: 'options', options: '常规变更\n紧急变更', required: false,
       scope: 'main', group: '扩展信息', sort: 3, width: 1, list: false, filter: false, export: true,
-      editableRoles: ['employee', 'manager', 'leader', 'admin'], enabled: true
+      editableRoles: ['employee', 'manager', 'leader', 'admin'], enabled: false
     },
     {
       id: 'CF-TASK-EMERGENCY', module: 'task', label: '紧急审批人', key: 'emergencyApprover',
       type: 'person', source: 'none', required: false,
       scope: 'main', dependsOn: 'changeType', dependsValue: '紧急变更',
       group: '扩展信息', sort: 4, width: 1, list: false, filter: false, export: true,
-      editableRoles: ['employee', 'manager', 'leader', 'admin'], enabled: true
+      editableRoles: ['employee', 'manager', 'leader', 'admin'], enabled: false
     },
     {
       id: 'CF-SUB-RESULT', module: 'task', label: '执行结果', key: 'execResult',

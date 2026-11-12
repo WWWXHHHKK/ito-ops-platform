@@ -1581,6 +1581,32 @@
     task.updatedBy = state.user ? state.user.name : '系统';
   }
 
+  function migrateTaskMainFields() {
+    const key = 'ito.ops.field.taskMainDisabled.v1';
+    let applied = false;
+    try {
+      applied = !!(window.localStorage && window.localStorage.getItem(key) === '1');
+    } catch (e) {
+      applied = false;
+    }
+    if (applied) return false;
+
+    const ids = ['CF-TASK-CHANGE', 'CF-TASK-CHANGE-TYPE', 'CF-TASK-EMERGENCY'];
+    let changed = false;
+    (state.fieldDefs || []).forEach(function (f) {
+      if (ids.indexOf(f.id) > -1 && f.enabled !== false) {
+        f.enabled = false;
+        changed = true;
+      }
+    });
+    try {
+      if (window.localStorage) window.localStorage.setItem(key, '1');
+    } catch (e) {
+      /* 本地存储不可用时仅在当前内存状态生效 */
+    }
+    return changed;
+  }
+
   function initState() {
     state.tasks = clone(D.tasks).map(migrateTask);
     state.personalArchive = clone(D.personalArchive || []);
@@ -1637,6 +1663,8 @@
     });
     /* 业务系统统一使用任务标签：移除旧的自定义字段，并把旧值迁入标签。 */
     state.fieldDefs = (state.fieldDefs || []).filter(function (f) { return f.id !== 'CF-TASK-IMPACT'; });
+    /* 主任务扩展字段默认停用；仅首次迁移，保留管理员后续在字段定义中重新启用的选择。 */
+    state.__taskMainFieldsMigrated = migrateTaskMainFields();
     const officialSystems = {};
     (D.systemGroups || []).forEach(function (group) {
       (group.systems || []).forEach(function (name) { officialSystems[name] = true; });
@@ -1826,6 +1854,7 @@
       history.replaceState(null, '', bootUrl.pathname + bootUrl.search + bootUrl.hash);
     }
     initState();
+    if (state.__taskMainFieldsMigrated) persistState(true);
     if (!resetRequested && !state.__restoredSnapshot && window.DeliverableStore && window.DeliverableStore.applyWorkflow) {
       window.DeliverableStore.applyWorkflow();
     }
