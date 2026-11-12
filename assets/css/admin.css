@@ -2450,7 +2450,7 @@ tr:hover .row-actions .btn { opacity: 1; }
   transition: 0.16s;
 }
 .dev-dock button:hover { background: var(--bg-deep); color: var(--ink); }
-.dev-dock button.active { background: var(--brand-strong); color: #fff; }
+.dev-dock button.active { background: var(--brand); color: #fff; }
 .dev-dock .dev-reset {
   margin-left: 3px;
   padding-left: 9px;
@@ -3512,7 +3512,7 @@ html.still *, html.still *::before, html.still *::after {
   transition: background 0.15s var(--ease), color 0.15s var(--ease);
 }
 .anchor-nav button:hover { background: var(--brand-soft); }
-.anchor-nav button.active { background: var(--brand-strong); color: #fff; }
+.anchor-nav button.active { background: var(--brand); color: #fff; }
 [id^="sec-"] { scroll-margin-top: 150px; }
 
 /* 列表分页 */
@@ -3539,7 +3539,7 @@ html.still *, html.still *::before, html.still *::after {
   font-variant-numeric: tabular-nums;
 }
 .pager-num:hover, .pager-nav:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); }
-.pager-num.active { background: var(--brand-strong); border-color: var(--brand-strong); color: #fff; }
+.pager-num.active { background: var(--brand); border-color: var(--brand); color: #fff; }
 .pager-nav:disabled { opacity: 0.4; cursor: default; }
 .pager-dots { font-size: 12px; color: var(--ink-3); padding: 0 2px; }
 
