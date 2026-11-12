@@ -654,9 +654,9 @@
 
       '<div class="mine-overview">' +
         '<section class="card chart-card">' +
-          '<div class="chart-head"><div><h3 class="chart-title">' + (isLeader ? '团队闭环趋势' : (st.role === 'manager' ? '个人与团队闭环趋势' : '个人闭环趋势')) + '</h3><p class="chart-sub">近 5 个月闭环子任务 · 含历史归档</p></div>' +
+          '<div class="chart-head"><div><h3 class="chart-title">' + (isLeader ? '团队闭环趋势' : (st.role === 'manager' ? '个人与团队闭环趋势' : '个人闭环趋势')) + '</h3><p class="chart-sub">近 5 个月闭环主任务 · 按任务所属月份</p></div>' +
             '<span class="head-tag">' + (isLeader ? 'TEAM' : (st.role === 'manager' ? 'PERSONAL / TEAM' : 'PERSONAL')) + '</span></div>' +
-          '<div class="chart-body" id="myChart" role="img" aria-label="近 5 个月闭环任务趋势图，可按月份查看任务明细"></div>' +
+          '<div class="chart-body" id="myChart" role="img" aria-label="近 5 个月闭环主任务趋势图，可按月份查看任务明细"></div>' +
         '</section>' +
         '<div class="mine-kpi-stack">' +
           '<div class="card kpi-card" data-mine-kpi="open" role="button" tabindex="0" aria-label="查看' + scopeLabel + '在办任务"><div class="kpi-label">' + U().icon('task') + '<span>' + scopeLabel + '在办</span></div><div class="kpi-value">' + open.length + '<span class="unit">项</span></div><div class="kpi-meta"><span>含 ' + approval.length + ' 项审批中 · 按子任务统计</span></div></div>' +
@@ -757,7 +757,6 @@
         monthStarts.push(d);
         monthLabels.push((d.getMonth() + 1) + ' 月');
       }
-      const archiveItems = (st.personalArchive || []);
       const role = st.role;
       const group = currentGroup(st);
       const teamCounts = function (groupId) {
@@ -769,32 +768,13 @@
       const monthKeyOf = function (date) {
         return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
       };
-      const inMonth = function (value, month) {
-        return String(value || '').slice(0, 7) === monthKeyOf(month);
-      };
-      const actualClosed = function (month, filter) {
-        const out = [];
-        st.tasks.forEach(function (task) {
-          if (task.canceled || task.draft) return;
-          (task.subs || []).forEach(function (sub) {
-            if (sub.status !== '已完成' || !inMonth(sub.completedAt, month)) return;
-            if (filter && !filter({ task: task, sub: sub, group: sub.group || task.group, owner: sub.owner })) return;
-            out.push({ task: task, sub: sub });
-          });
-        });
-        return out;
-      };
-      const archiveClosed = function (month, filter) {
-        return archiveItems.filter(function (item) {
-          if (!inMonth(item.completedAt, month)) return false;
-          return !filter || filter({ archive: item, group: item.group, owner: item.owner });
-        });
-      };
       const personalCounts = function () {
         return monthStarts.map(function (month) {
-          const actual = actualClosed(month, function (x) { return x.owner === st.user.name; }).length;
-          const archived = archiveClosed(month, function (x) { return x.owner === st.user.name; }).length;
-          return actual + archived;
+          const code = monthKeyOf(month).replace('-', '');
+          return st.tasks.filter(function (t) {
+            return !t.canceled && !t.draft && t.status === '已完成' &&
+              t.owner === st.user.name && t.id.slice(3, 9) === code;
+          }).length;
         });
       };
       const chartSeries = [];
@@ -1027,54 +1007,6 @@
         });
       }
 
-      function archiveFileOf(item) {
-        const map = {
-          '巡检': { name: '核心交换机巡检汇总.pptx', size: '2.4 MB', type: 'PPTX' },
-          '变更': { name: '扩容实施与回退验证.docx', size: '860 KB', type: 'DOCX' },
-          '开发': { name: '需求评审方案.docx', size: '720 KB', type: 'DOCX' },
-          '操作': { name: '缓存策略调整报告.pdf', size: '1.2 MB', type: 'PDF' },
-          '维保': { name: 'UPS电池组放电测试记录.xlsx', size: '96 KB', type: 'XLSX' },
-          '值班': { name: '监测数据补录清单.xlsx', size: '88 KB', type: 'XLSX' }
-        };
-        const file = map[item.type] || map['操作'];
-        return {
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          url: 'assets/samples/deliverables/' + encodeURIComponent(file.name),
-          archivedAt: String(item.completedAt || '').slice(0, 10)
-        };
-      }
-
-      function openArchiveDetail(item) {
-        const file = archiveFileOf(item);
-        U().detailModal({
-          title: item.name,
-          sub: '历史任务归档 · ' + item.completedAt,
-          body: '<div class="detail-grid">' +
-            '<div class="detail-field"><label>任务编号</label><div class="mono">' + U().esc(item.id) + '</div></div>' +
-            '<div class="detail-field"><label>来源任务</label><div>' + U().esc(item.task) + '</div></div>' +
-            '<div class="detail-field"><label>专业组</label><div>' + U().groupPill(item.group) + '</div></div>' +
-            '<div class="detail-field"><label>执行人</label><div>' + U().esc(item.owner || '—') + '</div></div>' +
-            '<div class="detail-field"><label>任务类型</label><div>' + U().esc(item.type) + '</div></div>' +
-            '<div class="detail-field"><label>优先级</label><div>' + U().badge(item.level) + '</div></div>' +
-            '<div class="detail-field"><label>实际工时</label><div>' + (item.hours || 0) + ' h</div></div>' +
-            '<div class="detail-field"><label>完成时间</label><div>' + U().esc(item.completedAt) + '</div></div>' +
-            '<div class="detail-field"><label>状态</label><div>' + U().badge('已完成') + '</div></div>' +
-          '</div>' +
-          '<div class="detail-section"><h4>成果物（1）</h4>' +
-            '<div class="archive-file">' +
-              '<span class="archive-file-type">' + file.type + '</span>' +
-              '<div class="archive-file-main"><b>' + U().esc(file.name) + '</b>' +
-                '<span>历史归档 · ' + U().esc(file.size) + ' · ' + U().esc(file.archivedAt) + '</span></div>' +
-              '<a class="btn btn-ghost btn-sm" href="' + U().esc(file.url) + '" target="_blank" rel="noopener">预览</a>' +
-            '</div>' +
-          '</div>',
-          foot: '<button class="btn btn-ghost" data-close type="button">关闭</button>',
-          onMount: function (closeFn, root) { root.querySelector('[data-close]').addEventListener('click', closeFn); }
-        });
-      }
-
       function openMineMonth(index, scope) {
         if (index == null || !monthStarts[index]) return;
         const month = monthStarts[index];
@@ -1082,55 +1014,36 @@
         const scopeName = scopeKey === 'team' ? '团队'
           : scopeKey === 'group' ? '本组'
           : (role === 'manager' ? '我的' : '个人');
-        const filter = scopeKey === 'group'
-          ? function (x) { return !!group && x.group === group.id; }
-          : scopeKey === 'mine'
-            ? function (x) { return x.owner === st.user.name; }
-            : null;
-        const actual = actualClosed(month, filter);
-        const archived = archiveClosed(month, filter);
-        const combined = actual.map(function (x) {
-          return { kind: 'actual', at: x.sub.completedAt, x: x };
-        }).concat(archived.map(function (a) {
-          return { kind: 'archive', at: a.completedAt, a: a };
-        })).sort(function (a, b) {
-          return String(b.at || '').localeCompare(String(a.at || ''));
+        const code = monthKeyOf(month).replace('-', '');
+        const list = st.tasks.filter(function (t) {
+          if (t.canceled || t.draft || t.status !== '已完成') return false;
+          if (t.id.slice(3, 9) !== code) return false;
+          if (scopeKey === 'group') return !!group && t.group === group.id;
+          if (scopeKey === 'mine') return t.owner === st.user.name;
+          return true;
+        }).sort(function (a, b) {
+          return String(b.completedAt || '').localeCompare(String(a.completedAt || ''));
         });
-        const rows = combined.map(function (row) {
-          if (row.kind === 'actual') {
-            const x = row.x;
-            return '<tr class="mine-kpi-row" data-task="' + U().esc(x.task.id) + '" data-sub="' + U().esc(x.sub.id) + '" style="cursor:pointer">' +
-              '<td><div class="cell-task"><b>' + U().esc(x.sub.name) + '</b><small>' + U().esc(x.task.name) + '</small></div></td>' +
-              '<td>' + U().groupPill(x.sub.group) + '</td>' +
-              '<td>' + U().esc(x.sub.owner || '—') + '</td>' +
-              '<td class="num">' + U().esc(x.sub.completedAt || '—') + '</td>' +
-              '<td><span class="badge green">当前任务</span></td></tr>';
-          }
-          const a = row.a;
-          return '<tr class="mine-kpi-row" data-archive-id="' + U().esc(a.id) + '" style="cursor:pointer">' +
-            '<td><div class="cell-task"><b>' + U().esc(a.name) + '</b><small>' + U().esc(a.task) + ' · ' + U().esc(a.id) + '</small></div></td>' +
-            '<td>' + U().groupPill(a.group) + '</td>' +
-            '<td>' + U().esc(a.owner || '—') + '</td>' +
-            '<td class="num">' + U().esc(a.completedAt || '—') + '</td>' +
-            '<td><span class="badge gray">历史归档</span></td></tr>';
+        const rows = list.map(function (t) {
+          return '<tr class="mine-kpi-row" data-task="' + U().esc(t.id) + '" style="cursor:pointer">' +
+            '<td><div class="cell-task"><b>' + U().esc(t.name) + '</b><small>' + U().esc(t.id) + '</small></div></td>' +
+            '<td>' + U().groupPill(t.group) + '</td>' +
+            '<td>' + U().esc(t.owner || '—') + '</td>' +
+            '<td class="num">' + U().esc(t.completedAt || '—') + '</td>' +
+            '<td><span class="badge green">主任务</span></td></tr>';
         }).join('');
         U().modal({
           title: scopeName + '闭环 · ' + monthLabels[index],
-          sub: month.getFullYear() + ' 年 ' + (month.getMonth() + 1) + ' 月 · 共 ' + combined.length + ' 项子任务 · 当前任务 + 历史归档',
+          sub: month.getFullYear() + ' 年 ' + (month.getMonth() + 1) + ' 月 · 共 ' + list.length + ' 项主任务 · 按任务所属月份',
           wide: true,
-          body: rows ? '<div class="table-wrap"><table class="data-table"><thead><tr><th>任务</th><th>专业组</th><th>执行人</th><th>完成时间</th><th>来源</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : U().emptyState('该月暂无闭环任务', '任务完成归档后会出现在这里', 'task'),
+          body: rows ? '<div class="table-wrap"><table class="data-table"><thead><tr><th>任务</th><th>专业组</th><th>负责人</th><th>完成时间</th><th>类型</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : U().emptyState('该月暂无闭环任务', '任务完成后会出现在这里', 'task'),
           foot: '<button class="btn btn-ghost" data-close type="button">关闭</button>',
           onMount: function (close, root) {
             root.querySelector('[data-close]').addEventListener('click', close);
             root.querySelectorAll('.mine-kpi-row').forEach(function (row) {
               row.addEventListener('click', function () {
                 close();
-                if (row.dataset.archiveId) {
-                  const item = archiveItems.find(function (a) { return a.id === row.dataset.archiveId; });
-                  if (item) openArchiveDetail(item);
-                  return;
-                }
-                if (ITO.taskActions && ITO.taskActions.detail) ITO.taskActions.detail(row.dataset.task, row.dataset.sub);
+                if (ITO.taskActions && ITO.taskActions.detail) ITO.taskActions.detail(row.dataset.task);
               });
             });
           }

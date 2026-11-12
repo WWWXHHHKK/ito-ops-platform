@@ -457,6 +457,20 @@
   allTasks.sort(function (a, b) { return String(b.id).localeCompare(String(a.id)); });
   D.tasks = allTasks;
 
+  /* 团队 / 主管 / 员工趋势图：按任务所属月份统计已完成主任务。 */
+  const trendMonths = MONTHS.map(function (m) { return m.key; });
+  const trendTeam = {};
+  groupIds.forEach(function (g) { trendTeam[g] = []; });
+  trendMonths.forEach(function (monthKey) {
+    const code = monthKey.replace('-', '');
+    groupIds.forEach(function (g) {
+      trendTeam[g].push(allTasks.filter(function (t) {
+        return t.status === '已完成' && t.group === g && t.id.slice(3, 9) === code;
+      }).length);
+    });
+  });
+  D.teamTrend = trendTeam;
+
   const orderedIds = Object.keys(idMap).sort(function (a, b) { return b.length - a.length; });
 
   function replaceString(value) {
