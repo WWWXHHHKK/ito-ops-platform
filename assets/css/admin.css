@@ -2277,7 +2277,6 @@ tr:hover .row-actions .btn { opacity: 1; }
   box-shadow: var(--shadow-sm);
 }
 .wall-search { width: 320px; }
-.wall-total { font-size: 10.5px; color: var(--muted); }
 .wall-toolbar .btn { margin-left: auto; }
 .wall-section { margin-bottom: 24px; }
 .wall-section-head {

@@ -565,7 +565,6 @@
       '</div>' +
       '<div class="wall-toolbar">' +
         '<label class="search-field wall-search">' + U().icon('search') + '<input id="wallSearch" type="search" placeholder="搜索标签名称 / 类型..."></label>' +
-        '<span class="wall-total">' + personTags.length + ' 个人标签 · ' + taskTags.length + ' 个任务标签</span>' +
         (canEdit ? '<button class="btn btn-primary" id="wallNewBtn" type="button">' + U().icon('plus') + '新增标签</button>' : '') +
       '</div>' +
       '<div class="wall-columns">' +

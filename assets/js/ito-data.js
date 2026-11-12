@@ -112,7 +112,7 @@ window.ITO_DATA = (() => {
     { uid: 'E20008', name: '郑工',   group: 'infra',  title: '工程师',       tags: ['工程师'],         joined: '2023-04-18', phone: '13800001208' },
 
     { uid: 'E20009', name: '王主管', group: 'app',    title: '应用组主管',   tags: ['管理', 'KCC'],    joined: '2022-05-10', phone: '13900001210' },
-    { uid: 'E20010', name: '赵主管', group: 'comm',   title: '通信组主管',   tags: ['管理', '割接'],   joined: '2021-09-06', phone: '13900001203' },
+    { uid: 'E20010', name: '赵主管', group: 'comm',   title: '通信组主管',   tags: ['管理', '通信线路'], joined: '2021-09-06', phone: '13900001203' },
     { uid: 'E20011', name: '李主管', group: 'online', title: '在线组主管',   tags: ['管理', '终端'],   joined: '2022-03-14', phone: '13900001211' },
     { uid: 'E20012', name: '刘主管', group: 'infra',  title: '基础设施组主管', tags: ['管理', '机房'], joined: '2021-11-22', phone: '13900001212' },
 
@@ -124,13 +124,13 @@ window.ITO_DATA = (() => {
     { uid: 'E20018', name: '朱工', group: 'app', title: '助理工程师', tags: ['工程师'],         joined: '2025-08-15', phone: '13800001218' },
     { uid: 'E20019', name: '胡工', group: 'app', title: '工程师',     tags: ['KNS'],            joined: '2026-01-12', phone: '13800001219' },
 
-    { uid: 'E20020', name: '郭工', group: 'comm', title: '高级工程师', tags: ['核心岗', '割接'], joined: '2024-01-15', phone: '13800001220' },
+    { uid: 'E20020', name: '郭工', group: 'comm', title: '高级工程师', tags: ['核心岗', '通信线路'], joined: '2024-01-15', phone: '13800001220' },
     { uid: 'E20021', name: '罗工', group: 'comm', title: '工程师',     tags: ['工程师'],         joined: '2024-05-08', phone: '13800001221' },
-    { uid: 'E20022', name: '梁工', group: 'comm', title: '工程师',     tags: ['割接'],           joined: '2024-08-19', phone: '13800001222' },
+    { uid: 'E20022', name: '梁工', group: 'comm', title: '工程师',     tags: ['通信线路'],       joined: '2024-08-19', phone: '13800001222' },
     { uid: 'E20023', name: '宋工', group: 'comm', title: '助理工程师', tags: ['工程师'],         joined: '2024-12-02', phone: '13800001223' },
-    { uid: 'E20024', name: '唐工', group: 'comm', title: '工程师',     tags: ['割接'],           joined: '2025-03-10', phone: '13800001224' },
+    { uid: 'E20024', name: '唐工', group: 'comm', title: '工程师',     tags: ['通信网络'],       joined: '2025-03-10', phone: '13800001224' },
     { uid: 'E20025', name: '许工', group: 'comm', title: '工程师',     tags: ['工程师'],         joined: '2025-09-23', phone: '13800001225' },
-    { uid: 'E20026', name: '邓工', group: 'comm', title: '助理工程师', tags: ['割接'],           joined: '2026-01-06', phone: '13800001226' },
+    { uid: 'E20026', name: '邓工', group: 'comm', title: '助理工程师', tags: ['通信传输'],       joined: '2026-01-06', phone: '13800001226' },
 
     { uid: 'E20027', name: '冯工', group: 'online', title: '高级工程师', tags: ['核心岗', '终端'], joined: '2024-03-05', phone: '13800001227' },
     { uid: 'E20028', name: '曹工', group: 'online', title: '工程师',     tags: ['工程师'],         joined: '2024-07-17', phone: '13800001228' },
@@ -564,7 +564,7 @@ window.ITO_DATA = (() => {
     { name: '机房', stars: 3, count: 12, group: 'infra',  desc: '核心机房巡检与动力环境保障' },
     { name: 'KCC',  stars: 2, count: 8,  group: 'app',    desc: '核心业务系统变更与发布' },
     { name: 'KNS',  stars: 2, count: 6,  group: 'app',    desc: 'KNS 接口与性能优化' },
-    { name: '割接', stars: 2, count: 5,  group: 'comm',   desc: '核心网络割接与回退验证' },
+    { name: '通信线路', stars: 2, count: 5, group: 'comm', desc: '通信线路维护与应急保障' },
     { name: '终端', stars: 1, count: 3,  group: 'online', desc: '终端安全与基线核查' },
     { name: 'DTT',  stars: 1, count: 2,  group: 'online', desc: '监测数据质量专项' }
   ];
@@ -582,8 +582,8 @@ window.ITO_DATA = (() => {
     { person: '张经理', name: '变更', type: '任务标签', stars: 0, count: 4, firstClaimed: '2026-02-03', desc: '高风险变更与割接审批' },
     { person: '陈工', name: 'KCC', type: '人员标签', stars: 2, count: 7, firstClaimed: '2025-10-12', desc: '核心业务系统变更与发布' },
     { person: '陈工', name: '机房', type: '人员标签', stars: 1, count: 3, firstClaimed: '2026-01-08', desc: '核心机房巡检与动力环境保障' },
-    { person: '赵工', name: '割接', type: '人员标签', stars: 3, count: 11, firstClaimed: '2025-07-21', desc: '核心网络割接与回退验证' },
-    { person: '周工', name: '割接', type: '人员标签', stars: 2, count: 6, firstClaimed: '2025-11-15', desc: '核心网络割接与回退验证' },
+    { person: '赵工', name: '通信线路', type: '人员标签', stars: 3, count: 11, firstClaimed: '2025-07-21', desc: '通信线路维护与应急保障' },
+    { person: '周工', name: '通信网络', type: '人员标签', stars: 2, count: 6, firstClaimed: '2025-11-15', desc: '通信网络配置与故障处置' },
     { person: '孙工', name: '终端', type: '人员标签', stars: 3, count: 9, firstClaimed: '2025-09-03', desc: '终端安全与基线核查' },
     { person: '吴工', name: '终端', type: '人员标签', stars: 2, count: 5, firstClaimed: '2026-02-17', desc: '终端安全与基线核查' },
     { person: '刘工', name: '机房', type: '人员标签', stars: 3, count: 13, firstClaimed: '2025-06-11', desc: '核心机房巡检与动力环境保障' },
@@ -591,10 +591,10 @@ window.ITO_DATA = (() => {
   ];
 
   /* 新成员的能力标签：让个人统计 / 月报有内容 */
-  const GROUP_TAG = { app: 'KCC', comm: '割接', online: '终端', infra: '机房' };
+  const GROUP_TAG = { app: 'KCC', comm: '通信线路', online: '终端', infra: '机房' };
   const GROUP_TAG_DESC = {
     app: '核心业务系统变更与发布',
-    comm: '核心网络割接与回退验证',
+    comm: '通信线路维护与应急保障',
     online: '终端安全与基线核查',
     infra: '核心机房巡检与动力环境保障'
   };
@@ -613,6 +613,68 @@ window.ITO_DATA = (() => {
       firstClaimed: '2025-' + pad2((i % 9) + 1) + '-' + pad2((i % 20) + 1),
       desc: GROUP_TAG_DESC[p.group]
     });
+  });
+
+  /* 能力标签补充：每人至少保留 2 个非授权类人员标签，避免个人详情过空。 */
+  const GROUP_EXTRA_TAGS = {
+    app: ['接口平台', '应用系统', '数据库', '报表平台'],
+    comm: ['通信线路', '通信网络', '通信传输', '应急通信', '通信值班'],
+    online: ['监测平台', '采集终端', '桌面运维', '网络安全'],
+    infra: ['动力环境', '供配电', '暖通空调', '消防安防']
+  };
+  const EXTRA_TAG_DESC = {
+    '接口平台': '接口联调与平台接入保障',
+    '应用系统': '业务系统运行维护与发布',
+    '数据库': '数据库运维、备份与性能优化',
+    '报表平台': '报表开发与数据质量保障',
+    '通信线路': '通信线路维护与应急保障',
+    '通信网络': '通信网络配置与故障处置',
+    '通信传输': '传输链路维护与切换验证',
+    '应急通信': '应急通信保障与现场处置',
+    '通信值班': '通信值班调度与交接',
+    '监测平台': '监测平台运行维护与告警处置',
+    '采集终端': '采集终端配置与数据核对',
+    '桌面运维': '桌面终端与办公设备维护',
+    '网络安全': '网络安全策略与基线核查',
+    '动力环境': '机房动力环境巡检与保障',
+    '供配电': '供配电系统维护与倒换验证',
+    '暖通空调': '暖通空调运行维护',
+    '消防安防': '消防安防设施巡检与联动'
+  };
+  staff.forEach(function (p, i) {
+    p.tags = (p.tags || []).slice();
+    const domainTags = ['KCC', 'KNS', '终端', '机房', '通信线路', '通信网络', '通信传输', '应急通信', '通信值班'];
+    const hasDomain = domainTags.some(function (name) { return p.tags.indexOf(name) > -1; });
+    if (!hasDomain && GROUP_TAG[p.group]) p.tags.push(GROUP_TAG[p.group]);
+    const staffPool = (GROUP_EXTRA_TAGS[p.group] || []).filter(function (name) { return p.tags.indexOf(name) === -1; });
+    if (staffPool.length) p.tags.push(staffPool[i % staffPool.length]);
+    p.tags = p.tags.filter(function (tag, idx, list) { return list.indexOf(tag) === idx; });
+  });
+
+  staff.forEach(function (p, i) {
+    const own = personAchievements.filter(function (a) {
+      return a.person === p.name && a.type === '人员标签';
+    }).map(function (a) { return a.name; });
+    const need = 2 - own.length;
+    if (need <= 0) return;
+    const pool = (GROUP_EXTRA_TAGS[p.group] || []).filter(function (name) {
+      return own.indexOf(name) === -1;
+    });
+    if (!pool.length) return;
+    for (let n = 0; n < need && n < pool.length; n += 1) {
+      const name = pool[(i + n) % pool.length];
+      if (own.indexOf(name) > -1) continue;
+      own.push(name);
+      personAchievements.push({
+        person: p.name,
+        name: name,
+        type: '人员标签',
+        stars: (i % 3) + 1,
+        count: 3 + ((i + n) % 8),
+        firstClaimed: '2025-' + pad2((i % 9) + 1) + '-' + pad2((i % 20) + 1),
+        desc: EXTRA_TAG_DESC[name] || '专业能力标签'
+      });
+    }
   });
 
   const permissions = {
@@ -673,8 +735,7 @@ window.ITO_DATA = (() => {
     KCC: { star2: 5, star3: 10 },
     KNS: { star2: 5, star3: 10 },
     '终端': { star2: 3, star3: 8 },
-    '机房': { star2: 5, star3: 10 },
-    '割接': { star2: 5, star3: 10 }
+    '机房': { star2: 5, star3: 10 }
   };
 
   const achievementWall = (function () {
@@ -957,7 +1018,7 @@ window.ITO_DATA = (() => {
       id: 'CF-MP-CONTRACT', module: 'maintenancePlan', label: '合同编号', key: 'contractNo',
       type: 'text', source: 'none', required: false,
       group: '计划信息', sort: 1, width: 1, list: true, filter: true, export: true,
-      editableRoles: ['employee', 'manager', 'leader', 'admin'], enabled: true
+      editableRoles: ['employee', 'manager', 'leader', 'admin'], enabled: false
     },
     {
       id: 'CF-MR-PART', module: 'maintenanceRecord', label: '更换部件', key: 'replacedPart',

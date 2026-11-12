@@ -76,7 +76,13 @@
   const meetingPeople = (staffByGroup.comm || []).filter(p => p.name.indexOf('主管') === -1);
   const meetingPool = meetingPeople.length ? meetingPeople : D.staff.filter(p => p.name.indexOf('主管') === -1);
 
-  const SYSTEMS = ['KCC', 'KNS', 'DTW', 'DTP', 'KSM', 'DKM', 'KDN', '核心交换机', '防火墙', 'UPS', '空调', '语音网关', '数据库', '监控平台', '办公终端', '存储阵列'];
+  const SYSTEMS = (D.taskTags || []).concat([
+    '核心交换机', '防火墙', 'UPS', '空调', '语音网关', '数据库', '监控平台', '办公终端', '存储阵列'
+  ]).filter(function (name, index, list) { return name && list.indexOf(name) === index; });
+  const SYSTEM_TAG = {
+    '核心交换机': 'KNS', '防火墙': 'KNS', UPS: '机房', '空调': '机房', '语音网关': '厂房通信系统',
+    '数据库': 'KCC', '监控平台': 'DTT', '办公终端': '终端', '存储阵列': '机房'
+  };
   const AREAS = ['A基地', 'B基地', 'C基地', '核心机房', '一区', '二区', '办公区', '生产区'];
 
   const SOURCES = ['会议行动', '专业任务', '程序升版', '质量自查', '安全检查', '应急演练', '年度重点工作', '变更管理', '任务督办', '外部反馈'];
@@ -154,10 +160,10 @@
     '综合': ['app', 'comm', 'online', 'infra']
   };
   const TAG_BY_GROUP = {
-    app: ['KCC', 'KNS', '移动终端设备'],
-    comm: ['KNS', '机房'],
-    online: ['移动终端设备', '机房'],
-    infra: ['机房']
+    app: ['KCC', 'KNS', 'KDN', 'KSM', 'DTT'],
+    comm: ['KNS', '机房', '厂房通信系统'],
+    online: ['终端', 'DTT', 'DTC', 'DTW', '机房'],
+    infra: ['机房', 'KSM', 'KNS']
   };
 
   function monthInfo(key) {
@@ -202,7 +208,9 @@
     const progress = status === '已完成' ? 100 : 20 + Math.floor(rng() * 65);
     const name = tpl.name.replace(/\{system\}/g, system).replace(/\{area\}/g, area);
     const source = pick(rng, SOURCES);
-    const tags = TAG_BY_GROUP[group] ? [pick(rng, TAG_BY_GROUP[group])] : [];
+    const tags = [tpl.name.indexOf('{system}') > -1
+      ? (SYSTEM_TAG[system] || system || '机房')
+      : (TAG_BY_GROUP[group] ? pick(rng, TAG_BY_GROUP[group]) : '机房')];
     const desc = tpl.standard + ' 来源：' + source + '。' + tpl.progress;
     return {
       id: '',

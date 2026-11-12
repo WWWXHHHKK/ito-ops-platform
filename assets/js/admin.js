@@ -8,7 +8,7 @@
 
   window.ITO = window.ITO || {};
   const D = window.ITO_DATA;
-  const BUILD_VERSION = '20261112z25';
+  const BUILD_VERSION = '20261112z29';
   const DATA_SOURCE = window.ITO_DATA_SOURCE;
   const PERSIST_KEYS = [
     'tasks', 'personalArchive', 'messages', 'logs', 'staff', 'groups', 'auths',
@@ -1670,10 +1670,10 @@
       (group.systems || []).forEach(function (name) { officialSystems[name] = true; });
     });
     const tagRenames = {
-      '终端': '移动终端设备',
-      '视频会议系统': '视频会议',
-      '卫星电话系统': '卫星电话',
-      '厂房通信系统': '厂房通信'
+      '移动终端设备': '终端',
+      '视频会议': '视频会议系统',
+      '卫星电话': '卫星电话系统',
+      '厂房通信': '厂房通信系统'
     };
     const normalizeTags = function (tags) {
       const out = [];
