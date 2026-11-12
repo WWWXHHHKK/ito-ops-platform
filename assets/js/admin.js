@@ -8,7 +8,7 @@
 
   window.ITO = window.ITO || {};
   const D = window.ITO_DATA;
-  const BUILD_VERSION = '20261112z32';
+  const BUILD_VERSION = '20261112z33';
   const DATA_SOURCE = window.ITO_DATA_SOURCE;
   const PERSIST_KEYS = [
     'tasks', 'personalArchive', 'messages', 'logs', 'staff', 'groups', 'auths',
@@ -1885,7 +1885,9 @@
 
     const params = new URLSearchParams(location.search);
     if (params.get('still') === '1') document.documentElement.classList.add('still');
-    devMode = /^(localhost|127\.0\.0\.1|::1|\[::1\])$/.test(location.hostname) || params.get('dev') === '1';
+    devMode = location.protocol === 'file:' ||
+      /^(localhost|127\.0\.0\.1|::1|\[::1\])$/.test(location.hostname) ||
+      params.get('dev') === '1';
 
     /* 进入界面前先跑一次规则检测，保证列表里的“最近触发”是最新一轮结果。 */
     if (window.ITO_ALERT_ENGINE) window.ITO_ALERT_ENGINE.check({ auto: true, boot: true });
