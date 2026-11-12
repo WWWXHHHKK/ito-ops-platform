@@ -3520,13 +3520,14 @@ html.still *, html.still *::before, html.still *::after {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px 12px;
   padding: 10px 14px;
   border-top: 1px solid var(--line);
 }
 .pager-info { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.pager-nums { display: flex; align-items: center; gap: 4px; }
-.pager-num, .pager-nav {
+.pager-nums { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.pager-nav {
   min-width: 28px;
   height: 28px;
   padding: 0 6px;
@@ -3538,10 +3539,37 @@ html.still *, html.still *::before, html.still *::after {
   cursor: pointer;
   font-variant-numeric: tabular-nums;
 }
-.pager-num:hover, .pager-nav:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); }
-.pager-num.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+.pager-nav:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); }
 .pager-nav:disabled { opacity: 0.4; cursor: default; }
-.pager-dots { font-size: 12px; color: var(--ink-3); padding: 0 2px; }
+.pager-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.pager-input {
+  width: 44px;
+  height: 28px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.pager-input:focus {
+  outline: 2px solid rgba(235, 97, 42, 0.45);
+  outline-offset: 1px;
+  border-color: var(--brand);
+}
+.pager-jump[hidden] { display: none; }
 
 /* 台账浮动跳转条：滚过专项表头后右上淡入 */
 .jump-float {

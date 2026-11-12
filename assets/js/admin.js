@@ -1925,21 +1925,35 @@
     const pages = Math.max(1, Math.ceil(total / pageSize));
     const cur = Math.min(Math.max(1, page), pages);
     if (!total) return '';
-    const nums = [];
-    let prev = 0;
-    for (let p = 1; p <= pages; p += 1) {
-      if (p !== 1 && p !== pages && Math.abs(p - cur) > 1) continue;
-      if (p - prev > 1) nums.push('<span class="pager-dots">…</span>');
-      nums.push('<button type="button" class="pager-num' + (p === cur ? ' active' : '') + '" data-pager="' + id + '" data-page="' + p + '">' + p + '</button>');
-      prev = p;
-    }
-    return '<div class="pager"><span class="pager-info">共 ' + total + ' 条 · 第 ' + cur + ' / ' + pages + ' 页</span>' +
+    return '<div class="pager"><span class="pager-info">共 ' + total + ' 条</span>' +
       '<span class="pager-nums">' +
       '<button type="button" class="pager-nav" data-pager="' + id + '" data-page="' + (cur - 1) + '"' + (cur <= 1 ? ' disabled' : '') + ' aria-label="上一页">‹</button>' +
-      nums.join('') +
+      '<span class="pager-current">第 <input class="pager-input" type="text" inputmode="numeric" pattern="[0-9]*" value="' + cur + '" data-pager-input="' + id + '" data-pages="' + pages + '" title="输入页码后按回车跳转" aria-label="当前第 ' + cur + ' 页，共 ' + pages + ' 页，输入页码后跳转"> / ' + pages + ' 页</span>' +
       '<button type="button" class="pager-nav" data-pager="' + id + '" data-page="' + (cur + 1) + '"' + (cur >= pages ? ' disabled' : '') + ' aria-label="下一页">›</button>' +
+      '<button type="button" class="pager-jump" data-pager="' + id + '" data-page="' + cur + '" hidden aria-hidden="true"></button>' +
       '</span></div>';
   };
+
+  document.addEventListener('keydown', function (e) {
+    const input = e.target && e.target.closest ? e.target.closest('[data-pager-input]') : null;
+    if (!input || e.key !== 'Enter') return;
+    e.preventDefault();
+    input.blur();
+  });
+
+  document.addEventListener('change', function (e) {
+    const input = e.target && e.target.closest ? e.target.closest('[data-pager-input]') : null;
+    if (!input) return;
+    const pages = Math.max(1, Number(input.dataset.pages) || 1);
+    const value = Math.round(Number(input.value));
+    const page = Math.min(Math.max(1, Number.isFinite(value) ? value : 1), pages);
+    input.value = String(page);
+    const pager = input.closest('.pager');
+    const jump = pager && pager.querySelector('.pager-jump');
+    if (!jump) return;
+    jump.dataset.page = String(page);
+    jump.click();
+  });
 
   /* ── public API ──────────────────────────── */
   ITO.ui = {
