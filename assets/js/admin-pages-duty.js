@@ -270,7 +270,7 @@
       '<div class="duty-notes">' +
         '<div class="card duty-note"><b>交接时间</b><span>每周一 08:00 由上一周值班人与下一周值班人完成交接；系统提前 30 分钟提醒，08:15 未确认将升级通知。</span></div>' +
         '<div class="card duty-note"><b>交接内容</b><span>未闭环任务、在途变更、未处理告警、授权到期与高风险作业，逐项确认责任人与下一步动作。</span></div>' +
-        '<div class="card duty-note"><b>升级路径</b><span>值班人 15 分钟未响应 → 专业组主管；30 分钟未恢复 → 部门负责人；P1 事件直接上报张经理。</span></div>' +
+        '<div class="card duty-note"><b>升级路径</b><span>值班人 15 分钟未响应 → 专业组主管；30 分钟未恢复 → 部门负责人；P1 事件直接上报' + U().esc(D.roleInfo.leader.name) + '。</span></div>' +
       '</div>';
     },
 
@@ -1513,7 +1513,8 @@
         return row ? row.name : '—';
       });
       const currentCalls = dutyCallsOf(current).length;
-      const assistant = memberOf('赵主管') || {};
+      const commManager = (st.groups.find(function (g) { return g.id === 'comm'; }) || {}).manager;
+      const assistant = memberOf(commManager) || {};
 
       const rows = weeks.map(function (w) {
         const status = w.dutyStatus || '正常';
@@ -1539,7 +1540,7 @@
       }) +
       summary([
         { icon: 'calendar', value: '第 ' + current.weekNo + ' 周', label: '本周周期 · ' + weekRange(current) },
-        { icon: 'users', value: '赵主管', label: '通信助理 · ' + U().esc(assistant.phone || '—') + ' · 7×24 联系' },
+        { icon: 'users', value: U().esc(assistant.name || commManager || '—'), label: '通信助理 · ' + U().esc(assistant.phone || '—') + ' · 7×24 联系' },
         { icon: 'task', value: '4 人', label: currentRoles.join(' / '), tone: 'blue' },
         { icon: 'clock', value: currentCalls + ' 天', label: (currentCalls * 8) + ' h · 本周出勤', tone: 'green' }
       ]) +

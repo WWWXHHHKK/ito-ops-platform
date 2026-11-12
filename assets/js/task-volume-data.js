@@ -71,10 +71,12 @@
   const managers = {};
   groupIds.forEach(id => {
     const g = (D.groups || []).find(x => x.id === id);
-    managers[id] = (g && g.manager) || (staffByGroup[id][0] || {}).name || '赵主管';
+    managers[id] = (g && g.manager) || (staffByGroup[id][0] || {}).name || '系统';
   });
-  const meetingPeople = (staffByGroup.comm || []).filter(p => p.name.indexOf('主管') === -1);
-  const meetingPool = meetingPeople.length ? meetingPeople : D.staff.filter(p => p.name.indexOf('主管') === -1);
+  const managerNames = {};
+  (D.groups || []).forEach(function (g) { if (g.manager) managerNames[g.manager] = true; });
+  const meetingPeople = (staffByGroup.comm || []).filter(function (p) { return !managerNames[p.name]; });
+  const meetingPool = meetingPeople.length ? meetingPeople : D.staff.filter(function (p) { return !managerNames[p.name]; });
 
   const SYSTEMS = (D.taskTags || []).concat([
     '核心交换机', '防火墙', 'UPS', '空调', '语音网关', '数据库', '监控平台', '办公终端', '存储阵列'

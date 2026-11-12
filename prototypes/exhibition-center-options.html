@@ -741,7 +741,7 @@
       active: 128, closed: 342, overdue: 7, sla: '95.9', ontime: '88.7',
       groups: [42, 33, 29, 24], stages: [18, 11, 14, 85, 342], overdueGroups: [1, 2, 2, 2],
       newToday: 24, closedToday: 21, highRisk: 1, step: 2,
-      title: '高风险审批升级处置', note: '已升级至王主管 · 高风险授权审批中 · 关联割接任务等待执行'
+      title: '高风险审批升级处置', note: '已升级至王振邦 · 高风险授权审批中 · 关联割接任务等待执行'
     },
     {
       id: 'recovered', label: '闭环', tone: 'ok',
@@ -824,10 +824,10 @@
     ];
 
     const groups = [
-      { name: '应用组', manager: '王主管', value: st.groups[0], color: '#EB612A' },
-      { name: '通信组', manager: '赵主管', value: st.groups[1], color: '#0A72E8' },
-      { name: '在线组', manager: '李主管', value: st.groups[2], color: '#1FAE5C' },
-      { name: '基础设施组', manager: '刘主管', value: st.groups[3], color: '#E08A00' }
+      { name: '应用组', manager: '王振邦', value: st.groups[0], color: '#EB612A' },
+      { name: '通信组', manager: '赵宏毅', value: st.groups[1], color: '#0A72E8' },
+      { name: '在线组', manager: '李国维', value: st.groups[2], color: '#1FAE5C' },
+      { name: '基础设施组', manager: '刘建安', value: st.groups[3], color: '#E08A00' }
     ];
 
     const risks = [
@@ -928,7 +928,7 @@
     const sideRows = [
       { name: '变更申请', desc: '变更单与影响分析', meta: '完成', tone: 'ok' },
       { name: '风险评估', desc: '高风险作业识别', meta: '完成', tone: 'ok' },
-      { name: '高风险授权', desc: st.id === 'overdue' ? '审批超时 · 等待升级' : st.id === 'handling' ? '王主管审批中' : st.id === 'recovered' ? '授权通过' : '待审批', meta: st.id === 'recovered' ? '通过' : '待办', tone: st.id === 'overdue' ? 'crit' : st.id === 'handling' ? 'warn' : 'ok' },
+      { name: '高风险授权', desc: st.id === 'overdue' ? '审批超时 · 等待升级' : st.id === 'handling' ? '王振邦审批中' : st.id === 'recovered' ? '授权通过' : '待审批', meta: st.id === 'recovered' ? '通过' : '待办', tone: st.id === 'overdue' ? 'crit' : st.id === 'handling' ? 'warn' : 'ok' },
       { name: '工作票', desc: '高风险作业工作票', meta: st.id === 'recovered' || st.id === 'handling' ? '已签发' : '待签发', tone: taskTone(st, 'work') },
       { name: '割接实施', desc: '通信网络割接窗口', meta: st.id === 'recovered' ? '执行中' : '待执行', tone: taskTone(st, 'cut') },
       { name: '回退验证', desc: '割接后回退校验', meta: st.id === 'recovered' ? '待验证' : '待执行', tone: 'ok' }
@@ -936,7 +936,7 @@
 
     const timeline = [
       { time: '18:00', title: '超期发现', desc: '策略评审超过截止时间' },
-      { time: '19:10', title: '升级主管', desc: '高风险审批升级至王主管' },
+      { time: '19:10', title: '升级主管', desc: '高风险审批升级至王振邦' },
       { time: '20:30', title: '授权通过', desc: '高风险作业授权完成' },
       { time: '21:00', title: '割接执行', desc: '割接进入执行与回退验证' }
     ];
@@ -1025,10 +1025,10 @@
     const st = s();
     const active = st.id === 'overdue' || st.id === 'handling';
     const groups = [
-      { name: '应用组', en: 'APP', manager: '王主管', active: st.groups[0], members: 2, overdue: st.overdueGroups[0], tone: groupTone(st, '应用组') },
-      { name: '通信组', en: 'COMM', manager: '赵主管', active: st.groups[1], members: 2, overdue: st.overdueGroups[1], tone: groupTone(st, '通信组') },
-      { name: '在线组', en: 'ONLINE', manager: '李主管', active: st.groups[2], members: 2, overdue: st.overdueGroups[2], tone: groupTone(st, '在线组') },
-      { name: '基础设施组', en: 'INFRA', manager: '刘主管', active: st.groups[3], members: 2, overdue: st.overdueGroups[3], tone: groupTone(st, '基础设施组') }
+      { name: '应用组', en: 'APP', manager: '王振邦', active: st.groups[0], members: 2, overdue: st.overdueGroups[0], tone: groupTone(st, '应用组') },
+      { name: '通信组', en: 'COMM', manager: '赵宏毅', active: st.groups[1], members: 2, overdue: st.overdueGroups[1], tone: groupTone(st, '通信组') },
+      { name: '在线组', en: 'ONLINE', manager: '李国维', active: st.groups[2], members: 2, overdue: st.overdueGroups[2], tone: groupTone(st, '在线组') },
+      { name: '基础设施组', en: 'INFRA', manager: '刘建安', active: st.groups[3], members: 2, overdue: st.overdueGroups[3], tone: groupTone(st, '基础设施组') }
     ];
 
     const layerHtml = groups.map(function (g, i) {
@@ -1075,9 +1075,9 @@
         ) +
         panel(8, '值班与授权', 'DUTY & AUTH',
           '<div class="twin-bottom-panel twin-risk">' +
-            '<div class="twin-risk-row s-ok"><i></i><b>值班主管</b><em>王主管</em></div>' +
-            '<div class="twin-risk-row s-ok"><i></i><b>白班</b><em>李工 / 陈工</em></div>' +
-            '<div class="twin-risk-row s-ok"><i></i><b>夜班</b><em>赵工</em></div>' +
+            '<div class="twin-risk-row s-ok"><i></i><b>值班主管</b><em>王振邦</em></div>' +
+            '<div class="twin-risk-row s-ok"><i></i><b>白班</b><em>李承远 / 陈启航</em></div>' +
+            '<div class="twin-risk-row s-ok"><i></i><b>夜班</b><em>赵明川</em></div>' +
             '<div class="twin-risk-row s-ok"><i></i><b>授权覆盖</b><em>6 / 8</em></div>' +
             '<div class="capacity-foot"><span>今日交接 08:00</span><b>5 人在岗</b></div>' +
           '</div>',

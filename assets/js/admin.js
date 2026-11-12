@@ -8,7 +8,7 @@
 
   window.ITO = window.ITO || {};
   const D = window.ITO_DATA;
-  const BUILD_VERSION = '20261112z30';
+  const BUILD_VERSION = '20261112z31';
   const DATA_SOURCE = window.ITO_DATA_SOURCE;
   const PERSIST_KEYS = [
     'tasks', 'personalArchive', 'messages', 'logs', 'staff', 'groups', 'auths',
@@ -1403,7 +1403,7 @@
     task.canceled = task.canceled || null;
     task.summaryRework = !!task.summaryRework;
     task.leaderApproval = task.leaderApproval || null;
-    task.source = task.source || (task.initiator === '张经理' ? 'leader' : task.initiator === '系统' ? 'system' : 'self');
+    task.source = task.source || (task.initiator === D.roleInfo.leader.name ? 'leader' : task.initiator === '系统' ? 'system' : 'self');
 
     task.subs = (task.subs || []).map((sub) => {
       if (sub.status === '待派发') sub.status = '待分发';
@@ -1543,7 +1543,7 @@
             planType: 'duty',
             name: '通信值班 · 第' + w.weekNo + '周 · ' + role,
             group: 'comm',
-            owner: '赵主管',
+            owner: (D.groups.find(function (g) { return g.id === 'comm'; }) || {}).manager || D.roleInfo.manager.name,
             executor: row.name,
             due: w.end + ' 20:00',
             hours: 8,
@@ -1744,7 +1744,7 @@
       ensureAudit(p, (p.joined || D.meta.today) + ' 09:00', '系统', '加入组织');
     });
     state.auths.forEach(function (a) {
-      ensureAudit(a, '2026-01-01 09:00', '王主管', '创建授权');
+      ensureAudit(a, '2026-01-01 09:00', D.roleInfo.manager.name, '创建授权');
     });
     state.wallTags.forEach(function (t) {
       ensureAudit(t, '2025-01-01 09:00', '系统', '创建标签');

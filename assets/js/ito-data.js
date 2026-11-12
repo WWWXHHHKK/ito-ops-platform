@@ -494,6 +494,67 @@ window.ITO_DATA = (() => {
     { id: 'AU-2026-0188', person: '潘工',   type: '低压电工证',       group: 'infra',  scope: '机房低压配电作业', validTo: '2027-04-30', status: '有效' }
   ];
 
+  /* 模拟作业授权补全：按专业组资格分配，目标为有效持有人数（含临期，不含已过期）。 */
+  (function seedWorkAuthorizations() {
+    const TARGETS = [
+      { type: '工作负责人授权',   target: 8, groups: ['app'],                        scope: '作业组织、安全交底与现场管控' },
+      { type: '准备工程师授权',   target: 8, groups: ['app'],                        scope: '作业准备、隔离验证与风险识别' },
+      { type: '高风险作业授权',   target: 6, groups: ['comm'],                       scope: '高风险作业现场管控与监护' },
+      { type: 'RP1 授权',         target: 5, groups: ['comm'],                       scope: 'RP1 系统操作与隔离验证' },
+      { type: 'RP2 授权',         target: 5, groups: ['comm', 'online'],             scope: 'RP2 系统操作与设备隔离' },
+      { type: '登高车作业授权',   target: 6, groups: ['comm', 'infra'],              scope: '登高车作业与防坠落措施' },
+      { type: '低压电工证',       target: 6, groups: ['online', 'infra'],            scope: '低压配电与电气作业' },
+      { type: '高压电工证',       target: 3, groups: ['infra'],                      scope: '高压配电与倒闸操作' },
+      { type: '工具库授权',       target: 8, groups: ['app', 'comm', 'online', 'infra'], scope: '工具库借还、校验与盘点' }
+    ];
+    const VALID_TO = ['2027-03-31', '2027-06-30', '2027-09-30'];
+    const workCount = {};
+    let seq = 200;
+    let added = 0;
+    auths.forEach(function (a) {
+      workCount[a.person] = (workCount[a.person] || 0) + 1;
+    });
+    TARGETS.forEach(function (cfg) {
+      const held = {};
+      let current = 0;
+      auths.forEach(function (a) {
+        if (a.type !== cfg.type) return;
+        held[a.person] = true;
+        if (a.status !== '已过期') current += 1;
+      });
+      let guard = 0;
+      while (current < cfg.target && guard < 200) {
+        guard += 1;
+        let best = null;
+        let bestCount = 99;
+        staff.forEach(function (p) {
+          if (cfg.groups.indexOf(p.group) === -1 || held[p.name]) return;
+          const count = workCount[p.name] || 0;
+          if (count >= 3) return;
+          if (count < bestCount) {
+            best = p;
+            bestCount = count;
+          }
+        });
+        if (!best) break;
+        auths.push({
+          id: 'AU-2026-' + ('000' + seq).slice(-4),
+          person: best.name,
+          type: cfg.type,
+          group: best.group,
+          scope: cfg.scope,
+          validTo: VALID_TO[added % VALID_TO.length],
+          status: '有效'
+        });
+        held[best.name] = true;
+        workCount[best.name] = bestCount + 1;
+        seq += 1;
+        added += 1;
+        current += 1;
+      }
+    });
+  })();
+
   const messages = [
     { id: 'MSG-001', type: '审批', title: '高风险作业授权待审批', body: 'T10027-03「UPS 电池组测试」已提交高风险作业授权，请尽快完成审批。', time: '2026-11-02 18:20', read: false },
     { id: 'MSG-002', type: '超期', title: 'UPS 电池组测试已超期', body: 'T10027-03「UPS 电池组测试」已超过截止时间 5 天，请优先处置。', time: '2026-11-02 20:00', read: false },
@@ -1543,9 +1604,10 @@ window.ITO_DATA = (() => {
       { key: '网络', post: '通信值班-网络', code: 'TX-WL' },
       { key: '桌面', post: '通信值班-桌面', code: 'TX-ZM' }
     ];
+    const commManager = (data.groups.find(function (g) { return g.id === 'comm'; }) || {}).manager;
+    const assistant = data.staff.find(function (p) { return p.name === commManager; }) || {};
     data.duty.weeks.forEach(function (w) {
-      const assistant = data.staff.find(function (p) { return p.name === '赵主管'; }) || {};
-      const roster = [{ post: '通信助理', code: 'TX-ZL', name: '赵主管', phone: assistant.phone || '' }];
+      const roster = [{ post: '通信助理', code: 'TX-ZL', name: commManager || '—', phone: assistant.phone || '' }];
       META.forEach(function (meta, k) {
         const name = (w.team || [])[k];
         if (!name) return;
@@ -1909,6 +1971,88 @@ window.ITO_DATA = (() => {
       }
     });
   })();
+
+  /* 全量模拟姓名映射：人员、授权、值班、任务、日志、大修与外部人员统一替换。 */
+  const NAME_MAP = {
+    '李工': '李承远',
+    '陈工': '陈启航',
+    '赵工': '赵明川',
+    '周工': '周文博',
+    '孙工': '孙立恒',
+    '吴工': '吴承宇',
+    '刘工': '刘景行',
+    '郑工': '郑云舟',
+    '王主管': '王振邦',
+    '赵主管': '赵宏毅',
+    '李主管': '李国维',
+    '刘主管': '刘建安',
+    '林工': '林书言',
+    '何工': '何俊驰',
+    '高工': '高远航',
+    '徐工': '徐嘉宁',
+    '马工': '马骁然',
+    '朱工': '朱明哲',
+    '胡工': '胡启元',
+    '郭工': '郭远山',
+    '罗工': '罗子谦',
+    '梁工': '梁思远',
+    '宋工': '宋云开',
+    '唐工': '唐正阳',
+    '许工': '许星河',
+    '邓工': '邓嘉树',
+    '冯工': '冯亦辰',
+    '曹工': '曹景明',
+    '彭工': '彭泽宇',
+    '曾工': '曾令仪',
+    '肖工': '肖承泽',
+    '田工': '田雨辰',
+    '董工': '董书恒',
+    '袁工': '袁浩然',
+    '潘工': '潘立新',
+    '蒋工': '蒋云帆',
+    '蔡工': '蔡明轩',
+    '余工': '余嘉禾',
+    '杜工': '杜文清',
+    '叶工': '叶青云',
+    '张经理': '张维远',
+    '吴工（工程公司）': '吴立诚（工程公司）',
+    '沈工（工程公司）': '沈望舒（工程公司）',
+    '韩工（工程公司）': '韩立言（工程公司）',
+    '周皓': '周允成'
+  };
+  const NAME_KEYS = Object.keys(NAME_MAP).sort(function (a, b) { return b.length - a.length; });
+  const NAME_BOUNDARY = '[\\s、，,。；;：:（）()\\[\\]【】《》@+\\/|·\\-]';
+  const NAME_ALT = NAME_KEYS.map(function (name) {
+    return name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }).join('|');
+  const NAME_RE = new RegExp('(^|' + NAME_BOUNDARY + ')(' + NAME_ALT + ')(?=$|' + NAME_BOUNDARY + '|[0-9])', 'g');
+  const PAREN_NAME_RE = new RegExp('([（(])(' + NAME_ALT + ')(?=[\\u4e00-\\u9fa5])', 'g');
+
+  function renameText(value) {
+    return String(value)
+      .replace(NAME_RE, function (_, lead, name) { return lead + (NAME_MAP[name] || name); })
+      .replace(PAREN_NAME_RE, function (_, lead, name) { return lead + (NAME_MAP[name] || name); });
+  }
+
+  const renamedSeen = new WeakSet();
+  function renameNames(value) {
+    if (typeof value === 'string') return renameText(value);
+    if (!value || typeof value !== 'object') return value;
+    if (renamedSeen.has(value)) return value;
+    renamedSeen.add(value);
+    if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i += 1) value[i] = renameNames(value[i]);
+      return value;
+    }
+    Object.keys(value).forEach(function (key) {
+      const renamedKey = NAME_MAP[key] || key;
+      const next = renameNames(value[key]);
+      if (renamedKey !== key) delete value[key];
+      value[renamedKey] = next;
+    });
+    return value;
+  }
+  renameNames(data);
 
   const ITO = window.ITO = window.ITO || {};
   ITO.authStatus = function (validTo) {

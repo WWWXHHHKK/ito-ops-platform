@@ -12,9 +12,9 @@
   function U() { return ITO.ui; }
 
   const ROLES = [
-    { key: 'leader', name: '领导层', person: '张经理', tone: 'leader' },
-    { key: 'manager', name: '主管层', person: '王主管', tone: 'manager' },
-    { key: 'employee', name: '员工层', person: '李工', tone: 'employee' },
+    { key: 'leader', name: '领导层', person: D.roleInfo.leader.name, tone: 'leader' },
+    { key: 'manager', name: '主管层', person: D.roleInfo.manager.name, tone: 'manager' },
+    { key: 'employee', name: '员工层', person: D.roleInfo.employee.name, tone: 'employee' },
     { key: 'admin', name: '系统管理员', person: '平台管理员', tone: 'admin' }
   ];
 

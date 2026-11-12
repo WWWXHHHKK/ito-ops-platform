@@ -239,7 +239,7 @@
 
   function sourceOf(t) {
     if (t.source) return t.source;
-    if (t.initiator === '张经理') return 'leader';
+    if (t.initiator === D.roleInfo.leader.name) return 'leader';
     if (t.initiator === '系统') return 'system';
     return 'self';
   }

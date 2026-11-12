@@ -99,7 +99,7 @@
     {
       id: 'handling', label: '处置', tone: 'warn', flow: 'warn',
       title: '高风险审批升级处置',
-      note: '已升级至刘主管 · 高风险授权审批中',
+      note: '已升级至' + ((D.groups.find(function (g) { return g.id === 'infra'; }) || {}).manager || '基础设施组主管') + ' · 高风险授权审批中',
       route: 'dispatch'
     },
     {

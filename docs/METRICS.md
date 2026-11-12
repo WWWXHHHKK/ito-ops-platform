@@ -210,7 +210,7 @@
 | `SLA-BREACH-COUNT` | 超期次数 | L2 | 规模 | 当前未完成且已过截止的子任务数 | count(overdue) | **7** | 0 | `C` |
 | `SLA-BREACH-PRIORITY` | 分级超期率 | L2 | 分布 | 各等级超期子任务÷该等级在办子任务 | 按 level 分组 | **紧急 75.0 / 重要 42.9 / 一般 33.3** | ≤3% | `C` |
 | `SLA-APPROVAL-P90` | 审批时长 P90 | L3 | 时效 | 待审批事项年龄的第 90 百分位 | nearest-rank P90 | **131.9h** | ≤72h | `C` |
-| `SLA-APPROVAL-ROLE` | 审批人分布 | L3 | 分布 | 待审批事项按审批人分组 | 按 approver 分组 | **张经理 2 / 刘主管 1 / 赵主管 1 / 陈工 1 / 王主管 1** | — | `C` |
+| `SLA-APPROVAL-ROLE` | 审批人分布 | L3 | 分布 | 待审批事项按审批人分组 | 按 approver 分组 | **张维远 2 / 刘建安 1 / 赵宏毅 1 / 陈启航 1 / 王振邦 1** | — | `C` |
 | `SLA-CLOSE-7D` | 近 7 天闭环 | L3 | 规模 | 最近 7 个自然日闭环任务数 | Σ最近 7 日 completed | **90** | — | `C` |
 | `SLA-NEW-7D` | 近 7 天新增 | L3 | 规模 | 最近 7 个自然日新增任务数 | Σ最近 7 日 newTasks | **102** | — | `C` |
 | `SLA-BACKLOG-TREND` | 近 7 天积压变化 | L3 | 规模 | 近 7 天新增减闭环 | 102−90 | **+12** | ≤0 | `C` |
@@ -303,8 +303,8 @@
 | `DUT-WEEKS` | 排班周数 | L2 | 规模 | 当前生成的值班周数 | count(weeks) | **13** | — | `C` |
 | `DUT-ROTATION` | 轮值人数 | L2 | 规模 | 参与值班轮换的人数 | count(pool) | **9** | 9 | `C` |
 | `DUT-COVERAGE` | 值班覆盖率 | L1 | 比率 | 已排班周数占应有周数比例 | 已排班周÷应有周 | **100.0%** | 100% | `C` |
-| `DUT-CURRENT` | 本周值班组 | L3 | 明细 | 当前周 4 个值班角色人员 | weeks[currentKey].dutyRoster | **郭工 / 赵工 / 周工 / 罗工** | — | `C` |
-| `DUT-NEXT` | 下周值班组 | L3 | 明细 | 下一周 4 个值班角色人员 | weeks[nextKey].dutyRoster | **梁工 / 宋工 / 唐工 / 许工** | — | `C` |
+| `DUT-CURRENT` | 本周值班组 | L3 | 明细 | 当前周 4 个值班角色人员 | weeks[currentKey].dutyRoster | **郭远山 / 赵明川 / 周文博 / 罗子谦** | — | `C` |
+| `DUT-NEXT` | 下周值班组 | L3 | 明细 | 下一周 4 个值班角色人员 | weeks[nextKey].dutyRoster | **梁思远 / 宋云开 / 唐正阳 / 许星河** | — | `C` |
 | `DUT-CURRENT-OPEN` | 值班人在办 | L2 | 规模 | 本周值班人名下未完成子任务 | 值班人 open 计数 | **3** | ≤3 | `C` |
 | `DUT-CURRENT-OVERDUE` | 值班人超期 | L2 | 规模 | 本周值班人名下超期子任务 | 值班人 overdue 计数 | **1** | 0 | `C` |
 | `DUT-CURRENT-CLOSED` | 值班人闭环 | L3 | 规模 | 本周值班人名下已完成子任务 | 值班人 closed 计数 | **1** | — | `C` |
@@ -313,24 +313,24 @@
 | `DUT-SWAP` | 调班次数 | L3 | 规模 | 统计周期内值班调整次数 | count(note) | **0** | 0 | `C` |
 | `DUT-NIGHT-EVENTS` | 夜间事件数 | L2 | 规模 | 值班时段内 20:00–08:00 发生的事件数 | count(20:00–08:00) | **—** | ≤10 | `G` |
 
-> 值班人员模型为通信组一套人员：通信助理赵主管不参与轮换，应急 / 线路 / 网络 / 桌面从 9 人池按周轮换；出勤按天 8h 计入常规任务，不再使用单人「本周值班人」口径。原 `DUT-CURRENT-OPEN / OVERDUE / CLOSED` 为旧单人模型指标，已停用。
+> 值班人员模型为通信组一套人员：通信助理赵宏毅不参与轮换，应急 / 线路 / 网络 / 桌面从 9 人池按周轮换；出勤按天 8h 计入常规任务，不再使用单人「本周值班人」口径。原 `DUT-CURRENT-OPEN / OVERDUE / CLOSED` 为旧单人模型指标，已停用。
 
 ### 3.8 授权 `AUT`（12）
 
 | ID | 名称 | 层级 | 类型 | 定义 | 公式 | 当前值 | 目标 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `AUT-TOTAL` | 授权总数 | L2 | 规模 | 授权台账记录总数 | count(auths) | **20** | — | `C` |
-| `AUT-VALID` | 有效授权 | L1 | 规模 | 未撤销且未过期的授权数 | count(effective) | **17** | — | `C` |
+| `AUT-TOTAL` | 授权总数 | L2 | 规模 | 授权台账记录总数 | count(auths) | **58** | — | `C` |
+| `AUT-VALID` | 有效授权 | L1 | 规模 | 未撤销且未过期的授权数 | count(effective) | **55** | — | `C` |
 | `AUT-EXPIRED` | 已过期 | L2 | 规模 | validTo 早于今天的授权数 | count(过期) | **3** | 0 | `C` |
 | `AUT-REVOKED` | 已撤销 | L3 | 规模 | 状态为已撤销的授权数 | count(已撤销) | **0** | 0 | `C` |
-| `AUT-EXPIRING-60D` | 60 天内到期 | L1 | 规模 | 未来 60 天内到期且未撤销的授权数 | 0≤剩余天数≤60（`ITO.authStatus` 临期口径） | **10**（矩阵含基础资格 26） | ≤6 | `C` |
-| `AUT-COVERAGE` | 授权覆盖率 | L1 | 比率 | 至少持有一条有效授权的人数÷总人数 | 有效授权人数÷40 | **95.0%** | 100% | `C` |
-| `AUT-AVG-REMAIN` | 平均剩余天数 | L2 | 时效 | 有效授权剩余有效期的平均值 | Σ剩余天数÷有效授权数 | **91 天** | ≥60 天 | `C` |
-| `AUT-HIGHRISK` | 高风险授权人数 | L2 | 规模 | 持有效高风险作业授权的人数 | distinct(person, type=高风险作业, 有效) | **3** | ≥2 | `C` |
-| `AUT-WORKLEAD` | 工作负责人授权人数 | L2 | 规模 | 持有效工作负责人授权的人数 | distinct(person, type=工作负责人, 有效) | **4** | ≥3 | `C` |
-| `AUT-UTILIZATION` | 授权使用率 | L2 | 比率 | 被任务实际引用的有效授权÷有效授权数 | 引用数÷17 | **—** | ≥60% | `G` |
-| `AUT-REVOKE-RATE` | 授权撤销率 | L3 | 比率 | 已撤销÷授权总数 | 0÷20 | **0.0%** | 0 | `C` |
-| `AUT-EXPIRY-90D` | 90 天内到期 | L2 | 规模 | 未来 90 天内到期且未撤销的授权数 | 0≤剩余≤90 | **6** | ≤4 | `C` |
+| `AUT-EXPIRING-60D` | 60 天内到期 | L1 | 规模 | 未来 60 天内到期且未撤销的授权数 | 0≤剩余天数≤60（`ITO.authStatus` 临期口径） | **10**（矩阵另含值班授权 10） | ≤6 | `C` |
+| `AUT-COVERAGE` | 授权覆盖率 | L1 | 比率 | 至少持有一条有效授权的人数÷总人数 | 有效授权人数÷40 | **100.0%** | 100% | `C` |
+| `AUT-AVG-REMAIN` | 平均剩余天数 | L2 | 时效 | 有效授权剩余有效期的平均值 | Σ剩余天数÷有效授权数 | **195.8 天** | ≥60 天 | `C` |
+| `AUT-HIGHRISK` | 高风险授权人数 | L2 | 规模 | 持有效高风险作业授权的人数 | distinct(person, type=高风险作业, 有效) | **6** | ≥2 | `C` |
+| `AUT-WORKLEAD` | 工作负责人授权人数 | L2 | 规模 | 持有效工作负责人授权的人数 | distinct(person, type=工作负责人, 有效) | **8** | ≥3 | `C` |
+| `AUT-UTILIZATION` | 授权使用率 | L2 | 比率 | 被任务实际引用的有效授权÷有效授权数 | 引用数÷55 | **—** | ≥60% | `G` |
+| `AUT-REVOKE-RATE` | 授权撤销率 | L3 | 比率 | 已撤销÷授权总数 | 0÷58 | **0.0%** | 0 | `C` |
+| `AUT-EXPIRY-90D` | 90 天内到期 | L2 | 规模 | 未来 90 天内到期且未撤销的授权数 | 0≤剩余≤90 | **11** | ≤4 | `C` |
 
 ### 3.9 消息 `MSG`（11）
 
@@ -391,7 +391,7 @@
 | `PPL-TAG-COVERAGE` | 人员标签覆盖率 | L2 | 比率 | 至少有一个旧标签字段值的人数÷总人数 | 非空 tags÷40 | **100.0%** | 100% | `C` |
 | `PPL-SYSTEM-SKILL` | 系统熟练度覆盖 | L3 | 比率 | 标注 KCC 或 DTT 熟练度的人数÷总人数 | 含 KCC/DTT÷40 | **17.5%** | ≥50% | `C` |
 | `PPL-SKILL-COVERAGE` | 技能标签覆盖率 | L2 | 比率 | 至少有一个 SKL 标签的人数÷总人数 | 23÷40 | **57.5%** | ≥80% | `C` |
-| `PPL-HIGHRISK-RATE` | 高风险授权覆盖率 | L2 | 比率 | 持有效高风险授权人数÷总人数 | 3÷40 | **7.5%** | ≥25% | `C` |
+| `PPL-HIGHRISK-RATE` | 高风险授权覆盖率 | L2 | 比率 | 持有效高风险授权人数÷总人数 | 6÷40 | **15.0%** | ≥25% | `C` |
 | `PPL-UTILIZATION` | 工时利用率 | L2 | 比率 | 实际工时÷可用工时 | 实际÷可用 | **—** | 70–90% | `G` |
 | `PPL-TRAINING` | 人均培训时长 | L3 | 时效 | 培训总时长÷人数 | Σ培训÷40 | **—** | ≥40h | `G` |
 
@@ -518,10 +518,10 @@
 ### 4.13 授权覆盖率 `AUT-COVERAGE`
 
 - **公式**：至少持有一条有效授权的人数 ÷ 总人数。
-- **当前值**：38 / 40 = 95.0%。
+- **当前值**：40 / 40 = 100.0%。
 - **目标 / 预警**：100% / <90%。
-- **读法**：40 人中 38 人至少持有一条有效授权；2 人暂无有效授权。
-- **注意**：有效授权 17 条，其中 60 天内到期 10 条；覆盖率不是“长期安全”的同义词。
+- **读法**：40 人全部持有一条以上有效授权（入厂授权、基本安全培训全员有效）。
+- **注意**：有效授权 55 条，其中 60 天内到期 10 条；矩阵另含 10 条值班授权临期。覆盖率不是“长期安全”的同义词。
 
 ### 4.14 未读消息 `MSG-UNREAD`
 
@@ -644,7 +644,7 @@
 | 05 | 任务流量沙盘 | `TSK-OPENING`、`TSK-NEW-30D`、`TSK-CLOSED-30D`、`TSK-ACTIVE` | 86 + 384 = 470，342 + 128 = 470；节点下钻 |
 | 06 | 任务类型构成 | — | 巡检 38 / 变更 31 / 开发 27 / 维保 19 / 试验 13，切片树图 |
 | 07 | 超期时长分布 | `TSK-OVERDUE` | <1 天 1 / 1–3 天 2 / 3–5 天 2 / ≥5 天 2，合计 7 |
-| 08 | 值班与授权 | `DUT-CURRENT`、`DUT-NEXT`、`AUT-VALID`、`AUT-EXPIRING-60D`、`AUT-COVERAGE` | 周工 / 郭工，授权覆盖 38/40 |
+| 08 | 值班与授权 | `DUT-CURRENT`、`DUT-NEXT`、`AUT-VALID`、`AUT-EXPIRING-60D`、`AUT-COVERAGE` | 郭远山 / 赵明川 / 周文博 / 罗子谦，授权覆盖 40/40 |
 | 09 | 任务 SLA | `SLA-TASK`、`SLA-ONTIME`、`SLA-AVG-CLOSE`、`SLA-OVERDUE-RATE` | 92.0 分 / A 级，目标 ≥90 分 |
 | 10 | 维保计划 | `MNT-ENABLED`、`MNT-NEXT`、`MNT-VENDORS-ACTIVE` | 3/4 启用，下次 11-07 09:00，厂商 3 家 |
 | 11 | 待办与消息 | `TSK-PENDING`、`MSG-UNREAD`、`MSG-TOTAL` | 待处理 9，未读 3 / 共 6 |
@@ -658,9 +658,9 @@
 | 派发与审批 | `TSK-PENDING`、`SLA-APPROVAL-72H`、`SLA-APPROVAL-AGE-AVG`、`SLA-APPROVAL-AGE-MAX`、`SLA-APPROVAL-OVERDUE` | 6 项待审批，3 项超 72h |
 | 巡检管理 | `INS-PLANS`、`INS-ENABLED`、`INS-RECORDS`、`INS-ABNORMAL-ITEMS`、`INS-RECTIFY-RATE` | 5 计划 / 4 启用 / 5 记录 / 2 异常 |
 | 维保管理 | `MNT-PLANS`、`MNT-ENABLED`、`MNT-RECORDS`、`MNT-VENDORS-ALL`、`MNT-NEXT` | 4 计划 / 3 启用 / 4 记录 / 4 厂商 |
-| 值班管理 | `DUT-WEEKS`、`DUT-ROTATION`、`DUT-COVERAGE`、`DUT-CURRENT`、`DUT-NEXT` | 13 周 / 8 人 / 本周周工 |
+| 值班管理 | `DUT-WEEKS`、`DUT-ROTATION`、`DUT-COVERAGE`、`DUT-CURRENT`、`DUT-NEXT` | 13 周 / 9 人轮换 / 本周郭远山 |
 | 组织架构 | `GRP-ACTIVE`、`GRP-OVERDUE`、`GRP-PER-CAPITA`、`PPL-TOTAL`、`PPL-CORE` | 4 组 / 40 人 / 每组 10 人 |
-| 授权管理 | `AUT-TOTAL`、`AUT-VALID`、`AUT-EXPIRED`、`AUT-EXPIRING-60D`、`AUT-COVERAGE` | 台账 20 条 / 17 有效 / 3 过期 / 10 临期；矩阵 38 实际 / 32 可拿 / 26 临期 / 9 过期 |
+| 授权管理 | `AUT-TOTAL`、`AUT-VALID`、`AUT-EXPIRED`、`AUT-EXPIRING-60D`、`AUT-COVERAGE` | 台账 58 条 / 55 有效 / 3 过期 / 10 临期；矩阵 40 实际 / 32 可拿 / 20 临期 / 3 过期 |
 | 站内消息 | `MSG-TOTAL`、`MSG-UNREAD`、`MSG-TODAY`、`MSG-TYPES` | 6 条 / 3 未读 / 2 今日 / 6 类 |
 | 预警规则 | `ALR-RULES`、`ALR-ENABLED`、`ALR-ENABLE-RATE`、`ALR-CHANNELS` | 5 条 / 5 启用 / 站内渠道 |
 | 操作日志 | `DAT-LOG-TOTAL` | 10 条 / 今日 4 / 系统 4 / 7 个操作人 / 6 类 |
@@ -811,8 +811,8 @@
 | `ito-data.js staff/groups` | `PPL-*`、`GRP-MEMBERS`、`GRP-PER-CAPITA` | 40 人 / 4 组 |
 | `ito-data.js inspection*` | `INS-*` | 5 计划 / 5 记录 |
 | `ito-data.js maintenance*` | `MNT-*` | 4 计划 / 4 记录 |
-| `ito-data.js duty` | `DUT-*` | 13 周 / 8 人轮换 |
-| `ito-data.js auths` | `AUT-*` | 20 条授权 |
+| `ito-data.js duty` | `DUT-*` | 13 周 / 9 人轮换 |
+| `ito-data.js auths` | `AUT-*` | 58 条授权（55 有效 / 3 过期） |
 | `ito-data.js messages` | `MSG-*` | 6 条消息 |
 | `ito-data.js alertRules` | `ALR-*` | 5 条规则 |
 | `ito-data.js logs/achievements/permissions` | `DAT-*` | 10 日志 / 6 成就标签 / 4×10 权限 |
