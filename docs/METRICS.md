@@ -637,7 +637,7 @@
 
 | 编号 | 面板 | 主要指标 | 备注 |
 | --- | --- | --- | --- |
-| 01 | 任务健康 | `TSK-ACTIVE`、`TSK-OVERDUE`、`TSK-DUE-TODAY` | 分段状态带：109 正常 / 12 临期 / 7 超期，健康率 85.2% |
+| 01 | 任务健康 | `TSK-ACTIVE`、`TSK-OVERDUE`、`TSK-DUE-TODAY` | 分段状态带：217 正常 / 8 临期 / 13 超期，健康率 91.2% |
 | 02 | 任务流量 | `TSK-NEW-30D`、`TSK-CLOSED-30D`、`TSK-NET-FLOW` | 日均新增 12.8 / 日均闭环 11.4 / 日均净流入 +1.4，30/7 天切换 |
 | 03 | 巡检执行 | `INS-ENABLED`、`INS-RECORDS`、`INS-ABNORMAL-ITEMS`、`INS-RECTIFY-RATE` | 4/5 启用，近 7 天矩阵，2 个异常项，整改 100% |
 | 04 | 今日态势 | `TSK-ACTIVE`、`TSK-CLOSED-30D`、`TSK-HIGH-RISK` | 今日新增 10 / 闭环 8 / 净流入 +2 / 高风险 3；四态控制位于 05 头部 |

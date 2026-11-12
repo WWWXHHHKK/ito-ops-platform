@@ -8,7 +8,7 @@
 
   window.ITO = window.ITO || {};
   const D = window.ITO_DATA;
-  const BUILD_VERSION = '20261112z31';
+  const BUILD_VERSION = '20261112z32';
   const DATA_SOURCE = window.ITO_DATA_SOURCE;
   const PERSIST_KEYS = [
     'tasks', 'personalArchive', 'messages', 'logs', 'staff', 'groups', 'auths',
@@ -1065,9 +1065,8 @@
     closeOverlays();
     const url = new URL(location.href);
     url.searchParams.set('role', role);
-    url.hash = '';
-    history.replaceState(null, '', url.pathname + url.search);
-    enterApp(role);
+    history.replaceState(null, '', url.pathname + url.search + url.hash);
+    enterApp(role, { routeMode: 'preserve' });
   }
 
   function renderShell() {
@@ -1352,13 +1351,16 @@
 
     grid.addEventListener('click', (e) => {
       const card = e.target.closest('[data-role]');
-      if (card) enterApp(card.dataset.role);
+      if (card) enterApp(card.dataset.role, { routeMode: 'default' });
     });
   }
 
-  function enterApp(roleKey) {
+  function enterApp(roleKey, options) {
     if (!D.roleInfo[roleKey]) return;
     if (roleKey === 'super' && !devMode) return;
+    const opts = options || {};
+    const mode = opts.routeMode || 'auto';
+    const prevScroll = window.scrollY || 0;
     state.role = roleKey;
     state.user = D.roleInfo[roleKey];
     sessionStorage.setItem('ito.admin.role', roleKey);
@@ -1372,10 +1374,26 @@
     const rawHash = qIndex > -1 ? fullHash.slice(0, qIndex) : fullHash;
     const rawQuery = qIndex > -1 ? fullHash.slice(qIndex) : '';
     const saved = parseHash();
-    const target = !rawHash ? defaultRoute() : (can(saved) ? saved : defaultRoute());
-    const hash = '#/' + target + (target === rawHash ? rawQuery : '');
-    if (location.hash === hash) render();
-    else location.hash = hash;
+    let target;
+    if (mode === 'default') {
+      target = defaultRoute();
+    } else if (mode === 'preserve' && rawHash) {
+      target = can(saved) ? saved : defaultRoute();
+      if (target !== saved) toast('当前身份无权访问该模块，已返回默认页', 'warn');
+    } else {
+      target = !rawHash ? defaultRoute() : (can(saved) ? saved : defaultRoute());
+    }
+    const keepQuery = mode !== 'default' && target === rawHash;
+    const hash = '#/' + target + (keepQuery ? rawQuery : '');
+    if (location.hash === hash) {
+      render({
+        preservePager: mode === 'preserve',
+        preserveScroll: mode === 'preserve',
+        scrollY: prevScroll
+      });
+    } else {
+      location.hash = hash;
+    }
     setTimeout(showEntryMessages, 420);
     if (window.ITO_ALERT_ENGINE) window.ITO_ALERT_ENGINE.start();
   }

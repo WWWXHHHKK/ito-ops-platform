@@ -369,7 +369,8 @@
         } else if (i < overdueHours.length + dueSoonHours.length) {
           due = new Date(demoNow.getTime() + dueSoonHours[i - overdueHours.length] * 3600000);
         } else {
-          due = new Date(novStart.getTime() + (14 + (i % 15)) * 86400000 + (8 + (i % 9)) * 3600000);
+          /* 正常在办任务跟随演示日顺延，保证 12 月演示时健康率仍为 91.2%。 */
+          due = new Date(demoNow.getTime() + (14 + (i % 15)) * 86400000 + (8 + (i % 9)) * 3600000);
         }
         t.due = dateTime(due);
         if (!t.createdAt || parse(t.createdAt) >= due || String(t.createdAt).slice(0, 10) === todayKey) {
