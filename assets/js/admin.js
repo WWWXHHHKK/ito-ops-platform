@@ -8,7 +8,7 @@
 
   window.ITO = window.ITO || {};
   const D = window.ITO_DATA;
-  const BUILD_VERSION = '20261112z29';
+  const BUILD_VERSION = '20261112z30';
   const DATA_SOURCE = window.ITO_DATA_SOURCE;
   const PERSIST_KEYS = [
     'tasks', 'personalArchive', 'messages', 'logs', 'staff', 'groups', 'auths',

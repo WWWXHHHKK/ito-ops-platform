@@ -43,13 +43,13 @@
       // 值班授权按人发放：通信组 10 人（含值班主管），其他组不持有
       const pool = (D.duty && D.duty.authPool) || [];
       if (pool.indexOf(person.name) === -1) return null;
-      return { validTo: '2026-12-31', base: true, source: '基础资格' };
+      return { validTo: '2027-01-10', base: true, source: '基础资格' };
     }
     // 入厂授权 / 基本安全培训：准入基础，全员持有；少数已过期 / 临期用于演示补办提醒
     let validTo = type === '入厂授权' ? '2027-10-28' : '2027-06-30';
     const sample = person.name !== '赵工';
     if (sample && index % 14 === 2) validTo = type === '入厂授权' ? '2026-10-15' : '2026-09-30';
-    if (sample && index % 11 === 3) validTo = '2026-12-20';
+    if (sample && index % 11 === 3) validTo = '2027-01-10';
     return { validTo: validTo, base: true, source: '基础资格' };
   }
 
