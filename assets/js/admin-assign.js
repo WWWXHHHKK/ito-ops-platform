@@ -280,7 +280,8 @@
           ? '<div class="assign-fit-note">本组同资质人员均承担大修任务，改派空间有限。</div>'
           : '')
       : '';
-    const dueBtn = fit.suggestedDate && opts.allowDue !== false
+    const currentDue = fit.currentEnd ? String(fit.currentEnd).slice(0, 10) : '';
+    const dueBtn = fit.suggestedDate && opts.allowDue !== false && (!currentDue || fit.suggestedDate > currentDue)
       ? '<button class="btn btn-ghost btn-sm" type="button" data-assign-due="' + U().esc(fit.suggestedDate) + '">' +
         '建议截止 ' + U().esc(mmdd(fit.suggestedDate)) + (fit.suggestedItem ? '（避开「' + U().esc(fit.suggestedItem.name) + '」）' : '') + '</button>'
       : '';
@@ -338,8 +339,6 @@
       return '<div class="detail-section"><h4>' + U().esc(fit.summary.name) + ' · ' + U().esc(fit.summary.basis) + '</h4>' +
         '<p style="margin:0 0 8px">' + U().esc(conflictLine(fit)) + '</p>' +
         '<ul style="margin:0 0 8px;padding-left:18px">' + items + '</ul>' + load +
-        (fit.suggestedDate ? '<p style="margin:8px 0 0">建议截止：<b>' + U().esc(fit.suggestedDate) + '</b>' +
-          (fit.suggestedItem ? '（避开「' + U().esc(fit.suggestedItem.name) + '」）' : '') + '</p>' : '') +
         '</div>';
     }).join('');
     U().modal({

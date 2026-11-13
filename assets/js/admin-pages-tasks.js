@@ -1024,6 +1024,7 @@
         const singleOwner = root.querySelector('#ntSingleOwner');
         let singleAnchorOwner = singleOwner.value;
         let singleAltUsed = false;
+        let singleDueUsed = false;
         const singleDue = root.querySelector('#ntSingleDue');
         const singleTicket = root.querySelector('#ntSingleTicket');
         const singleAuth = root.querySelector('#ntSingleAuth');
@@ -1214,10 +1215,12 @@
           });
           singleAnchorOwner = '';
           singleAltUsed = false;
+          singleDueUsed = false;
           rows = rows.map(function (row) {
             row.owner = '';
             row._altAnchor = '';
             row._altUsed = false;
+            row._dueUsed = false;
             return row;
           });
           renderRows();
@@ -1315,7 +1318,7 @@
           const suppressAlt = singleAltUsed || (!!singleAnchorOwner && s.owner !== singleAnchorOwner);
           const fit = fitFor(s.owner, s.auth, s.hours, s.due);
           if (!fit || fit.level === 'none') return;
-          singleOverhaul.innerHTML = window.ITO.assignPanelHtml(fit, { allowPick: !live && !suppressAlt, allowDue: true });
+          singleOverhaul.innerHTML = window.ITO.assignPanelHtml(fit, { allowPick: !live && !suppressAlt, allowDue: !singleDueUsed });
           window.ITO.bindAssignPanel(singleOverhaul, null, {
             onPick: function (name) {
               singleAltUsed = true;
@@ -1323,6 +1326,7 @@
               singleOwner.dispatchEvent(new Event('change', { bubbles: true }));
             },
             onDue: function (date) {
+              singleDueUsed = true;
               singleDue.value = date + 'T18:00';
               singleDue.dispatchEvent(new Event('change', { bubbles: true }));
             }
@@ -1373,7 +1377,7 @@
             const body = shown.map(function (x, idx) {
               return '<div class="detail-section" data-overhaul-section="' + idx + '"><h4>第 ' + (x.i + 1) + ' 行 · ' +
                 U().esc(x.row.name || '未命名') + ' · ' + U().esc(x.row.owner) + '</h4>' +
-                window.ITO.assignPanelHtml(x.fit, { allowPick: !live && !x.suppressAlt, allowDue: true }) + '</div>';
+                window.ITO.assignPanelHtml(x.fit, { allowPick: !live && !x.suppressAlt, allowDue: !x.row._dueUsed }) + '</div>';
             }).join('');
             U().modal({
               title: '拆分任务大修冲突',
@@ -1398,6 +1402,7 @@
                       paintSplitOverhaul();
                     },
                     onDue: function (date) {
+                      entry.row._dueUsed = true;
                       const input = tbody.querySelector('tr[data-row="' + entry.i + '"] [data-f="due"]');
                       if (input) {
                         input.value = date + 'T18:00';
@@ -1692,7 +1697,7 @@
           '<b>' + U().esc(sub.name) + '</b><span class="mono">' + sub.id + '</span></div>' +
         '<div id="dpOverhaul" style="margin-top:12px"></div>' +
         '<div class="form-grid" style="margin-top:16px">' +
-          U().formRow({ label: '执行人', required: true, control: '<select id="dpOwner">' + U().peopleOptions(sub.group, sub.owner, { auth: sub.ticket ? sub.auth : '无需授权', hours: sub.hours, due: sub.due }) + '</select>' }) +
+          U().formRow({ label: '执行人', required: true, control: '<select id="dpOwner"><option value="">请选择执行人</option>' + U().peopleOptions(sub.group, '', { auth: sub.ticket ? sub.auth : '无需授权', hours: sub.hours, due: sub.due }) + '</select>' }) +
           U().formRow({ label: '截止时间', required: true, control: '<input id="dpDue" type="datetime-local" value="' + dueVal + '">' }) +
           U().formRow({ label: '作业授权', full: true, control: '<select id="dpAuth">' + U().statusOptions(AUTH_TYPES, sub.ticket ? (sub.auth === '—' ? '工作负责人授权' : sub.auth) : '无需授权') + '</select>' }) +
           '<div class="form-field full"><div class="assign-hint" id="dpHint"></div></div>' +
@@ -1706,8 +1711,9 @@
         const dueInput = root.querySelector('#dpDue');
         const dpHint = root.querySelector('#dpHint');
         const dpOverhaul = root.querySelector('#dpOverhaul');
-        const anchorOwner = sub.owner;
+        let anchorOwner = '';
         let altUsed = false;
+        let dueUsed = false;
         const fitNow = function () {
           if (!window.ITO.assignmentFit || !ownerSel.value) return null;
           return window.ITO.assignmentFit({
@@ -1720,9 +1726,10 @@
         };
         const paintOverhaul = function () {
           if (!dpOverhaul || !window.ITO.assignPanelHtml) return;
+          if (!anchorOwner && ownerSel.value) anchorOwner = ownerSel.value;
           const fit = fitNow();
           const suppressAlt = altUsed || (!!anchorOwner && ownerSel.value !== anchorOwner);
-          dpOverhaul.innerHTML = fit ? window.ITO.assignPanelHtml(fit, { allowPick: !suppressAlt, allowDue: true }) : '';
+          dpOverhaul.innerHTML = fit ? window.ITO.assignPanelHtml(fit, { allowPick: !suppressAlt, allowDue: !dueUsed }) : '';
           window.ITO.bindAssignPanel(dpOverhaul, null, {
             onPick: function (name) {
               altUsed = true;
@@ -1730,13 +1737,19 @@
               ownerSel.dispatchEvent(new Event('change', { bubbles: true }));
             },
             onDue: function (date) {
+              dueUsed = true;
               dueInput.value = date + 'T18:00';
               dueInput.dispatchEvent(new Event('change', { bubbles: true }));
             }
           });
         };
         const paintHint = function () {
-          if (!dpHint || !ITO.assigneeInfo) return;
+          if (!dpHint) return;
+          if (!ownerSel.value) {
+            dpHint.innerHTML = '<span class="muted">选择执行人后显示本周 / 本月负荷与授权匹配</span>';
+            return;
+          }
+          if (!ITO.assigneeInfo) return;
           const auth = sub.ticket ? authSel.value : '无需授权';
           const info = ITO.assigneeInfo(ownerSel.value, auth, sub.hours, (dueInput.value || '').replace('T', ' '));
           const bad = info.weekAfter > 100 || info.monthAfter > 100 || !info.authOk;
@@ -2413,7 +2426,7 @@
         '<div class="form-grid">' +
           U().formRow({ label: '当前执行人', control: '<div class="static-field">' + U().esc(target.owner) + '</div>' }) +
           U().formRow({ label: '新截止时间', required: true, control: '<input id="raDue" type="datetime-local" value="' + dueInput(target.due) + '">' }) +
-          U().formRow({ label: '新执行人', required: true, control: '<select id="raOwner">' + U().peopleOptions(target.group, target.owner, { auth: target.auth, hours: target.hours, due: target.due }) + '</select>' }) +
+          U().formRow({ label: '新执行人', required: true, control: '<select id="raOwner"><option value="">请选择新执行人</option>' + U().peopleOptions(target.group, '', { auth: target.auth, hours: target.hours, due: target.due }) + '</select>' }) +
           '<div class="form-field full" id="raRelease"></div>' +
           '<div class="form-field full" id="raOverhaul"></div>' +
           '<div class="form-field full"><div class="assign-hint" id="raHint"></div></div>' +
@@ -2427,8 +2440,9 @@
         const hint = root.querySelector('#raHint');
         const releaseEl = root.querySelector('#raRelease');
         const overhaulEl = root.querySelector('#raOverhaul');
-        const anchorOwner = target.owner;
+        let anchorOwner = '';
         let altUsed = false;
+        let dueUsed = false;
         const oldDue = target.due;
         const oldSummary = window.ITO.overhaulSummaryOf ? window.ITO.overhaulSummaryOf(target.owner) : null;
         if (releaseEl) {
@@ -2448,9 +2462,10 @@
         };
         const paintOverhaul = function () {
           if (!overhaulEl || !window.ITO.assignPanelHtml) return;
+          if (!anchorOwner && ownerSel.value) anchorOwner = ownerSel.value;
           const fit = fitNow();
           const suppressAlt = altUsed || (!!anchorOwner && ownerSel.value !== anchorOwner);
-          overhaulEl.innerHTML = fit ? window.ITO.assignPanelHtml(fit, { allowPick: !suppressAlt, allowDue: true }) : '';
+          overhaulEl.innerHTML = fit ? window.ITO.assignPanelHtml(fit, { allowPick: !suppressAlt, allowDue: !dueUsed }) : '';
           window.ITO.bindAssignPanel(overhaulEl, null, {
             onPick: function (name) {
               altUsed = true;
@@ -2458,13 +2473,19 @@
               ownerSel.dispatchEvent(new Event('change', { bubbles: true }));
             },
             onDue: function (date) {
+              dueUsed = true;
               dueInputEl.value = date + 'T18:00';
               dueInputEl.dispatchEvent(new Event('change', { bubbles: true }));
             }
           });
         };
         const paintHint = function () {
-          if (!hint || !ITO.assigneeInfo) return;
+          if (!hint) return;
+          if (!ownerSel.value) {
+            hint.innerHTML = '<span class="muted">选择新执行人后显示负荷变化与授权匹配</span>';
+            return;
+          }
+          if (!ITO.assigneeInfo) return;
           const newDue = (dueInputEl.value || '').replace('T', ' ');
           const oldInfo = ITO.assigneeInfo(target.owner, target.auth, 0, target.due);
           const newInfo = ITO.assigneeInfo(ownerSel.value, target.auth, target.hours, newDue);
