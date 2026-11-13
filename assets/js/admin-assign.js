@@ -259,6 +259,7 @@
   function panelHtml(fit, options) {
     const opts = options || {};
     if (!fit || fit.level === 'none') return '';
+    const allowPick = opts.allowPick !== false;
     const red = fit.level === 'red';
     const list = fit.summary.items.slice(0, 3).map(function (p) {
       const tags = [];
@@ -268,15 +269,17 @@
       return '<li><b>' + U().esc(mmdd(p.node)) + '</b><span>' + U().esc(p.item.name) + '</span>' +
         (tags.length ? '<em>' + U().esc(tags.join(' / ')) + '</em>' : '') + '</li>';
     }).join('');
-    const alts = fit.alternatives.list.map(function (alt) {
+    const alts = allowPick ? fit.alternatives.list.map(function (alt) {
       return '<button class="btn btn-soft btn-sm" type="button" data-assign-pick="' + U().esc(alt.name) + '">' +
         U().esc(alt.name) + ' · ' + U().esc(alt.relation) + ' · ' + U().esc(alt.auth) + ' · ' + U().esc(alt.overhaul) + '</button>';
-    }).join('');
-    const altNote = fit.alternatives.noAlt
-      ? '<div class="assign-fit-note">本组无同资质替代人，建议调整截止时间或协调支援。</div>'
-      : fit.alternatives.allBusy
-        ? '<div class="assign-fit-note">本组同资质人员均承担大修任务，改派空间有限。</div>'
-        : '';
+    }).join('') : '';
+    const altNote = allowPick
+      ? (fit.alternatives.noAlt
+        ? '<div class="assign-fit-note">本组无同资质替代人，建议调整截止时间或协调支援。</div>'
+        : fit.alternatives.allBusy
+          ? '<div class="assign-fit-note">本组同资质人员均承担大修任务，改派空间有限。</div>'
+          : '')
+      : '';
     const dueBtn = fit.suggestedDate && opts.allowDue !== false
       ? '<button class="btn btn-ghost btn-sm" type="button" data-assign-due="' + U().esc(fit.suggestedDate) + '">' +
         '建议截止 ' + U().esc(mmdd(fit.suggestedDate)) + (fit.suggestedItem ? '（避开「' + U().esc(fit.suggestedItem.name) + '」）' : '') + '</button>'
@@ -332,18 +335,9 @@
         ? '<div class="assign-fit-load">参考负荷：本周 ' + fit.load.weekRate + '% → ' + fit.load.weekAfter + '% · 本月 ' +
           fit.load.monthRate + '% → ' + fit.load.monthAfter + '% · ' + (fit.authOk ? '授权匹配' : '缺少授权') + '</div>'
         : '';
-      const alts = fit.alternatives.list.length
-        ? '<p style="margin:8px 0 0">可改派：' + fit.alternatives.list.map(function (a) {
-            return U().esc(a.name) + '（' + U().esc(a.overhaul) + '）';
-          }).join('、') + '</p>'
-        : fit.alternatives.noAlt
-          ? '<p style="margin:8px 0 0">本组无同资质替代人，建议调整截止时间或协调支援。</p>'
-          : fit.alternatives.allBusy
-            ? '<p style="margin:8px 0 0">本组同资质人员均承担大修任务，改派空间有限。</p>'
-            : '';
       return '<div class="detail-section"><h4>' + U().esc(fit.summary.name) + ' · ' + U().esc(fit.summary.basis) + '</h4>' +
         '<p style="margin:0 0 8px">' + U().esc(conflictLine(fit)) + '</p>' +
-        '<ul style="margin:0 0 8px;padding-left:18px">' + items + '</ul>' + load + alts +
+        '<ul style="margin:0 0 8px;padding-left:18px">' + items + '</ul>' + load +
         (fit.suggestedDate ? '<p style="margin:8px 0 0">建议截止：<b>' + U().esc(fit.suggestedDate) + '</b>' +
           (fit.suggestedItem ? '（避开「' + U().esc(fit.suggestedItem.name) + '」）' : '') + '</p>' : '') +
         '</div>';

@@ -1022,6 +1022,8 @@
         const singleType = root.querySelector('#ntSingleType');
         const singleHours = root.querySelector('#ntSingleHours');
         const singleOwner = root.querySelector('#ntSingleOwner');
+        let singleAnchorOwner = singleOwner.value;
+        let singleAltUsed = false;
         const singleDue = root.querySelector('#ntSingleDue');
         const singleTicket = root.querySelector('#ntSingleTicket');
         const singleAuth = root.querySelector('#ntSingleAuth');
@@ -1166,14 +1168,23 @@
         paintSingleOverhaul();
         paintSplitOverhaul();
 
-        [singleOwner, singleDue, singleAuth].forEach(function (el) {
+        [singleDue, singleAuth].forEach(function (el) {
           if (el) el.addEventListener('change', paintSingleOverhaul);
+        });
+        if (singleOwner) singleOwner.addEventListener('change', function () {
+          if (singleAnchorOwner && singleOwner.value !== singleAnchorOwner) singleAltUsed = true;
+          paintSingleOverhaul();
         });
         if (singleHours) singleHours.addEventListener('input', paintSingleOverhaul);
         if (singleTicket) singleTicket.addEventListener('change', paintSingleOverhaul);
         tbody.addEventListener('change', function (e) {
           const f = e.target.dataset ? e.target.dataset.f : '';
           if (f === 'owner' || f === 'due' || f === 'auth' || f === 'ticket') {
+            if (f === 'owner') {
+              const tr = e.target.closest('tr[data-row]');
+              const row = tr ? rows[Number(tr.dataset.row)] : null;
+              if (row && row._altAnchor && e.target.value !== row._altAnchor) row._altUsed = true;
+            }
             syncRows();
             paintSplitOverhaul();
           }
@@ -1201,7 +1212,14 @@
           singleOwner.innerHTML = '<option value="">请选择执行人</option>' + U().peopleOptions(currentGroup, '', {
             auth: singleAuth.value, hours: singleHours.value
           });
-          rows = rows.map(function (row) { row.owner = ''; return row; });
+          singleAnchorOwner = '';
+          singleAltUsed = false;
+          rows = rows.map(function (row) {
+            row.owner = '';
+            row._altAnchor = '';
+            row._altUsed = false;
+            return row;
+          });
           renderRows();
           paintSingleOverhaul();
           paintSplitOverhaul();
@@ -1293,11 +1311,14 @@
           if (currentMode !== 'single') return;
           const s = readSingle();
           if (!s.owner) return;
+          if (!singleAnchorOwner) singleAnchorOwner = s.owner;
+          const suppressAlt = singleAltUsed || (!!singleAnchorOwner && s.owner !== singleAnchorOwner);
           const fit = fitFor(s.owner, s.auth, s.hours, s.due);
           if (!fit || fit.level === 'none') return;
-          singleOverhaul.innerHTML = window.ITO.assignPanelHtml(fit, { allowPick: !live, allowDue: true });
+          singleOverhaul.innerHTML = window.ITO.assignPanelHtml(fit, { allowPick: !live && !suppressAlt, allowDue: true });
           window.ITO.bindAssignPanel(singleOverhaul, null, {
             onPick: function (name) {
+              singleAltUsed = true;
               singleOwner.value = name;
               singleOwner.dispatchEvent(new Event('change', { bubbles: true }));
             },
@@ -1325,6 +1346,8 @@
             chip.className = 'assign-row-chip';
             chip.onclick = null;
             if (!row || !row.owner) return;
+            if (!row._altAnchor) row._altAnchor = row.owner;
+            const suppressAlt = !!row._altUsed || (!!row._altAnchor && row.owner !== row._altAnchor);
             const fit = fitFor(row.owner, row.ticket ? row.auth : '无需授权', Number(row.hours) || 0, row.due);
             if (!fit || fit.level === 'none') return;
             chip.hidden = false;
@@ -1334,7 +1357,7 @@
               event.stopPropagation();
               if (splitOverhaul) splitOverhaul.click();
             };
-            shown.push({ i: i, row: row, fit: fit });
+            shown.push({ i: i, row: row, fit: fit, suppressAlt: suppressAlt });
           });
           if (!shown.length) {
             splitOverhaul.hidden = true;
@@ -1350,7 +1373,7 @@
             const body = shown.map(function (x, idx) {
               return '<div class="detail-section" data-overhaul-section="' + idx + '"><h4>第 ' + (x.i + 1) + ' 行 · ' +
                 U().esc(x.row.name || '未命名') + ' · ' + U().esc(x.row.owner) + '</h4>' +
-                window.ITO.assignPanelHtml(x.fit, { allowPick: !live, allowDue: true }) + '</div>';
+                window.ITO.assignPanelHtml(x.fit, { allowPick: !live && !x.suppressAlt, allowDue: true }) + '</div>';
             }).join('');
             U().modal({
               title: '拆分任务大修冲突',
@@ -1365,6 +1388,7 @@
                   if (!entry) return;
                   window.ITO.bindAssignPanel(section, null, {
                     onPick: function (name) {
+                      entry.row._altUsed = true;
                       const sel = tbody.querySelector('tr[data-row="' + entry.i + '"] [data-f="owner"]');
                       if (sel) {
                         sel.value = name;
@@ -1682,6 +1706,8 @@
         const dueInput = root.querySelector('#dpDue');
         const dpHint = root.querySelector('#dpHint');
         const dpOverhaul = root.querySelector('#dpOverhaul');
+        const anchorOwner = sub.owner;
+        let altUsed = false;
         const fitNow = function () {
           if (!window.ITO.assignmentFit || !ownerSel.value) return null;
           return window.ITO.assignmentFit({
@@ -1695,9 +1721,11 @@
         const paintOverhaul = function () {
           if (!dpOverhaul || !window.ITO.assignPanelHtml) return;
           const fit = fitNow();
-          dpOverhaul.innerHTML = fit ? window.ITO.assignPanelHtml(fit, { allowPick: true, allowDue: true }) : '';
+          const suppressAlt = altUsed || (!!anchorOwner && ownerSel.value !== anchorOwner);
+          dpOverhaul.innerHTML = fit ? window.ITO.assignPanelHtml(fit, { allowPick: !suppressAlt, allowDue: true }) : '';
           window.ITO.bindAssignPanel(dpOverhaul, null, {
             onPick: function (name) {
+              altUsed = true;
               ownerSel.value = name;
               ownerSel.dispatchEvent(new Event('change', { bubbles: true }));
             },
@@ -1718,7 +1746,11 @@
         };
         paintHint();
         paintOverhaul();
-        ownerSel.addEventListener('change', function () { paintHint(); paintOverhaul(); });
+        ownerSel.addEventListener('change', function () {
+          if (anchorOwner && ownerSel.value !== anchorOwner) altUsed = true;
+          paintHint();
+          paintOverhaul();
+        });
         authSel.addEventListener('change', function () { paintHint(); paintOverhaul(); });
         dueInput.addEventListener('change', function () { paintHint(); paintOverhaul(); });
         root.querySelector('[data-cancel]').addEventListener('click', close);
@@ -2395,6 +2427,8 @@
         const hint = root.querySelector('#raHint');
         const releaseEl = root.querySelector('#raRelease');
         const overhaulEl = root.querySelector('#raOverhaul');
+        const anchorOwner = target.owner;
+        let altUsed = false;
         const oldDue = target.due;
         const oldSummary = window.ITO.overhaulSummaryOf ? window.ITO.overhaulSummaryOf(target.owner) : null;
         if (releaseEl) {
@@ -2415,9 +2449,11 @@
         const paintOverhaul = function () {
           if (!overhaulEl || !window.ITO.assignPanelHtml) return;
           const fit = fitNow();
-          overhaulEl.innerHTML = fit ? window.ITO.assignPanelHtml(fit, { allowPick: true, allowDue: true }) : '';
+          const suppressAlt = altUsed || (!!anchorOwner && ownerSel.value !== anchorOwner);
+          overhaulEl.innerHTML = fit ? window.ITO.assignPanelHtml(fit, { allowPick: !suppressAlt, allowDue: true }) : '';
           window.ITO.bindAssignPanel(overhaulEl, null, {
             onPick: function (name) {
+              altUsed = true;
               ownerSel.value = name;
               ownerSel.dispatchEvent(new Event('change', { bubbles: true }));
             },
@@ -2439,7 +2475,11 @@
         };
         paintHint();
         paintOverhaul();
-        ownerSel.addEventListener('change', function () { paintHint(); paintOverhaul(); });
+        ownerSel.addEventListener('change', function () {
+          if (anchorOwner && ownerSel.value !== anchorOwner) altUsed = true;
+          paintHint();
+          paintOverhaul();
+        });
         dueInputEl.addEventListener('change', function () { paintHint(); paintOverhaul(); });
         root.querySelector('[data-cancel]').addEventListener('click', close);
         root.querySelector('[data-ok]').addEventListener('click', function () {
