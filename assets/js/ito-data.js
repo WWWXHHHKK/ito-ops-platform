@@ -484,11 +484,11 @@ window.ITO_DATA = (() => {
     { id: 'AU-2026-0198', person: '郭工',   type: '登高车作业授权',   group: 'comm',   scope: '通信杆路与登高作业', validTo: '2027-01-01', status: '有效' },
     { id: 'AU-2026-0197', person: '林工',   type: 'RP1 授权',         group: 'app',    scope: 'RP1 业务系统操作', validTo: '2027-03-31', status: '有效' },
     { id: 'AU-2026-0196', person: '冯工',   type: '低压电工证',       group: 'online', scope: '低压配电与终端作业', validTo: '2026-12-31', status: '有效' },
-    { id: 'AU-2026-0195', person: '袁工',   type: '高压电工证',       group: 'infra',  scope: '高压配电室作业', validTo: '2026-10-31', status: '已过期' },
+    { id: 'AU-2026-0195', person: '周工',   type: '高压电工证',       group: 'comm',   scope: '通信高压配电与电气作业', validTo: '2026-10-31', status: '已过期' },
     { id: 'AU-2026-0194', person: '罗工',   type: 'RP2 授权',         group: 'comm',   scope: 'RP2 网络设备操作', validTo: '2027-01-31', status: '有效' },
     { id: 'AU-2026-0193', person: '曹工',   type: '工具库授权',       group: 'online', scope: '在线监测工具借还', validTo: '2027-01-01', status: '有效' },
     { id: 'AU-2026-0192', person: '赵主管', type: '高风险作业授权',   group: 'comm',   scope: '通信割接高风险作业统筹', validTo: '2027-05-31', status: '有效' },
-    { id: 'AU-2026-0191', person: '高工',   type: '登高车作业授权',   group: 'app',    scope: '应用现场登高作业', validTo: '2026-09-30', status: '已过期' },
+    { id: 'AU-2026-0191', person: '郑工',   type: '登高车作业授权',   group: 'infra',  scope: '机房登高作业与防坠落措施', validTo: '2026-09-30', status: '已过期' },
     { id: 'AU-2026-0190', person: '宋工',   type: '工具库授权',       group: 'comm',   scope: '通信工具与仪表借还', validTo: '2027-02-28', status: '有效' },
     { id: 'AU-2026-0189', person: '李主管', type: '准备工程师授权',   group: 'online', scope: '在线监测变更准备', validTo: '2026-12-31', status: '有效' },
     { id: 'AU-2026-0188', person: '潘工',   type: '低压电工证',       group: 'infra',  scope: '机房低压配电作业', validTo: '2027-04-30', status: '有效' }
@@ -873,9 +873,9 @@ window.ITO_DATA = (() => {
   overhaul.personnel = [
     ['通信组', '13（技术工人）', '12', '10', '7', '8', '4', '11', '惠州', '含业主 5 人'],
     ['应用组', '4（辅助工人）', '0', '0', '0', '0', '0', '0', '惠州', '团队参与 4 人'],
-    ['在线组', '5（技术工人）', '1', '0', '3', '0', '0', '0', '惠州', '团队参与 8 人'],
+    ['在线组', '5（技术工人）', '3', '2', '4', '2', '0', '0', '惠州', '团队参与 8 人'],
     ['在线组', '3（辅助工人）', '', '', '', '', '', '', '惠州', ''],
-    ['基础设施组', '7（技术工人）', '2', '0', '0', '0', '0', '0', '惠州', '团队参与 7 人']
+    ['基础设施组', '7（技术工人）', '3', '2', '1', '1', '0', '0', '惠州', '团队参与 7 人']
   ];
   delete overhaul.personnelGap;
   overhaul.qcHolders = [
@@ -930,9 +930,18 @@ window.ITO_DATA = (() => {
     choose(comm, 'RP1 授权', 7, 'RP1 系统操作与隔离验证', 2);
     choose(comm, 'RP2 授权', 8, 'RP2 系统操作与设备隔离', 0);
     choose(comm, '低压电工证', 10, '通信低压配电与电气作业', 1);
-    choose(online, '工作负责人授权', 1, '在线监测作业组织与现场管控', 2);
-    choose(online, 'RP1 授权', 3, 'RP1 系统操作与隔离验证', 0);
-    choose(infra, '工作负责人授权', 2, '基础设施作业组织与现场管控', 1);
+    choose(online, '工作负责人授权', 3, '在线监测作业组织与现场管控', 2);
+    choose(online, '准备工程师授权', 2, '在线监测作业准备与风险识别', 0);
+    choose(online, 'RP1 授权', 4, 'RP1 系统操作与隔离验证', 0);
+    choose(online, 'RP2 授权', 2, 'RP2 系统操作与设备隔离', 1);
+    choose(online, '工具库授权', 4, '在线监测工具借还管理', 2);
+    choose(infra, '工作负责人授权', 3, '基础设施作业组织与现场管控', 1);
+    choose(infra, '准备工程师授权', 2, '基础设施作业准备与风险识别', 0);
+    choose(infra, 'RP1 授权', 1, 'RP1 系统操作与隔离验证', 2);
+    choose(infra, 'RP2 授权', 1, 'RP2 系统操作与设备隔离', 1);
+    choose(infra, '登高车作业授权', 6, '登高车作业与现场监护', 0);
+    choose(infra, '高风险作业授权', 2, '高风险作业现场管控与监护', 2);
+    choose(infra, '工具库授权', 2, '基础设施工具借还管理', 1);
     /* 保留 12 月初可见的 10 条临期作业授权样例。 */
     ['郭工', '梁工', '宋工', '唐工', '许工'].forEach(function (name) {
       const a = auths.find(function (x) {
@@ -954,7 +963,7 @@ window.ITO_DATA = (() => {
   const dictionaries = [
     {
       id: 'overhaulBase', name: '大修基地', group: '大修专项', code: 'OVERHAUL_BASE', builtin: true,
-      desc: '配置完成后，大修人员的新增 / 编辑与基地筛选会立即读取这里的启用项。',
+      desc: '用于大修人员历史数据的基地归属与字典统计；人员矩阵按专业组展示，不再按基地筛选。',
       values: [
         { name: 'A地区', code: 'A', sort: 1, enabled: true },
         { name: 'B地区', code: 'B', sort: 2, enabled: true }

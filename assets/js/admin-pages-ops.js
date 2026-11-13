@@ -1220,14 +1220,12 @@
     st.ui = st.ui || {};
     const q = (st.ui.overhaulPersonSearch || '').trim().toLowerCase();
     const gf = st.ui.personGroupFilter || '';
-    const bf = st.ui.personBaseFilter || '';
     const all = (overhaulData().personnel || []);
     return all.filter(function (row) {
       if (gf && row.group !== gf) return false;
-      if (bf && row.base !== bf) return false;
       if (ITO.customFieldMatch && !ITO.customFieldMatch('overhaulPerson', row, st.ui.personCustomFilters || {})) return false;
       if (!q) return true;
-      return [row.base, overhaulGroupName(row.group), row.tech, row.aux, row.basic, row.workLead, row.prep, row.rp1, row.rp2, row.qc, row.electric, row.authNote, row.note]
+      return [overhaulGroupName(row.group), row.tech, row.aux, row.basic, row.workLead, row.prep, row.rp1, row.rp2, row.qc, row.electric, row.note]
         .join(' ').toLowerCase().indexOf(q) > -1;
     });
   }
@@ -1357,27 +1355,10 @@
       const personRows = personFiltered.map(function (row) {
         return overhaulPersonRow(row, person.indexOf(row));
       }).join('');
-      const personBase = S().ui.personBaseFilter || '';
-      const personQuery = (S().ui.overhaulPersonSearch || '').trim().toLowerCase();
-      const gapText = o.personnelGap || '';
-      const gapVisible = gapText &&
-        (!S().ui.personGroupFilter || S().ui.personGroupFilter === 'comm') &&
-        (!personBase || personBase === 'B地区') &&
-        (!personQuery || gapText.toLowerCase().indexOf(personQuery) > -1);
-      const gapRow = gapVisible ? '<tr data-oh-person="-1"><td colspan="' + (PERSON_HEADERS.length + (ITO.customFieldHeaders ? ITO.customFieldHeaders('overhaulPerson').length : 0)) + '" class="oh-gap-row">' + U().esc(gapText) + '</td></tr>' : '';
       const personPanel =
         '<section class="card table-card" id="ohPersonCard">' +
           '<div class="table-head oh-head"><div class="report-head-left"><h3>大修人员专项矩阵</h3>' +
-            '<input class="oh-search" id="ohPersonSearch" type="text" placeholder="搜索专业组 / 基地 / 备注…" value="' + U().esc((S().ui.overhaulPersonSearch || '')) + '">' +
-            '<select class="select" id="ohPersonBaseFilter" aria-label="基地"><option value="">全部基地</option>' +
-              (function () {
-                const list = ITO.dictValues ? ITO.dictValues('overhaulBase', true) : ['A地区', 'B地区'];
-                if ((o.personnel || []).some(function (r) { return r.base === 'X地区'; }) && list.indexOf('X地区') === -1) list.push('X地区');
-                return list;
-              })().map(function (b2) {
-                return '<option value="' + U().esc(b2) + '"' + (personBase === b2 ? ' selected' : '') + '>' + U().esc(b2) + '</option>';
-              }).join('') +
-            '</select>' +
+            '<input class="oh-search" id="ohPersonSearch" type="text" placeholder="搜索专业组 / 备注…" value="' + U().esc((S().ui.overhaulPersonSearch || '')) + '">' +
             '<select class="select" id="ohPersonGroupFilter" aria-label="专业组"><option value="">全部专业组</option>' +
               (S().groups || []).map(function (g2) {
                 return '<option value="' + U().esc(g2.id) + '"' + (S().ui.personGroupFilter === g2.id ? ' selected' : '') + '>' + U().esc(g2.name) + '</option>';
@@ -1390,7 +1371,7 @@
             '<button class="btn btn-primary btn-sm" id="ohPersonAddBtn" type="button">' + U().icon('plus') + '添加组行</button>' +
             '<button class="btn btn-ghost btn-sm" id="ohPersonExportBtn" type="button">' + U().icon('download') + '导出人员矩阵</button>') + '</div></div>' +
           '<div class="table-wrap"><table class="data-table oh-person-table"><thead><tr>' + personHead.map(function (h) { return '<th>' + U().esc(h || '—') + '</th>'; }).join('') + '</tr></thead>' +
-            '<tbody id="ohPersonTbody">' + ((personRows + gapRow) || '<tr><td colspan="' + (PERSON_HEADERS.length + (ITO.customFieldHeaders ? ITO.customFieldHeaders('overhaulPerson').length : 0)) + '">' + U().emptyState('没有匹配的人员记录', '调整搜索条件', 'users') + '</td></tr>') + '</tbody></table></div>' +
+            '<tbody id="ohPersonTbody">' + (personRows || '<tr><td colspan="' + (PERSON_HEADERS.length + (ITO.customFieldHeaders ? ITO.customFieldHeaders('overhaulPerson').length : 0)) + '">' + U().emptyState('没有匹配的人员记录', '调整搜索条件', 'users') + '</td></tr>') + '</tbody></table></div>' +
         '</section>';
 
       const panels = { items: itemsPanel, mats: matsPanel, person: personPanel };
@@ -1916,14 +1897,8 @@
           function rebuildPerson() {
             const all = o.personnel || [];
             const list = personFilteredOf(st);
-            const q = (st.ui.overhaulPersonSearch || '').trim().toLowerCase();
-            const bf = st.ui.personBaseFilter || '';
-            const gf = st.ui.personGroupFilter || '';
-            const gapText = o.personnelGap || '';
-            const gapVisible = gapText && (!gf || gf === 'comm') && (!bf || bf === 'B地区') && (!q || gapText.toLowerCase().indexOf(q) > -1);
-            const gapRow = gapVisible ? '<tr data-oh-person="-1"><td colspan="' + (PERSON_HEADERS.length + (ITO.customFieldHeaders ? ITO.customFieldHeaders('overhaulPerson').length : 0)) + '" class="oh-gap-row">' + U().esc(gapText) + '</td></tr>' : '';
             const tbody = document.getElementById('ohPersonTbody');
-            if (tbody) tbody.innerHTML = (list.map(function (row) { return overhaulPersonRow(row, all.indexOf(row)); }).join('') + gapRow) || '<tr><td colspan="' + (PERSON_HEADERS.length + (ITO.customFieldHeaders ? ITO.customFieldHeaders('overhaulPerson').length : 0)) + '">' + U().emptyState('没有匹配的人员记录', '调整搜索或筛选条件', 'users') + '</td></tr>';
+            if (tbody) tbody.innerHTML = list.map(function (row) { return overhaulPersonRow(row, all.indexOf(row)); }).join('') || '<tr><td colspan="' + (PERSON_HEADERS.length + (ITO.customFieldHeaders ? ITO.customFieldHeaders('overhaulPerson').length : 0)) + '">' + U().emptyState('没有匹配的人员记录', '调整搜索或筛选条件', 'users') + '</td></tr>';
           }
           const personSearch = document.getElementById('ohPersonSearch');
           if (personSearch) personSearch.addEventListener('input', function () {
@@ -1933,11 +1908,6 @@
           const personGroupFilter = document.getElementById('ohPersonGroupFilter');
           if (personGroupFilter) personGroupFilter.addEventListener('change', function () {
             st.ui.personGroupFilter = personGroupFilter.value;
-            rebuildPerson();
-          });
-          const personBaseFilter = document.getElementById('ohPersonBaseFilter');
-          if (personBaseFilter) personBaseFilter.addEventListener('change', function () {
-            st.ui.personBaseFilter = personBaseFilter.value;
             rebuildPerson();
           });
           document.querySelectorAll('[data-oh-person-cf-filter]').forEach(function (el) {
