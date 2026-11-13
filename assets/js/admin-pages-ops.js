@@ -911,15 +911,15 @@
   const OVERHAUL_PAGE_SIZE = 10;
   function overhaulData() { return (window.ITO_DATA && window.ITO_DATA.overhaul) || {}; }
 
-  const PERSON_HEADERS = ['基地', '专业组', '技术工人', '辅助工人', '基本安全', '工作负责人', '准备工程师', '辐射防护一级', '辐射防护二级', 'QC授权', '电工证', '授权说明', '备注'];
+  const PERSON_HEADERS = ['专业组', '技术工人', '辅助工人', '基本安全', '工作负责人', '准备工程师', 'RP1', 'RP2', 'QC授权', '电工证', '备注'];
   const PERSON_GROUP_ALIASES = { '通信组': 'comm', '基础组': 'infra', '基础设施组': 'infra', '应用组': 'app', '在线组': 'online', comm: 'comm', infra: 'infra', app: 'app', online: 'online' };
   const PERSON_AUTH_COLUMNS = {
-    5: { label: '工作负责人', types: ['工作负责人授权'] },
-    6: { label: '准备工程师', types: ['准备工程师授权'] },
-    7: { label: '辐射防护一级', types: ['RP1 授权'] },
-    8: { label: '辐射防护二级', types: ['RP2 授权'] },
-    9: { label: 'QC授权', types: [] },
-    10: { label: '电工证', types: ['低压电工证', '高压电工证'] }
+    4: { label: '工作负责人', types: ['工作负责人授权'] },
+    5: { label: '准备工程师', types: ['准备工程师授权'] },
+    6: { label: 'RP1', types: ['RP1 授权'] },
+    7: { label: 'RP2', types: ['RP2 授权'] },
+    8: { label: 'QC授权', types: [] },
+    9: { label: '电工证', types: ['低压电工证', '高压电工证'] }
   };
 
   function overhaulBaseLabel(raw) {
@@ -1068,9 +1068,9 @@
 
   function personnelValues(row) {
     return [
-      row.base, overhaulGroupName(row.group), row.tech, row.aux, row.basic,
+      overhaulGroupName(row.group), row.tech, row.aux, row.basic,
       row.workLead, row.prep, row.rp1, row.rp2, row.qc, row.electric,
-      row.authNote || '—', row.note || '—'
+      row.note || '—'
     ];
   }
 
@@ -1078,7 +1078,7 @@
     const baseOrder = {};
     (ITO.dictValues ? ITO.dictValues('overhaulBase', true) : ['A地区', 'B地区']).forEach(function (b, i) { baseOrder[b] = i; });
     baseOrder['X地区'] = 99;
-    const groupOrder = { app: 0, comm: 1, online: 2, infra: 3 };
+    const groupOrder = { comm: 0, app: 1, online: 2, infra: 3 };
     (S().groups || []).forEach(function (g, i) {
       if (groupOrder[g.id] == null) groupOrder[g.id] = i + 10;
     });
@@ -1249,12 +1249,12 @@
     const values = personnelValues(row);
     return '<tr data-oh-person="' + idx + '" class="oh-person-row">' +
       values.map(function (value, i) {
-        if (i === 1) return '<td>' + U().groupPill(row.group) + '</td>';
-        if (i >= 5 && i <= 10) {
+        if (i === 0) return '<td>' + U().groupPill(row.group) + '</td>';
+        if (i >= 4 && i <= 9) {
           const n = Number(value) || 0;
-          return '<td class="num"><button type="button" class="auth-count-btn' + (n ? '' : ' is-zero') + '" data-oh-auth-col="' + i + '" title="查看系统授权持有人">' + U().esc(value) + '</button></td>';
+          return '<td class="num"><button type="button" class="auth-count-btn' + (n ? '' : ' is-zero') + '" data-oh-auth-col="' + i + '" data-oh-group="' + U().esc(row.group) + '" title="查看团队授权持有人">' + U().esc(value) + '</button></td>';
         }
-        if (i >= 2 && i <= 10) return '<td class="num">' + U().esc(value) + '</td>';
+        if (i >= 1 && i <= 9) return '<td class="num">' + U().esc(value) + '</td>';
         const text = String(value == null ? '' : value);
         return '<td title="' + U().esc(text) + '"><span class="oh-person-note">' + U().esc(text) + '</span></td>';
       }).join('') +
@@ -1282,7 +1282,7 @@
           '<article class="card kpi-card"><div class="kpi-label">' + U().icon('clipboard') + '<span>行动项总数</span></div><div class="kpi-value">' + items.length + '<span class="unit"> 项</span></div><div class="kpi-meta"><span>进行中 ' + doing + ' · 已完成 ' + done + '</span></div></article>' +
           '<article class="card kpi-card" data-tone="green"><div class="kpi-label">' + U().icon('check') + '<span>已完成</span></div><div class="kpi-value">' + done + '<span class="unit"> 项</span></div><div class="kpi-meta"><span>完成率 ' + (items.length ? Math.round(done / items.length * 100) : 0) + '%</span></div></article>' +
           '<article class="card kpi-card" data-tone="blue"><div class="kpi-label">' + U().icon('award') + '<span>物资预算</span></div><div class="kpi-value">' + (budget / 10000).toFixed(1) + '<span class="unit"> 万</span></div><div class="kpi-meta"><span>物资 ' + mats.length + ' 项 · 到货跟踪中</span></div></article>' +
-          '<article class="card kpi-card" data-tone="red"><div class="kpi-label">' + U().icon('alert') + '<span>风险项</span></div><div class="kpi-value">' + riskN + '<span class="unit"> 项</span></div><div class="kpi-meta"><span>人员缺口：准备工程师 / QC / RP2</span></div></article>' +
+          '<article class="card kpi-card" data-tone="red"><div class="kpi-label">' + U().icon('alert') + '<span>风险项</span></div><div class="kpi-value">' + riskN + '<span class="unit"> 项</span></div><div class="kpi-meta"><span>大修资质：工作负责人 / 准备工程师 / RP1 / RP2 / QC / 电工证</span></div></article>' +
         '</div>';
 
       const tabHead = '<div class="tabs overhaul-tabs">' + OVERHAUL_TABS.map(function (t) {
@@ -1364,7 +1364,7 @@
         (!S().ui.personGroupFilter || S().ui.personGroupFilter === 'comm') &&
         (!personBase || personBase === 'B地区') &&
         (!personQuery || gapText.toLowerCase().indexOf(personQuery) > -1);
-      const gapRow = gapVisible ? '<tr data-oh-person="-1"><td colspan="' + (13 + (ITO.customFieldHeaders ? ITO.customFieldHeaders('overhaulPerson').length : 0)) + '" class="oh-gap-row">' + U().esc(gapText) + '</td></tr>' : '';
+      const gapRow = gapVisible ? '<tr data-oh-person="-1"><td colspan="' + (PERSON_HEADERS.length + (ITO.customFieldHeaders ? ITO.customFieldHeaders('overhaulPerson').length : 0)) + '" class="oh-gap-row">' + U().esc(gapText) + '</td></tr>' : '';
       const personPanel =
         '<section class="card table-card" id="ohPersonCard">' +
           '<div class="table-head oh-head"><div class="report-head-left"><h3>大修人员专项矩阵</h3>' +
@@ -1390,7 +1390,7 @@
             '<button class="btn btn-primary btn-sm" id="ohPersonAddBtn" type="button">' + U().icon('plus') + '添加组行</button>' +
             '<button class="btn btn-ghost btn-sm" id="ohPersonExportBtn" type="button">' + U().icon('download') + '导出人员矩阵</button>') + '</div></div>' +
           '<div class="table-wrap"><table class="data-table oh-person-table"><thead><tr>' + personHead.map(function (h) { return '<th>' + U().esc(h || '—') + '</th>'; }).join('') + '</tr></thead>' +
-            '<tbody id="ohPersonTbody">' + ((personRows + gapRow) || '<tr><td colspan="' + (13 + (ITO.customFieldHeaders ? ITO.customFieldHeaders('overhaulPerson').length : 0)) + '">' + U().emptyState('没有匹配的人员记录', '调整搜索条件', 'users') + '</td></tr>') + '</tbody></table></div>' +
+            '<tbody id="ohPersonTbody">' + ((personRows + gapRow) || '<tr><td colspan="' + (PERSON_HEADERS.length + (ITO.customFieldHeaders ? ITO.customFieldHeaders('overhaulPerson').length : 0)) + '">' + U().emptyState('没有匹配的人员记录', '调整搜索条件', 'users') + '</td></tr>') + '</tbody></table></div>' +
         '</section>';
 
       const panels = { items: itemsPanel, mats: matsPanel, person: personPanel };
@@ -1733,11 +1733,28 @@
         });
       }
 
-      function openAuthHolders(colIdx) {
+      function openAuthHolders(colIdx, groupId) {
         const col = PERSON_AUTH_COLUMNS[colIdx];
         if (!col) return;
+        if (!col.types.length) {
+          const qc = (o.qcHolders || []).filter(function (p) { return !groupId || p.group === groupId; });
+          U().detailModal({
+            title: 'QC授权 · 持有人',
+            sub: '大修专项名单 · 共 ' + qc.length + ' 人',
+            body: '<div class="detail-section"><div class="table-wrap"><table class="data-table"><thead><tr><th>姓名</th><th>基地</th><th>专业组</th><th>人员性质</th></tr></thead><tbody>' +
+              (qc.length ? qc.map(function (p) {
+                return '<tr><td><b>' + U().esc(p.name) + '</b></td><td>' + U().esc(p.base || '—') + '</td>' +
+                  '<td>' + U().groupPill(p.group) + '</td><td>' + U().esc(p.affiliation || '—') + '</td></tr>';
+              }).join('') : '<tr><td colspan="4">' + U().emptyState('暂无 QC 持有人', '在大修人员名单中维护', 'shield') + '</td></tr>') +
+              '</tbody></table></div></div>',
+            foot: '<button class="btn btn-ghost" data-close type="button">关闭</button>',
+            onMount: function (closeFn, root) { root.querySelector('[data-close]').addEventListener('click', closeFn); }
+          });
+          return;
+        }
         const holders = [];
         (st.staff || []).forEach(function (person) {
+          if (groupId && person.group !== groupId) return;
           (st.auths || []).forEach(function (a) {
             if (a.person !== person.name) return;
             if (col.types.length && col.types.indexOf(a.type) === -1) return;
@@ -1749,7 +1766,7 @@
         });
         U().detailModal({
           title: col.label + ' · 授权持有人',
-          sub: '系统作业授权 · 只读 · 共 ' + holders.length + ' 人',
+          sub: '团队授权 · 只读 · 共 ' + holders.length + ' 人',
           body: '<div class="detail-section"><div class="table-wrap"><table class="data-table"><thead><tr><th>人员</th><th>专业组</th><th>授权类型</th><th>有效期至</th><th>状态</th></tr></thead><tbody>' +
             (holders.length ? holders.map(function (h) {
               return '<tr><td><div class="cell-task"><b>' + U().esc(h.person.name) + '</b><small>' + U().esc(h.person.title || '') + '</small></div></td>' +
@@ -1796,18 +1813,16 @@
 
         function bodyHtml() {
           return '<div class="detail-section"><h4>人员信息</h4><div class="table-wrap"><table class="data-table"><tbody>' +
-            '<tr><td>基地</td><td>' + U().esc(row.base) + '</td></tr>' +
             '<tr><td>专业组</td><td>' + U().groupPill(row.group) + '</td></tr>' +
             '<tr><td>技术工人</td><td class="num">' + row.tech + ' 人</td></tr>' +
             '<tr><td>辅助工人</td><td class="num">' + row.aux + ' 人</td></tr>' +
             '<tr><td>基本安全</td><td class="num">' + row.basic + ' 人</td></tr>' +
             '<tr><td>工作负责人</td><td class="num">' + row.workLead + ' 人</td></tr>' +
             '<tr><td>准备工程师</td><td class="num">' + row.prep + ' 人</td></tr>' +
-            '<tr><td>辐射防护一级</td><td class="num">' + row.rp1 + ' 人</td></tr>' +
-            '<tr><td>辐射防护二级</td><td class="num">' + row.rp2 + ' 人</td></tr>' +
+            '<tr><td>RP1</td><td class="num">' + row.rp1 + ' 人</td></tr>' +
+            '<tr><td>RP2</td><td class="num">' + row.rp2 + ' 人</td></tr>' +
             '<tr><td>QC授权</td><td class="num">' + row.qc + ' 人</td></tr>' +
             '<tr><td>电工证</td><td class="num">' + row.electric + ' 人</td></tr>' +
-            '<tr><td>授权说明</td><td>' + U().esc(row.authNote || '—') + '</td></tr>' +
             '<tr><td>备注</td><td>' + U().esc(row.note || '—') + '</td></tr>' +
             (ITO.customFieldRows ? ITO.customFieldRows('overhaulPerson', row) : '') +
           '</tbody></table></div></div>';
@@ -1815,8 +1830,8 @@
 
         let changed = false;
         U().detailModal({
-          title: row.base + ' · ' + overhaulGroupName(row.group) + ' · 授权人数',
-          sub: '大修人员专项跟踪 · 技术工人 / 辅助工人 / 授权人数',
+          title: overhaulGroupName(row.group) + ' · 授权人数',
+          sub: overhaulGroupName(row.group) + ' · 技术工人 / 辅助工人 / 授权人数',
           body: bodyHtml(),
           foot: '<button class="btn btn-ghost" data-close type="button">关闭</button><span class="spacer"></span>' +
             (isEmployee ? '' : '<button class="btn btn-soft" data-edit type="button">' + U().icon('edit') + '编辑</button>'),
@@ -1831,7 +1846,7 @@
                 const bodyEl = detailRoot && detailRoot.querySelector('.modal-body');
                 if (bodyEl) bodyEl.innerHTML = bodyHtml();
                 const headEl = detailRoot && detailRoot.querySelector('.modal-head h2');
-                if (headEl) headEl.textContent = row.base + ' · ' + overhaulGroupName(row.group) + ' · 授权人数';
+                if (headEl) headEl.textContent = overhaulGroupName(row.group) + ' · 授权人数';
               });
             });
           }
@@ -1894,7 +1909,7 @@
         if (personCard) {
           personCard.addEventListener('click', function (e) {
             const authBtn = e.target.closest('[data-oh-auth-col]');
-            if (authBtn) { openAuthHolders(Number(authBtn.dataset.ohAuthCol)); return; }
+            if (authBtn) { openAuthHolders(Number(authBtn.dataset.ohAuthCol), authBtn.dataset.ohGroup || ''); return; }
             const row = e.target.closest('tr[data-oh-person]');
             if (row) openPersonDetail(Number(row.dataset.ohPerson));
           });
@@ -1906,9 +1921,9 @@
             const gf = st.ui.personGroupFilter || '';
             const gapText = o.personnelGap || '';
             const gapVisible = gapText && (!gf || gf === 'comm') && (!bf || bf === 'B地区') && (!q || gapText.toLowerCase().indexOf(q) > -1);
-            const gapRow = gapVisible ? '<tr data-oh-person="-1"><td colspan="' + (13 + (ITO.customFieldHeaders ? ITO.customFieldHeaders('overhaulPerson').length : 0)) + '" class="oh-gap-row">' + U().esc(gapText) + '</td></tr>' : '';
+            const gapRow = gapVisible ? '<tr data-oh-person="-1"><td colspan="' + (PERSON_HEADERS.length + (ITO.customFieldHeaders ? ITO.customFieldHeaders('overhaulPerson').length : 0)) + '" class="oh-gap-row">' + U().esc(gapText) + '</td></tr>' : '';
             const tbody = document.getElementById('ohPersonTbody');
-            if (tbody) tbody.innerHTML = (list.map(function (row) { return overhaulPersonRow(row, all.indexOf(row)); }).join('') + gapRow) || '<tr><td colspan="' + (13 + (ITO.customFieldHeaders ? ITO.customFieldHeaders('overhaulPerson').length : 0)) + '">' + U().emptyState('没有匹配的人员记录', '调整搜索或筛选条件', 'users') + '</td></tr>';
+            if (tbody) tbody.innerHTML = (list.map(function (row) { return overhaulPersonRow(row, all.indexOf(row)); }).join('') + gapRow) || '<tr><td colspan="' + (PERSON_HEADERS.length + (ITO.customFieldHeaders ? ITO.customFieldHeaders('overhaulPerson').length : 0)) + '">' + U().emptyState('没有匹配的人员记录', '调整搜索或筛选条件', 'users') + '</td></tr>';
           }
           const personSearch = document.getElementById('ohPersonSearch');
           if (personSearch) personSearch.addEventListener('input', function () {
@@ -2241,11 +2256,6 @@
 
       function personnelFormBody(row) {
         row = row || {};
-        const baseList = (ITO.dictValues ? ITO.dictValues('overhaulBase', true) : ['A地区', 'B地区']).slice();
-        if (row.base && baseList.indexOf(row.base) === -1) baseList.push(row.base);
-        const baseOptions = baseList.map(function (b2) {
-          return '<option value="' + U().esc(b2) + '"' + (row.base === b2 ? ' selected' : '') + '>' + U().esc(b2) + '</option>';
-        }).join('');
         const groupOptions = (S().groups || []).map(function (g2) {
           return '<option value="' + U().esc(g2.id) + '"' + (row.group === g2.id ? ' selected' : '') + '>' + U().esc(g2.name) + '</option>';
         }).join('');
@@ -2253,8 +2263,7 @@
         const field = function (label, id, value, hint) {
           return U().formRow({ label: label, control: '<input id="' + id + '" type="number" min="0" step="1" value="' + value + '">' + (hint ? '<span class="form-hint">' + hint + '</span>' : '') });
         };
-        return formSection('基本信息', '基地与专业组',
-          U().formRow({ label: '基地', required: true, control: '<select id="ohPerBase"><option value="">请选择基地</option>' + baseOptions + '</select>' }) +
+        return formSection('基本信息', '专业组',
           U().formRow({ label: '专业组', required: true, control: '<select id="ohPerGroup"><option value="">请选择专业组</option>' + groupOptions + '</select>' })
         ) +
         formSection('人员构成', '技术工人 / 辅助工人；基本安全人数自动合计',
@@ -2265,13 +2274,12 @@
         formSection('授权人数', '单位：人',
           field('工作负责人', 'ohPerWorkLead', count('workLead')) +
           field('准备工程师', 'ohPerPrep', count('prep')) +
-          field('辐射防护一级', 'ohPerRp1', count('rp1')) +
-          field('辐射防护二级', 'ohPerRp2', count('rp2')) +
+          field('RP1', 'ohPerRp1', count('rp1')) +
+          field('RP2', 'ohPerRp2', count('rp2')) +
           field('QC授权', 'ohPerQc', count('qc')) +
           field('电工证', 'ohPerElectric', count('electric'))
         ) +
-        formSection('说明', '授权说明与备注',
-          U().formRow({ label: '授权说明', full: true, control: '<input id="ohPerAuthNote" type="text" value="' + U().esc(row.authNote || '') + '" placeholder="如：8人已办理，剩余4人…">' }) +
+        formSection('说明', '备注',
           U().formRow({ label: '备注', full: true, control: '<input id="ohPerNote" type="text" value="' + U().esc(row.note || '') + '" placeholder="请填写备注">' })
         ) +
         (ITO.customFieldForm ? ITO.customFieldForm('overhaulPerson', row) : '');
@@ -2304,7 +2312,7 @@
         }
         U().modal({
           title: editing ? '编辑人员矩阵行' : '添加人员组行',
-          sub: '大修人员专项跟踪 · ' + (editing ? '修改基地、专业组与授权人数' : '仅新增矩阵区组行，作业授权名单区不受影响'),
+          sub: '大修人员专项跟踪 · ' + (editing ? '修改专业组与授权人数' : '仅新增矩阵区组行，作业授权名单区不受影响'),
           xwide: true,
           body: personnelFormBody(row),
           foot: '<button class="btn btn-ghost" data-cancel type="button">取消</button><span class="spacer"></span>' +
@@ -2324,16 +2332,15 @@
             auxEl.addEventListener('input', syncBasic);
             root.querySelector('[data-cancel]').addEventListener('click', close);
             root.querySelector('[data-save]').addEventListener('click', function () {
-              const baseEl = root.querySelector('#ohPerBase');
               const groupEl = root.querySelector('#ohPerGroup');
-              if (!U().validateRequired([[baseEl, '请选择基地'], [groupEl, '请选择专业组']])) return;
+              if (!U().validateRequired([[groupEl, '请选择专业组']])) return;
               const tech = Number(techEl.value) || 0;
               const aux = Number(auxEl.value) || 0;
               const num = function (id) { return Number(root.querySelector(id).value) || 0; };
               const cf = ITO.readCustomFields ? ITO.readCustomFields(root, 'overhaulPerson', editing ? row.extra : null) : { values: {}, errors: [] };
               if (cf.errors.length) { U().toast(cf.errors[0], 'warn'); return; }
               const data = {
-                base: baseEl.value,
+                base: (row && row.base) || 'A地区',
                 extra: cf.values,
                 group: groupEl.value,
                 tech: tech,
@@ -2345,20 +2352,19 @@
                 rp2: num('#ohPerRp2'),
                 qc: num('#ohPerQc'),
                 electric: num('#ohPerElectric'),
-                authNote: root.querySelector('#ohPerAuthNote').value.trim(),
                 note: root.querySelector('#ohPerNote').value.trim()
               };
               if (editing) {
                 Object.assign(row, data);
                 sortOverhaulPersonnel(o.personnel || []);
-                ITO.log('编辑大修人员矩阵行', data.base + ' · ' + overhaulGroupName(data.group), '任务');
+                ITO.log('编辑大修人员矩阵行', overhaulGroupName(data.group), '任务');
                 U().toast('人员矩阵已保存');
                 close();
                 if (refreshDetail) refreshDetail();
               } else {
                 (o.personnel || (o.personnel = [])).push(data);
                 sortOverhaulPersonnel(o.personnel || []);
-                ITO.log('新建大修人员矩阵行', data.base + ' · ' + overhaulGroupName(data.group), '任务');
+                ITO.log('新建大修人员矩阵行', overhaulGroupName(data.group), '任务');
                 U().toast('矩阵行已添加');
                 close();
                 refreshKeepScroll();

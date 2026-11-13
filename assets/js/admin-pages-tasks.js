@@ -936,6 +936,7 @@
 
     const body =
       '<div class="task-form">' +
+        '<div class="assign-top-alert" id="ntOverhaulTop" hidden></div>' +
         '<div class="task-mode-row">' +
           '<span class="task-source-label">任务模式</span>' +
           '<div class="seg-toggle" id="ntMode">' +
@@ -970,6 +971,7 @@
             '<div class="form-field"><label>开票</label><label class="ticket-check-line"><input id="ntSingleTicket" type="checkbox"' + (singleTicket ? ' checked' : '') + '><span>需要开票</span></label></div>' +
             '<div class="form-field"><label>授权</label><select id="ntSingleAuth"><option value="">请选择授权</option>' + U().statusOptions(AUTH_TYPES, singleAuth) + '</select></div>' +
           '</div>' +
+          '<div id="ntSingleOverhaul"></div>' +
         '</div>' +
         '<div class="split-fields" id="ntSplitFields">' +
           '<div class="subtask-head">' +
@@ -977,6 +979,7 @@
             (live ? '' : '<button class="btn btn-soft btn-sm" id="ntAddRow" type="button">' + U().icon('plus') + '添加任务行</button>') +
           '</div>' +
           '<div class="subtask-errors" id="ntSubErrors" hidden></div>' +
+          '<div class="assign-split-summary" id="ntSplitOverhaul" hidden></div>' +
           '<div class="subtask-wrap">' +
             '<table class="subtask-table">' +
               '<thead><tr><th>任务名称 <em>*</em></th><th>类型</th><th>等级</th><th>预估工时</th><th>执行人 <em>*</em></th><th>授权</th><th>开票</th><th>截止时间 <em>*</em></th><th>任务标签</th><th></th></tr></thead>' +
@@ -1022,6 +1025,9 @@
         const singleDue = root.querySelector('#ntSingleDue');
         const singleTicket = root.querySelector('#ntSingleTicket');
         const singleAuth = root.querySelector('#ntSingleAuth');
+        const overhaulTop = root.querySelector('#ntOverhaulTop');
+        const singleOverhaul = root.querySelector('#ntSingleOverhaul');
+        const splitOverhaul = root.querySelector('#ntSplitOverhaul');
 
         if (live) {
           groupSel.disabled = true;
@@ -1060,7 +1066,8 @@
             '<td><select class="cell-select" data-f="type"><option value="">请选择类型</option>' + U().statusOptions(TASK_TYPES, row.type) + '</select></td>' +
             '<td><select class="cell-select" data-f="level"><option value="">请选择等级</option>' + U().statusOptions(LEVELS, row.level) + '</select></td>' +
             '<td><input class="cell-input num" data-f="hours" type="number" min="0.5" max="200" step="0.5" value="' + row.hours + '" placeholder="工时"></td>' +
-            '<td><select class="cell-select" data-f="owner"' + (live ? ' disabled' : '') + '><option value="">请选择执行人</option>' + U().peopleOptions(currentGroup, row.owner, { auth: row.auth, hours: row.hours }) + '</select></td>' +
+            '<td><select class="cell-select" data-f="owner"' + (live ? ' disabled' : '') + '><option value="">请选择执行人</option>' + U().peopleOptions(currentGroup, row.owner, { auth: row.auth, hours: row.hours }) + '</select>' +
+              '<span class="assign-row-chip" data-row-overhaul="' + i + '"></span></td>' +
             '<td><select class="cell-select" data-f="auth"' + (row.ticket ? '' : ' disabled') + '><option value="">请选择授权</option>' + U().statusOptions(AUTH_TYPES, row.auth) + '</select></td>' +
             '<td class="cell-center"><label class="ticket-check" title="是否需要开票"><input type="checkbox" data-f="ticket"' + (row.ticket ? ' checked' : '') + '><span></span></label></td>' +
             '<td><input class="cell-input" data-f="due" data-date-picker="1" type="datetime-local" value="' + U().esc(row.due) + '"></td>' +
@@ -1137,6 +1144,8 @@
           if (subErrors) { subErrors.hidden = true; subErrors.innerHTML = ''; }
           if (single) renderRows();
           hints();
+          paintSingleOverhaul();
+          paintSplitOverhaul();
         }
 
         function authForRow(i, tr) {
@@ -1154,6 +1163,27 @@
         paintMainTags();
         paintMode();
         syncSingleAuth();
+        paintSingleOverhaul();
+        paintSplitOverhaul();
+
+        [singleOwner, singleDue, singleAuth].forEach(function (el) {
+          if (el) el.addEventListener('change', paintSingleOverhaul);
+        });
+        if (singleHours) singleHours.addEventListener('input', paintSingleOverhaul);
+        if (singleTicket) singleTicket.addEventListener('change', paintSingleOverhaul);
+        tbody.addEventListener('change', function (e) {
+          const f = e.target.dataset ? e.target.dataset.f : '';
+          if (f === 'owner' || f === 'due' || f === 'auth' || f === 'ticket') {
+            syncRows();
+            paintSplitOverhaul();
+          }
+        });
+        tbody.addEventListener('input', function (e) {
+          if (e.target.dataset && e.target.dataset.f === 'due') {
+            syncRows();
+            paintSplitOverhaul();
+          }
+        });
 
         modeBtns.forEach(function (btn) {
           btn.addEventListener('click', function () {
@@ -1173,6 +1203,8 @@
           });
           rows = rows.map(function (row) { row.owner = ''; return row; });
           renderRows();
+          paintSingleOverhaul();
+          paintSplitOverhaul();
         });
 
         singleTicket.addEventListener('change', syncSingleAuth);
@@ -1237,6 +1269,123 @@
             due: singleDue.value,
             ticket: singleTicket.checked,
             auth: singleTicket.checked ? singleAuth.value : '无需授权'
+          };
+        }
+
+        function fitFor(owner, auth, hours, due) {
+          if (!owner || !window.ITO.assignmentFit) return null;
+          return window.ITO.assignmentFit({
+            name: owner,
+            group: currentGroup,
+            auth: auth,
+            hours: hours,
+            due: due
+          });
+        }
+
+        function paintSingleOverhaul() {
+          if (!singleOverhaul) return;
+          if (overhaulTop) {
+            overhaulTop.hidden = true;
+            overhaulTop.innerHTML = '';
+          }
+          singleOverhaul.innerHTML = '';
+          if (currentMode !== 'single') return;
+          const s = readSingle();
+          if (!s.owner) return;
+          const fit = fitFor(s.owner, s.auth, s.hours, s.due);
+          if (!fit || fit.level === 'none') return;
+          singleOverhaul.innerHTML = window.ITO.assignPanelHtml(fit, { allowPick: !live, allowDue: true });
+          window.ITO.bindAssignPanel(singleOverhaul, null, {
+            onPick: function (name) {
+              singleOwner.value = name;
+              singleOwner.dispatchEvent(new Event('change', { bubbles: true }));
+            },
+            onDue: function (date) {
+              singleDue.value = date + 'T18:00';
+              singleDue.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          });
+          if (overhaulTop && fit.level === 'red') {
+            overhaulTop.hidden = false;
+            overhaulTop.innerHTML = U().icon('alert') + '<span>执行人存在后续大修冲突，请查看下方“后续大修专项”。</span>';
+          }
+        }
+
+        function paintSplitOverhaul() {
+          if (!splitOverhaul || !tbody) return;
+          const shown = [];
+          U().$$('#ntSubBody tr[data-row]', root).forEach(function (tr) {
+            const i = Number(tr.dataset.row);
+            const row = rows[i];
+            const chip = tr.querySelector('[data-row-overhaul]');
+            if (!chip) return;
+            chip.hidden = true;
+            chip.textContent = '';
+            chip.className = 'assign-row-chip';
+            chip.onclick = null;
+            if (!row || !row.owner) return;
+            const fit = fitFor(row.owner, row.ticket ? row.auth : '无需授权', Number(row.hours) || 0, row.due);
+            if (!fit || fit.level === 'none') return;
+            chip.hidden = false;
+            chip.textContent = fit.level === 'red' ? '大修冲突' : '大修需关注';
+            chip.classList.add(fit.level === 'red' ? 'is-red' : 'is-warn');
+            chip.onclick = function (event) {
+              event.stopPropagation();
+              if (splitOverhaul) splitOverhaul.click();
+            };
+            shown.push({ i: i, row: row, fit: fit });
+          });
+          if (!shown.length) {
+            splitOverhaul.hidden = true;
+            splitOverhaul.innerHTML = '';
+            splitOverhaul.onclick = null;
+            return;
+          }
+          const red = shown.filter(function (x) { return x.fit.level === 'red'; }).length;
+          splitOverhaul.hidden = false;
+          splitOverhaul.innerHTML = '<b>' + shown.length + ' 名执行人存在大修' + (red ? '冲突' : '安排') +
+            '</b><span>点击查看详情</span>';
+          splitOverhaul.onclick = function () {
+            const body = shown.map(function (x, idx) {
+              return '<div class="detail-section" data-overhaul-section="' + idx + '"><h4>第 ' + (x.i + 1) + ' 行 · ' +
+                U().esc(x.row.name || '未命名') + ' · ' + U().esc(x.row.owner) + '</h4>' +
+                window.ITO.assignPanelHtml(x.fit, { allowPick: !live, allowDue: true }) + '</div>';
+            }).join('');
+            U().modal({
+              title: '拆分任务大修冲突',
+              sub: '共 ' + shown.length + ' 行存在大修安排',
+              xwide: true,
+              body: body,
+              foot: '<button class="btn btn-ghost" data-close type="button">关闭</button>',
+              onMount: function (closeModal, modalRoot) {
+                modalRoot.querySelector('[data-close]').addEventListener('click', closeModal);
+                U().$$('[data-overhaul-section]', modalRoot).forEach(function (section, idx) {
+                  const entry = shown[idx];
+                  if (!entry) return;
+                  window.ITO.bindAssignPanel(section, null, {
+                    onPick: function (name) {
+                      const sel = tbody.querySelector('tr[data-row="' + entry.i + '"] [data-f="owner"]');
+                      if (sel) {
+                        sel.value = name;
+                        sel.dispatchEvent(new Event('change', { bubbles: true }));
+                      }
+                      closeModal();
+                      paintSplitOverhaul();
+                    },
+                    onDue: function (date) {
+                      const input = tbody.querySelector('tr[data-row="' + entry.i + '"] [data-f="due"]');
+                      if (input) {
+                        input.value = date + 'T18:00';
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                      }
+                      closeModal();
+                      paintSplitOverhaul();
+                    }
+                  });
+                });
+              }
+            });
           };
         }
 
@@ -1316,6 +1465,27 @@
           }).filter(function (entry) {
             return entry.info.weekAfter > 100 || entry.info.monthAfter > 100 || !entry.info.authOk;
           }) : [];
+          const fits = (!isDraft && window.ITO.assignmentFit) ? assignments.map(function (a) {
+            return window.ITO.assignmentFit({
+              name: a.name,
+              group: currentGroup,
+              auth: a.auth,
+              hours: a.hours,
+              due: a.due
+            });
+          }) : [];
+          let redFits = fits.filter(function (f) { return f.level === 'red'; });
+          if (isLive) {
+            redFits = redFits.filter(function (f, idx) {
+              const a = assignments[idx];
+              const row = currentMode === 'single'
+                ? (editing && editing.subs[0] ? editing.subs[0] : null)
+                : kept[idx];
+              const oldDue = row ? dueInput(row.due) : '';
+              return oldDue !== a.due;
+            });
+          }
+          let overhaulConfirmed = false;
 
           const proceed = function () {
           const cf = ITO.readCustomFields ? ITO.readCustomFields(root, 'task', editing ? editing.extra : null) : { values: {}, errors: [] };
@@ -1395,6 +1565,13 @@
             baseId + ' ' + name + ' · ' + subs.length + ' 个任务',
             '任务'
           );
+          if (overhaulConfirmed && redFits.length) {
+            ITO.log(
+              (isLive ? '编辑任务' : editing ? '派发草稿任务' : '新建并派发任务') + ' · 大修冲突确认',
+              baseId + ' ' + name + ' · ' + redFits.map(function (f) { return f.summary.name + ' ' + f.summary.count + ' 项'; }).join('、'),
+              '任务'
+            );
+          }
 
           st.taskFilters.q = '';
           st.taskFilters.group = '';
@@ -1405,7 +1582,16 @@
           ITO.refresh();
           };
 
-          if (risky.length) {
+          if (redFits.length) {
+            window.ITO.confirmAssignment(redFits, {
+              okText: isLive ? '仍要保存' : '仍要派发',
+              sub: isLive ? '截止时间调整后出现新的大修冲突，确认后保存修改' : '仍可继续创建并派发，确认后进入后续流程',
+              onConfirm: function () {
+                overhaulConfirmed = true;
+                proceed();
+              }
+            });
+          } else if (risky.length) {
             const lines = risky.map(function (entry) {
               const reasons = [];
               if (entry.info.weekAfter > 100 || entry.info.monthAfter > 100) {
@@ -1480,6 +1666,7 @@
       body:
         '<div class="dispatch-preview">' + U().badge(sub.level) + U().groupPill(sub.group) +
           '<b>' + U().esc(sub.name) + '</b><span class="mono">' + sub.id + '</span></div>' +
+        '<div id="dpOverhaul" style="margin-top:12px"></div>' +
         '<div class="form-grid" style="margin-top:16px">' +
           U().formRow({ label: '执行人', required: true, control: '<select id="dpOwner">' + U().peopleOptions(sub.group, sub.owner, { auth: sub.ticket ? sub.auth : '无需授权', hours: sub.hours, due: sub.due }) + '</select>' }) +
           U().formRow({ label: '截止时间', required: true, control: '<input id="dpDue" type="datetime-local" value="' + dueVal + '">' }) +
@@ -1494,6 +1681,32 @@
         const ownerSel = root.querySelector('#dpOwner');
         const dueInput = root.querySelector('#dpDue');
         const dpHint = root.querySelector('#dpHint');
+        const dpOverhaul = root.querySelector('#dpOverhaul');
+        const fitNow = function () {
+          if (!window.ITO.assignmentFit || !ownerSel.value) return null;
+          return window.ITO.assignmentFit({
+            name: ownerSel.value,
+            group: sub.group,
+            auth: sub.ticket ? authSel.value : '无需授权',
+            hours: sub.hours,
+            due: (dueInput.value || '').replace('T', ' ')
+          });
+        };
+        const paintOverhaul = function () {
+          if (!dpOverhaul || !window.ITO.assignPanelHtml) return;
+          const fit = fitNow();
+          dpOverhaul.innerHTML = fit ? window.ITO.assignPanelHtml(fit, { allowPick: true, allowDue: true }) : '';
+          window.ITO.bindAssignPanel(dpOverhaul, null, {
+            onPick: function (name) {
+              ownerSel.value = name;
+              ownerSel.dispatchEvent(new Event('change', { bubbles: true }));
+            },
+            onDue: function (date) {
+              dueInput.value = date + 'T18:00';
+              dueInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          });
+        };
         const paintHint = function () {
           if (!dpHint || !ITO.assigneeInfo) return;
           const auth = sub.ticket ? authSel.value : '无需授权';
@@ -1504,22 +1717,27 @@
             (info.authOk ? '授权匹配' : '缺少' + U().esc(auth)) + '</span>';
         };
         paintHint();
-        ownerSel.addEventListener('change', paintHint);
-        authSel.addEventListener('change', paintHint);
-        dueInput.addEventListener('change', paintHint);
+        paintOverhaul();
+        ownerSel.addEventListener('change', function () { paintHint(); paintOverhaul(); });
+        authSel.addEventListener('change', function () { paintHint(); paintOverhaul(); });
+        dueInput.addEventListener('change', function () { paintHint(); paintOverhaul(); });
         root.querySelector('[data-cancel]').addEventListener('click', close);
         root.querySelector('[data-ok]').addEventListener('click', function () {
           const owner = root.querySelector('#dpOwner').value;
           const dueRaw = root.querySelector('#dpDue').value;
           if (!owner || !dueRaw) { U().toast('请补全执行人与截止时间', 'warn'); return; }
           const authVal = sub.ticket ? authSel.value : '无需授权';
-          const commit = function () {
+          const fit = fitNow();
+          const commit = function (confirmed) {
             sub.owner = owner;
             sub.due = dueRaw.replace('T', ' ');
             sub.auth = authVal;
             sub.status = '执行中';
             sub.note = root.querySelector('#dpNote').value.trim();
             ITO.log('派发任务', sub.id + ' ' + sub.name + ' → ' + owner, '任务');
+            if (confirmed && fit && fit.level === 'red') {
+              ITO.log('派发任务 · 大修冲突确认', sub.id + ' ' + owner + ' · ' + fit.summary.count + ' 项大修任务', '任务');
+            }
             ITO.notify(owner, {
               type: '任务',
               title: '新任务已派发',
@@ -1530,10 +1748,17 @@
             U().toast('已派发给 ' + owner + '，任务进入执行中');
             ITO.refresh();
           };
+          if (fit && fit.level === 'red') {
+            window.ITO.confirmAssignment(fit, {
+              okText: '仍要派发',
+              onConfirm: function () { commit(true); }
+            });
+            return;
+          }
           if (ITO.guardAssignment) {
-            ITO.guardAssignment({ name: owner, auth: authVal, hours: sub.hours, due: dueRaw.replace('T', ' ') }, commit);
+            ITO.guardAssignment({ name: owner, auth: authVal, hours: sub.hours, due: dueRaw.replace('T', ' ') }, function () { commit(false); });
           } else {
-            commit();
+            commit(false);
           }
         });
       }
@@ -2155,34 +2380,83 @@
       body:
         '<div class="form-grid">' +
           U().formRow({ label: '当前执行人', control: '<div class="static-field">' + U().esc(target.owner) + '</div>' }) +
+          U().formRow({ label: '新截止时间', required: true, control: '<input id="raDue" type="datetime-local" value="' + dueInput(target.due) + '">' }) +
           U().formRow({ label: '新执行人', required: true, control: '<select id="raOwner">' + U().peopleOptions(target.group, target.owner, { auth: target.auth, hours: target.hours, due: target.due }) + '</select>' }) +
+          '<div class="form-field full" id="raRelease"></div>' +
+          '<div class="form-field full" id="raOverhaul"></div>' +
           '<div class="form-field full"><div class="assign-hint" id="raHint"></div></div>' +
           U().formRow({ label: '改派原因', full: true, required: true, control: '<textarea id="raReason" placeholder="说明改派原因，改派后保留当前任务状态并记录日志"></textarea>' }) +
         '</div>',
       foot: '<button class="btn btn-ghost" data-cancel type="button">取消</button><button class="btn btn-primary" data-ok type="button">确认改派</button>',
       onMount: function (close, root) {
         const ownerSel = root.querySelector('#raOwner');
+        const dueInputEl = root.querySelector('#raDue');
         const reason = root.querySelector('#raReason');
         const hint = root.querySelector('#raHint');
+        const releaseEl = root.querySelector('#raRelease');
+        const overhaulEl = root.querySelector('#raOverhaul');
+        const oldDue = target.due;
+        const oldSummary = window.ITO.overhaulSummaryOf ? window.ITO.overhaulSummaryOf(target.owner) : null;
+        if (releaseEl) {
+          releaseEl.innerHTML = '<div class="assign-release">原执行人 <b>' + U().esc(target.owner) + '</b>：' +
+            (oldSummary && oldSummary.count ? '大修 ' + oldSummary.count + ' 项，改派后不再承担本任务' : '无大修任务') +
+            '</div>';
+        }
+        const fitNow = function () {
+          if (!window.ITO.assignmentFit || !ownerSel.value) return null;
+          return window.ITO.assignmentFit({
+            name: ownerSel.value,
+            group: target.group,
+            auth: target.auth,
+            hours: target.hours,
+            due: (dueInputEl.value || '').replace('T', ' ')
+          });
+        };
+        const paintOverhaul = function () {
+          if (!overhaulEl || !window.ITO.assignPanelHtml) return;
+          const fit = fitNow();
+          overhaulEl.innerHTML = fit ? window.ITO.assignPanelHtml(fit, { allowPick: true, allowDue: true }) : '';
+          window.ITO.bindAssignPanel(overhaulEl, null, {
+            onPick: function (name) {
+              ownerSel.value = name;
+              ownerSel.dispatchEvent(new Event('change', { bubbles: true }));
+            },
+            onDue: function (date) {
+              dueInputEl.value = date + 'T18:00';
+              dueInputEl.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          });
+        };
         const paintHint = function () {
           if (!hint || !ITO.assigneeInfo) return;
+          const newDue = (dueInputEl.value || '').replace('T', ' ');
           const oldInfo = ITO.assigneeInfo(target.owner, target.auth, 0, target.due);
-          const newInfo = ITO.assigneeInfo(ownerSel.value, target.auth, target.hours, target.due);
+          const newInfo = ITO.assigneeInfo(ownerSel.value, target.auth, target.hours, newDue);
           hint.innerHTML = '原执行人 <b>' + U().esc(target.owner) + '</b> 本周 ' + oldInfo.weekRate + '% → 改派后 ' +
             Math.max(0, Math.round((oldInfo.weekRate - (target.hours || 0) / 40 * 100))) + '%；新执行人 <b>' + U().esc(ownerSel.value || '未选择') + '</b> 本周 ' +
             newInfo.weekRate + '% → <b>' + newInfo.weekAfter + '%</b>' +
             (newInfo.authOk ? '' : ' · <span class="text-red">缺少' + U().esc(target.auth || '所需授权') + '</span>');
         };
         paintHint();
-        ownerSel.addEventListener('change', paintHint);
+        paintOverhaul();
+        ownerSel.addEventListener('change', function () { paintHint(); paintOverhaul(); });
+        dueInputEl.addEventListener('change', function () { paintHint(); paintOverhaul(); });
         root.querySelector('[data-cancel]').addEventListener('click', close);
         root.querySelector('[data-ok]').addEventListener('click', function () {
           if (!ownerSel.value || ownerSel.value === target.owner) { U().toast('请选择新的执行人', 'warn'); return; }
           if (!reason.value.trim()) { U().toast('请填写改派原因', 'warn'); return; }
+          if (!dueInputEl.value) { U().toast('请选择新的截止时间', 'warn'); return; }
           const old = target.owner;
-          const commit = function () {
+          const newDue = dueInputEl.value.replace('T', ' ');
+          const fit = fitNow();
+          const commit = function (confirmed) {
             target.owner = ownerSel.value;
-            ITO.log('改派执行人', target.id + ' ' + target.name + ' · ' + old + ' → ' + target.owner + ' · ' + reason.value.trim(), '任务');
+            target.due = newDue;
+            ITO.log('改派执行人', target.id + ' ' + target.name + ' · ' + old + ' → ' + target.owner +
+              (newDue !== oldDue ? ' · 截止 ' + oldDue + ' → ' + newDue : '') + ' · ' + reason.value.trim(), '任务');
+            if (confirmed && fit && fit.level === 'red') {
+              ITO.log('改派执行人 · 大修冲突确认', target.id + ' ' + target.owner + ' · ' + fit.summary.count + ' 项大修任务', '任务');
+            }
             ITO.notify(old, {
               type: '任务',
               title: '任务已改派',
@@ -2199,10 +2473,18 @@
             U().toast('已改派给 ' + target.owner);
             ITO.refresh();
           };
+          if (fit && fit.level === 'red') {
+            window.ITO.confirmAssignment(fit, {
+              okText: '仍要改派',
+              sub: '新执行人存在大修冲突，确认后完成改派',
+              onConfirm: function () { commit(true); }
+            });
+            return;
+          }
           if (ITO.guardAssignment) {
-            ITO.guardAssignment({ name: ownerSel.value, auth: target.auth, hours: target.hours, due: target.due }, commit);
+            ITO.guardAssignment({ name: ownerSel.value, auth: target.auth, hours: target.hours, due: newDue }, function () { commit(false); });
           } else {
-            commit();
+            commit(false);
           }
         });
       }

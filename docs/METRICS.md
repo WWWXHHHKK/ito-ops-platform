@@ -319,18 +319,18 @@
 
 | ID | 名称 | 层级 | 类型 | 定义 | 公式 | 当前值 | 目标 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `AUT-TOTAL` | 授权总数 | L2 | 规模 | 授权台账记录总数 | count(auths) | **58** | — | `C` |
-| `AUT-VALID` | 有效授权 | L1 | 规模 | 未撤销且未过期的授权数 | count(effective) | **55** | — | `C` |
+| `AUT-TOTAL` | 授权总数 | L2 | 规模 | 授权台账记录总数 | count(auths) | **74** | — | `C` |
+| `AUT-VALID` | 有效授权 | L1 | 规模 | 未撤销且未过期的授权数 | count(effective) | **71** | — | `C` |
 | `AUT-EXPIRED` | 已过期 | L2 | 规模 | validTo 早于今天的授权数 | count(过期) | **3** | 0 | `C` |
 | `AUT-REVOKED` | 已撤销 | L3 | 规模 | 状态为已撤销的授权数 | count(已撤销) | **0** | 0 | `C` |
 | `AUT-EXPIRING-60D` | 60 天内到期 | L1 | 规模 | 未来 60 天内到期且未撤销的授权数 | 0≤剩余天数≤60（`ITO.authStatus` 临期口径） | **10**（矩阵另含值班授权 10） | ≤6 | `C` |
 | `AUT-COVERAGE` | 授权覆盖率 | L1 | 比率 | 至少持有一条有效授权的人数÷总人数 | 有效授权人数÷40 | **100.0%** | 100% | `C` |
-| `AUT-AVG-REMAIN` | 平均剩余天数 | L2 | 时效 | 有效授权剩余有效期的平均值 | Σ剩余天数÷有效授权数 | **195.8 天** | ≥60 天 | `C` |
+| `AUT-AVG-REMAIN` | 平均剩余天数 | L2 | 时效 | 有效授权剩余有效期的平均值 | Σ剩余天数÷有效授权数 | **202.4 天** | ≥60 天 | `C` |
 | `AUT-HIGHRISK` | 高风险授权人数 | L2 | 规模 | 持有效高风险作业授权的人数 | distinct(person, type=高风险作业, 有效) | **6** | ≥2 | `C` |
-| `AUT-WORKLEAD` | 工作负责人授权人数 | L2 | 规模 | 持有效工作负责人授权的人数 | distinct(person, type=工作负责人, 有效) | **8** | ≥3 | `C` |
-| `AUT-UTILIZATION` | 授权使用率 | L2 | 比率 | 被任务实际引用的有效授权÷有效授权数 | 引用数÷55 | **—** | ≥60% | `G` |
-| `AUT-REVOKE-RATE` | 授权撤销率 | L3 | 比率 | 已撤销÷授权总数 | 0÷58 | **0.0%** | 0 | `C` |
-| `AUT-EXPIRY-90D` | 90 天内到期 | L2 | 规模 | 未来 90 天内到期且未撤销的授权数 | 0≤剩余≤90 | **11** | ≤4 | `C` |
+| `AUT-WORKLEAD` | 工作负责人授权人数 | L2 | 规模 | 持有效工作负责人授权的人数 | distinct(person, type=工作负责人, 有效) | **13** | ≥3 | `C` |
+| `AUT-UTILIZATION` | 授权使用率 | L2 | 比率 | 被任务实际引用的有效授权÷有效授权数 | 引用数÷71 | **—** | ≥60% | `G` |
+| `AUT-REVOKE-RATE` | 授权撤销率 | L3 | 比率 | 已撤销÷授权总数 | 0÷74 | **0.0%** | 0 | `C` |
+| `AUT-EXPIRY-90D` | 90 天内到期 | L2 | 规模 | 未来 90 天内到期且未撤销的授权数 | 0≤剩余≤90 | **13** | ≤4 | `C` |
 
 ### 3.9 消息 `MSG`（11）
 
@@ -521,7 +521,7 @@
 - **当前值**：40 / 40 = 100.0%。
 - **目标 / 预警**：100% / <90%。
 - **读法**：40 人全部持有一条以上有效授权（入厂授权、基本安全培训全员有效）。
-- **注意**：有效授权 55 条，其中 60 天内到期 10 条；矩阵另含 10 条值班授权临期。覆盖率不是“长期安全”的同义词。
+- **注意**：有效授权 71 条，其中 60 天内到期 10 条；矩阵另含 10 条值班授权临期。覆盖率不是“长期安全”的同义词。
 
 ### 4.14 未读消息 `MSG-UNREAD`
 
@@ -660,7 +660,7 @@
 | 维保管理 | `MNT-PLANS`、`MNT-ENABLED`、`MNT-RECORDS`、`MNT-VENDORS-ALL`、`MNT-NEXT` | 4 计划 / 3 启用 / 4 记录 / 4 厂商 |
 | 值班管理 | `DUT-WEEKS`、`DUT-ROTATION`、`DUT-COVERAGE`、`DUT-CURRENT`、`DUT-NEXT` | 13 周 / 9 人轮换 / 本周郭远山 |
 | 组织架构 | `GRP-ACTIVE`、`GRP-OVERDUE`、`GRP-PER-CAPITA`、`PPL-TOTAL`、`PPL-CORE` | 4 组 / 40 人 / 每组 10 人 |
-| 授权管理 | `AUT-TOTAL`、`AUT-VALID`、`AUT-EXPIRED`、`AUT-EXPIRING-60D`、`AUT-COVERAGE` | 台账 58 条 / 55 有效 / 3 过期 / 10 临期；矩阵 40 实际 / 32 可拿 / 20 临期 / 3 过期 |
+| 授权管理 | `AUT-TOTAL`、`AUT-VALID`、`AUT-EXPIRED`、`AUT-EXPIRING-60D`、`AUT-COVERAGE` | 台账 74 条 / 71 有效 / 3 过期 / 10 临期；矩阵 40 实际 / 32 可拿 / 20 临期 / 3 过期 |
 | 站内消息 | `MSG-TOTAL`、`MSG-UNREAD`、`MSG-TODAY`、`MSG-TYPES` | 6 条 / 3 未读 / 2 今日 / 6 类 |
 | 预警规则 | `ALR-RULES`、`ALR-ENABLED`、`ALR-ENABLE-RATE`、`ALR-CHANNELS` | 5 条 / 5 启用 / 站内渠道 |
 | 操作日志 | `DAT-LOG-TOTAL` | 10 条 / 今日 4 / 系统 4 / 7 个操作人 / 6 类 |
@@ -812,7 +812,7 @@
 | `ito-data.js inspection*` | `INS-*` | 5 计划 / 5 记录 |
 | `ito-data.js maintenance*` | `MNT-*` | 4 计划 / 4 记录 |
 | `ito-data.js duty` | `DUT-*` | 13 周 / 9 人轮换 |
-| `ito-data.js auths` | `AUT-*` | 58 条授权（55 有效 / 3 过期） |
+| `ito-data.js auths` | `AUT-*` | 74 条授权（71 有效 / 3 过期） |
 | `ito-data.js messages` | `MSG-*` | 6 条消息 |
 | `ito-data.js alertRules` | `ALR-*` | 5 条规则 |
 | `ito-data.js logs/achievements/permissions` | `DAT-*` | 10 日志 / 6 成就标签 / 4×10 权限 |

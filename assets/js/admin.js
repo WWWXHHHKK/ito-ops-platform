@@ -8,7 +8,7 @@
 
   window.ITO = window.ITO || {};
   const D = window.ITO_DATA;
-  const BUILD_VERSION = '20261112z33';
+  const BUILD_VERSION = '20261112z34';
   const DATA_SOURCE = window.ITO_DATA_SOURCE;
   const PERSIST_KEYS = [
     'tasks', 'personalArchive', 'messages', 'logs', 'staff', 'groups', 'auths',
@@ -2109,7 +2109,12 @@
       const group = state.groups.find((g) => g.id === (staff ? staff.group : groupId)) || {};
       const role = group.manager === p.name ? '主管' : (group.leader === p.name ? '组长' : '');
       const info = infoOf(p.name);
-      const metaBits = [p.title || ''];
+      const metaBits = [];
+      if (showLoad && window.ITO.overhaulSummaryOf) {
+        const oh = window.ITO.overhaulSummaryOf(p.name);
+        if (oh && oh.count) metaBits.push(oh.chip);
+      }
+      if (p.title) metaBits.push(p.title);
       if (showLoad) {
         metaBits.push('本周 ' + info.weekRate + '% · 剩余 ' + info.weekRemain + 'h');
         if (opts.auth && opts.auth !== '无需授权' && opts.auth !== '—') {
