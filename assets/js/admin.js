@@ -8,7 +8,7 @@
 
   window.ITO = window.ITO || {};
   const D = window.ITO_DATA;
-  const BUILD_VERSION = '20261116z43';
+  const BUILD_VERSION = '20261116z44';
   const DATA_SOURCE = window.ITO_DATA_SOURCE;
   const PERSIST_KEYS = [
     'tasks', 'personalArchive', 'messages', 'logs', 'staff', 'groups', 'auths',
@@ -1072,7 +1072,7 @@
   function renderShell() {
     const u = state.user;
     $('#sideNav').innerHTML = navHtml();
-    $('#appbarUser').innerHTML = avatar(u.name, true) +
+    $('#appbarUser').innerHTML = '<span class="appbar-avatar" aria-hidden="true">' + icon('user') + '</span>' +
       '<div><b>' + esc(u.name) + '</b><span>' + esc(u.role === u.name ? u.title : u.role) + '</span></div>';
     const screenLink = document.querySelector('.appbar-right .screen-link');
     if (screenLink) screenLink.style.display = state.role === 'admin' ? 'none' : '';
@@ -1799,10 +1799,18 @@
 
     /* 侧边栏与页面内跳转统一走按钮，避免浏览器在左下角显示链接地址。 */
     document.addEventListener('click', (e) => {
-      const trigger = e.target.closest ? e.target.closest('[data-route]') : null;
-      if (!trigger) return;
-      e.preventDefault();
-      go(trigger.dataset.route);
+      const routeBtn = e.target.closest ? e.target.closest('[data-route]') : null;
+      if (routeBtn) {
+        e.preventDefault();
+        go(routeBtn.dataset.route);
+        return;
+      }
+      const hrefBtn = e.target.closest ? e.target.closest('button[data-href]') : null;
+      if (hrefBtn) {
+        e.preventDefault();
+        const href = hrefBtn.getAttribute('data-href');
+        if (href) location.href = href;
+      }
     });
 
     $('#bellBtn').addEventListener('click', () => go('messages'));

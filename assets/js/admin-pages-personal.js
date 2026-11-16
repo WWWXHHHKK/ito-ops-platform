@@ -1046,18 +1046,18 @@
     ensureAssessmentRedNotice(a);
     const red = a.safetySummary.red > 0;
 
-    const monthNotes = function (field) {
+    const monthNotes = function (field, base) {
       return (a.monthRows || []).map(function (row) {
-        return row.short + ' ' + assessNum(row[field]);
+        return row.short + ' ' + assessNum(row[field]) + '/' + base;
       }).join(' · ') || '—';
     };
     const passText = a.qualified ? '合格' : '未达标';
     const passClass = a.qualified ? 'is-ok' : 'is-bad';
     const slaNote = a.isQuarter
-      ? monthNotes('sla')
+      ? monthNotes('sla', a.baseSla)
       : '加分 ' + assessPoints(a.bonus) + ' · 扣分 ' + (a.deduction ? '-' + a.deduction : '0');
     const safetyNote = a.isQuarter
-      ? monthNotes('safety')
+      ? monthNotes('safety', a.baseSafety)
       : '黄灯 ' + a.safetySummary.yellow + ' · 红灯 ' + a.safetySummary.red;
 
     const totalCard = '<article class="card kpi-card assess-kpi-total" data-tone="green">' +
