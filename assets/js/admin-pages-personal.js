@@ -664,7 +664,7 @@
       series: [{
         name: '考核总分',
         type: 'bar',
-        barMaxWidth: 28,
+        barMaxWidth: 56,
         data: totals,
         itemStyle: {
           color: function (params) {
@@ -758,26 +758,25 @@
         '<div class="assess-detail-equation">基础 ' + a.baseSla + ' + 加分 ' + assessPoints(a.bonus) +
           ' - 扣分 ' + a.deduction + ' = <b>' + a.sla + ' / ' + a.baseSla + '</b></div>' +
         '<div class="assess-detail-section">' +
-          '<div class="assess-detail-title"><h4>扣分明细</h4><span>-' + a.deduction + ' 分</span></div>' +
+          '<div class="assess-detail-title"><h4>扣分明细</h4></div>' +
           '<div class="table-wrap"><table class="data-table assess-detail-table"><thead><tr><th>时间</th><th>类别</th><th>事项</th><th class="num">次数</th><th class="num">扣分</th></tr></thead><tbody>' +
             (deductionRows || '<tr><td colspan="5">' + U().emptyState('本期无扣分', '当前周期没有扣分记录', 'check') + '</td></tr>') +
             '<tr class="assess-total-row"><td colspan="4">扣分合计</td><td class="num assess-points neg">-' + a.deduction + '</td></tr>' +
           '</tbody></table></div>' +
         '</div>' +
         '<div class="assess-detail-section">' +
-          '<div class="assess-detail-title"><h4>加分项</h4><span>+' + a.bonus + ' 分</span></div>' +
+          '<div class="assess-detail-title"><h4>加分项</h4></div>' +
           '<div class="table-wrap"><table class="data-table assess-detail-table"><thead><tr><th>时间</th><th>类别</th><th>加分项</th><th class="num">计次</th><th class="num">加分</th></tr></thead><tbody>' +
             (bonusRows || '<tr><td colspan="5">' + U().emptyState('本期无加分', '当前周期没有加分记录', 'award') + '</td></tr>') +
             '<tr class="assess-total-row"><td colspan="4">加分合计</td><td class="num assess-points pos">+' + a.bonus + '</td></tr>' +
           '</tbody></table></div>' +
         '</div>' +
         '<div class="assess-detail-section">' +
-          '<div class="assess-detail-title"><h4>IT100 / SAP 扣分工单</h4><span>' + badTickets.length + ' 条 · 仅显示有扣分的工单</span></div>' +
+          '<div class="assess-detail-title"><h4>IT100 / SAP 扣分工单</h4></div>' +
           '<div class="table-wrap"><table class="data-table assess-sla-ticket-table"><thead><tr><th>工单号</th><th>系统</th><th>类型</th><th>事项</th><th>提交时间</th><th>响应时间</th><th>完成时间</th><th>及时响应</th><th>是否超期</th><th class="num">扣分</th></tr></thead><tbody>' +
             (ticketRows || '<tr><td colspan="10">' + U().emptyState('本期无扣分工单', '所有工单均按时完成', 'check') + '</td></tr>') +
           '</tbody></table></div>' +
         '</div>' +
-        '<p class="assess-note">' + U().esc(a.weeklyLogNote) + '</p>' +
       '</div>',
       foot: '<button class="btn btn-ghost" data-close type="button">关闭</button>',
       onMount: function (close, root) {
@@ -894,22 +893,9 @@
       '<div class="chart-body assess-trend-body" id="assessTrendChart"></div>' +
     '</section>';
 
-    const slaPct = Math.round(a.sla / a.baseSla * 100);
-    const safetyPct = Math.round(a.safety / a.baseSafety * 100);
-    const compositionCard = '<section class="card assess-composition-card">' +
-      '<div class="table-head"><div><h3>考核构成</h3><p class="table-note">' + (a.isQuarter ? '2026 Q4' : '2026 年 11 月') + ' · 满分 100</p></div><span class="head-tag">SLA + 安质环</span></div>' +
-      '<div class="assess-composition-body">' +
-        '<div class="assess-comp-total"><b>' + a.total + '</b><span>/ 100</span><em>合格线 95</em></div>' +
-        '<div class="assess-comp-row"><div class="assess-comp-head"><span>SLA 考核</span><b>' + a.sla + ' / ' + a.baseSla + '</b></div><div class="assess-comp-track"><i style="width:' + slaPct + '%"></i></div></div>' +
-        '<div class="assess-comp-row"><div class="assess-comp-head"><span>安质环</span><b>' + a.safety + ' / ' + a.baseSafety + '</b></div><div class="assess-comp-track is-safety"><i style="width:' + safetyPct + '%"></i></div></div>' +
-        '<div class="assess-comp-note"><span>计分口径</span><p>SLA 80 + 安质环 20 = 100；合格线 95 分。</p></div>' +
-        '<div class="assess-comp-foot"><span>' + (a.isQuarter ? '季度考核' : '月度考核') + '</span><span>点击上方卡片查看明细</span></div>' +
-      '</div>' +
-    '</section>';
-
     return toolbar +
       '<div class="kpi-grid personal-kpis assess-kpis">' + totalCard + slaCard + safetyCard + '</div>' +
-      '<div class="assess-trend-row">' + trendCard + compositionCard + '</div>';
+      trendCard;
   }
 
   P.personal = {

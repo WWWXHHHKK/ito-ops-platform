@@ -1311,9 +1311,9 @@ window.ITO_DATA = (() => {
       { date: '2026-11-11 16:10', category: '5S 管理', item: '拍照表扬', count: 1, points: 1 },
       { date: '2026-11-15 14:00', category: '创新创优', item: '合理化建议被采纳', count: 1, points: 3 },
       { date: '2026-11-22 09:40', category: '运维保障', item: '主动发现隐患', count: 1, points: 2 },
-      { date: '2026-11-30', category: '用户满意度', item: '招标方满意度', count: 0, points: 1 },
-      { date: '2026-11-30', category: '学科建设', item: '论文 / 知识成果 / 专利 / 技能比武', count: 0, points: 2 },
-      { date: '2026-11-30', category: '运维指标', item: '季度无超期', count: 0, points: 2 }
+      { date: '2026-11-30 17:00', category: '用户满意度', item: '招标方满意度', count: 0, points: 1 },
+      { date: '2026-11-30 17:10', category: '学科建设', item: '论文 / 知识成果 / 专利 / 技能比武', count: 0, points: 2 },
+      { date: '2026-11-30 17:20', category: '运维指标', item: '季度无超期', count: 0, points: 2 }
     ],
     tickets: [
       {
