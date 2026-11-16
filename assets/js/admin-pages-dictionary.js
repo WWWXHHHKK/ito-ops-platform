@@ -729,7 +729,7 @@
         '<div class="dict-note">' + (canEdit
           ? U().icon('alert') + ' 使用中的字典项不能删除。如不再使用，请先停用；历史数据会保留原名称，新增和编辑下拉不再出现。'
           : U().icon('alert') + ' <span>系统只读。配置位置：' + U().esc(ro.hint) +
-            (ro.route && ro.accessible ? ' · <a class="dict-source-link" href="#/' + U().esc(ro.route) + '">前往' + U().esc(ro.routeName || '配置页') + ' →</a>' :
+            (ro.route && ro.accessible ? ' · <button type="button" class="dict-source-link" data-route="' + U().esc(ro.route) + '">前往' + U().esc(ro.routeName || '配置页') + ' →</button>' :
               (ro.route ? '（当前角色无该模块入口）' : '')) + '</span>') + '</div>' +
         '<div class="table-wrap"><table class="data-table dict-table"><thead><tr><th>名称</th><th>编码</th><th>状态</th><th title="按当前业务记录实时统计，0 条表示暂无记录使用">使用中</th><th class="num">排序</th><th style="text-align:right">操作</th></tr></thead><tbody>' +
           (values.length ? values.map(function (v) {

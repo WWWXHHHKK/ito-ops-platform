@@ -635,6 +635,15 @@
     return Number.isInteger(n) ? String(n) : n.toFixed(1);
   }
 
+  /* 与团队闭环趋势一致的品牌橙纵向渐变。 */
+  function assessGradient(from, to) {
+    if (!window.echarts || !window.echarts.graphic) return to;
+    return new window.echarts.graphic.LinearGradient(0, 0, 0, 1, [
+      { offset: 0, color: from },
+      { offset: 1, color: to }
+    ]);
+  }
+
   function assessMoment(value) {
     return U().esc(assessTime(value));
   }
@@ -680,11 +689,11 @@
         barMaxWidth: 56,
         data: totals,
         itemStyle: {
-          color: '#EB612A',
-          borderRadius: [4, 4, 0, 0]
+          color: assessGradient('#F28D5E', '#EB612A'),
+          borderRadius: [5, 5, 0, 0]
         },
         emphasis: {
-          itemStyle: { color: '#D0531F' }
+          itemStyle: { color: assessGradient('#E07A4C', '#D0531F') }
         },
         label: {
           show: true,
@@ -1037,22 +1046,36 @@
     ensureAssessmentRedNotice(a);
     const red = a.safetySummary.red > 0;
 
+    const monthNotes = function (field) {
+      return (a.monthRows || []).map(function (row) {
+        return row.short + ' ' + assessNum(row[field]);
+      }).join(' · ') || '—';
+    };
+    const passText = a.qualified ? '合格' : '未达标';
+    const passClass = a.qualified ? 'is-ok' : 'is-bad';
+    const slaNote = a.isQuarter
+      ? monthNotes('sla')
+      : '加分 ' + assessPoints(a.bonus) + ' · 扣分 ' + (a.deduction ? '-' + a.deduction : '0');
+    const safetyNote = a.isQuarter
+      ? monthNotes('safety')
+      : '黄灯 ' + a.safetySummary.yellow + ' · 红灯 ' + a.safetySummary.red;
+
     const totalCard = '<article class="card kpi-card assess-kpi-total" data-tone="green">' +
       '<div class="kpi-label">' + U().icon('award') + '<span>考核总分</span></div>' +
       '<div class="kpi-value">' + assessNum(a.total) + '<span class="unit">分</span></div>' +
+      '<div class="kpi-meta"><span class="assess-kpi-pass ' + passClass + '">' + passText + '</span></div>' +
     '</article>';
     const slaCard = '<article class="card kpi-card assess-sla-card" data-tone="blue" data-assess-sla-card role="button" tabindex="0" title="' +
       (a.isQuarter ? '查看季度月度构成' : '查看扣分与加分明细') + '">' +
       '<div class="kpi-label">' + U().icon('shield') + '<span>SLA 考核</span><em class="assess-card-link">查看明细</em></div>' +
       '<div class="kpi-value">' + assessNum(a.sla) + '<span class="unit"> / ' + a.baseSla + '</span></div>' +
+      '<div class="kpi-meta"><span>' + U().esc(slaNote) + '</span></div>' +
     '</article>';
     const safetyCard = '<article class="card kpi-card assess-safety-kpi' + (red ? ' is-red' : '') + '" data-tone="amber" data-assess-safety-card role="button" tabindex="0" title="' +
       (a.isQuarter ? '查看季度月度构成' : '查看安质环详情') + '">' +
       '<div class="kpi-label">' + U().icon('check') + '<span>安质环</span><em class="assess-card-link">查看明细</em></div>' +
       '<div class="kpi-value">' + assessNum(a.safety) + '<span class="unit"> / ' + a.baseSafety + '</span></div>' +
-      '<div class="kpi-meta">' + (a.isQuarter
-        ? '<span>' + (a.monthRows || []).length + ' 个月均分</span>'
-        : '<span>黄灯 ' + a.safetySummary.yellow + ' · 红灯 ' + a.safetySummary.red + '</span>') +
+      '<div class="kpi-meta"><span>' + U().esc(safetyNote) + '</span>' +
         (red ? '<span class="assess-kpi-red">红色警告</span>' : '') + '</div>' +
     '</article>';
 

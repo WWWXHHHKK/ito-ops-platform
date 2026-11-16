@@ -8,7 +8,7 @@
 
   window.ITO = window.ITO || {};
   const D = window.ITO_DATA;
-  const BUILD_VERSION = '20261116z42';
+  const BUILD_VERSION = '20261116z43';
   const DATA_SOURCE = window.ITO_DATA_SOURCE;
   const PERSIST_KEYS = [
     'tasks', 'personalArchive', 'messages', 'logs', 'staff', 'groups', 'auths',
@@ -1039,10 +1039,10 @@
           const content = group.standalone
             ? '<span>' + name + '</span>'
             : icon(it.icon) + '<span>' + name + '</span>';
-          return '<a class="nav-item' + (isActive(it) ? ' active' : '') + '" href="#/' + it.id + '" data-route="' + it.id + '"' + (isActive(it) ? ' aria-current="page"' : '') + '>' +
+          return '<button type="button" class="nav-item' + (isActive(it) ? ' active' : '') + '" data-route="' + it.id + '"' + (isActive(it) ? ' aria-current="page"' : '') + '>' +
             content +
             (count ? '<b class="nav-count">' + count + '</b>' : '') +
-            '</a>';
+            '</button>';
         }).join('') + '</div></div>';
     }).join('');
   }
@@ -1795,6 +1795,14 @@
       if (!label || (e.key !== 'Enter' && e.key !== ' ')) return;
       e.preventDefault();
       label.click();
+    });
+
+    /* 侧边栏与页面内跳转统一走按钮，避免浏览器在左下角显示链接地址。 */
+    document.addEventListener('click', (e) => {
+      const trigger = e.target.closest ? e.target.closest('[data-route]') : null;
+      if (!trigger) return;
+      e.preventDefault();
+      go(trigger.dataset.route);
     });
 
     $('#bellBtn').addEventListener('click', () => go('messages'));

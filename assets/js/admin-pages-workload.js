@@ -366,7 +366,7 @@
       '<td><div class="cell-task"><b>值班交接 · 第 ' + h.week.weekNo + ' 周</b><small>' + U().esc(h.week.start + ' ~ ' + h.week.end) + ' · 交接给 ' + U().esc(h.incoming) + (h.record ? ' · 已有交接记录' : '') + '</small></div></td>' +
       '<td>' + (h.group ? U().groupPill(h.group) : '—') + '</td><td>' + U().esc(h.person) +
       '</td><td>—</td><td>' + U().esc(h.due) + '</td><td>' + U().badge(h.status) +
-      '</td><td style="text-align:right"><a class="btn btn-ghost btn-sm" href="#/duty">查看排班</a></td></tr>';
+      '</td><td style="text-align:right"><button type="button" class="btn btn-ghost btn-sm" data-route="duty">查看排班</button></td></tr>';
   }
 
   const REGULAR_PAGE_SIZE = 10;

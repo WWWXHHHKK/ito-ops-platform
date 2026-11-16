@@ -304,7 +304,7 @@
       const duty = t.source === '值班';
       const actionCell = t.status === '已完成'
         ? '<span class="muted">—</span>'
-        : '<a class="btn btn-ghost btn-sm" href="#/' + (duty ? 'duty' : (t.planType === 'inspection' ? 'inspection' : 'maintenance')) + '">' + (duty ? '查看排班' : '去执行') + '</a>';
+        : '<button type="button" class="btn btn-ghost btn-sm" data-route="' + (duty ? 'duty' : (t.planType === 'inspection' ? 'inspection' : 'maintenance')) + '">' + (duty ? '查看排班' : '去执行') + '</button>';
       return '<tr data-plan-task="' + U().esc(t.id) + '" class="plan-row" title="查看常规任务详情">' +
         '<td><div class="cell-task"><b>' + U().esc(t.name) + '</b><small>' + U().esc(t.source + ' · ' + t.planId) + '</small></div></td>' +
         '<td>' + U().groupPill(t.group) + '</td>' +
@@ -494,7 +494,7 @@
           '<td class="num">' + (t.hours || 0) + ' h</td>' +
           '<td class="num" style="white-space:nowrap">' + U().shortDate(t.due) + '</td>' +
           '<td>' + U().badge(t.status) + '</td>' +
-          '<td style="text-align:right">' + (t.status === '已完成' ? '<span class="muted">—</span>' : '<a class="btn btn-ghost btn-sm" href="#/' + (t.source === '值班' ? 'duty' : (t.planType === 'inspection' ? 'inspection' : 'maintenance')) + '">' + (t.source === '值班' ? '查看排班' : '去执行') + '</a>') + '</td></tr>';
+          '<td style="text-align:right">' + (t.status === '已完成' ? '<span class="muted">—</span>' : '<button type="button" class="btn btn-ghost btn-sm" data-route="' + (t.source === '值班' ? 'duty' : (t.planType === 'inspection' ? 'inspection' : 'maintenance')) + '">' + (t.source === '值班' ? '查看排班' : '去执行') + '</button>') + '</td></tr>';
       }
       const x = r.x;
       const rec = window.DeliverableStore ? window.DeliverableStore.getLatestSubmission(x.sub.id) : null;
@@ -647,7 +647,7 @@
         sub: greet() + '，' + st.user.name + (myGroup ? ' · ' + myGroup.name : '') + (isLeader ? ' · 全部专业组' : ''),
         actions:
           (ITO.isSuper() || ITO.roleIs('manager', 'leader')
-            ? '<a class="btn btn-ghost" href="#/tasks">' + U().icon('task') + '任务管理</a>'
+            ? '<button type="button" class="btn btn-ghost" data-route="tasks">' + U().icon('task') + '任务管理</button>'
             : '') +
           '<button class="btn btn-primary" id="myExportBtn" type="button">' + U().icon('download') + (isLeader ? '导出团队任务' : '导出我的任务') + '</button>'
       }) +

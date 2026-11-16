@@ -756,7 +756,7 @@
       }
       const approvalPending = ['审批中', '已挂起', '审批驳回', '待汇总'].indexOf(displayStatusText) > -1;
       if (approvalPending && !closedView) {
-        foot += '<a class="btn btn-soft" href="#/dispatch">前往派发与审批</a>';
+        foot += '<button type="button" class="btn btn-soft" data-route="dispatch">前往派发与审批</button>';
       }
     }
 
@@ -2914,7 +2914,7 @@
         '</div>' +
       '</div>' +
       '<section class="card table-card" id="ledgerCard">' +
-        '<div class="table-head"><div><h3>专项任务</h3><p class="table-note">手工新建任务 · <a href="#/overhaul">大修管理</a> · 点击行查看详情，展开可查看任务；审批中的任务不可编辑</p></div>' +
+        '<div class="table-head"><div><h3>专项任务</h3><p class="table-note">手工新建任务 · <button type="button" class="text-link" data-route="overhaul">大修管理</button> · 点击行查看详情，展开可查看任务；审批中的任务不可编辑</p></div>' +
           '<div class="ledger-meta"><span id="ledgerStats">' + statsChipsHtml(list) + '</span><button class="btn btn-ghost btn-sm" id="taskExportBtn" type="button">' + U().icon('download') + '导出清单</button></div></div>' +
         '<div class="table-wrap"><table class="data-table task-table">' +
           '<thead><tr><th>任务</th><th>专业组</th><th>发起人</th><th>负责人</th><th>授权</th><th>标签</th><th>优先级</th><th>截止时间</th><th>状态</th>' +
