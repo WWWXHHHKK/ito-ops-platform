@@ -1283,13 +1283,13 @@ window.ITO_DATA = (() => {
 
   /* ── 月度 / 季度考核演示数据 ───────────────────
      固定 2026-11 / 2026 Q4 口径，不随演示日期平移。
-     总分 = SLA 80 + 安质环 20，合格线 95。 */
+     总分 = SLA 80 + 安质环 20，合格线 95。
+     记分项一律整数；季度取季度内已结算月份的均分，允许一位小数。 */
   const assessment = {
     target: 95,
     baseSla: 80,
     baseSafety: 20,
     bonusCap: 2,
-    weeklyLogNote: '周日志：0.5 分口径与整数考核冲突，本期按 0 处理，本期无扣分。',
     period: {
       month: { key: '2026-11', label: '2026 年 11 月', short: '11 月', start: '2026-11-01', end: '2026-11-30' },
       quarter: { key: '2026-Q4', label: '2026 Q4', short: 'Q4', start: '2026-10-01', end: '2026-12-31', months: ['2026-10', '2026-11', '2026-12'] }
@@ -1301,21 +1301,131 @@ window.ITO_DATA = (() => {
       { key: '2026-10', label: '10 月', total: 95, sla: 76, safety: 19 },
       { key: '2026-11', label: '11 月', total: 96, sla: 77, safety: 19 }
     ],
-    deductions: [
-      { date: '2026-11-16 18:00', category: '任务超期', item: '任务超期 2 次', count: 2, points: -2 },
-      { date: '2026-11-12 15:30', category: '变更管理', item: '变更未按标准流程 1 次', count: 1, points: -3 },
-      { date: '2026-11-20 10:10', category: '过程管理', item: '过程管理数据/记录更新不及时 1 次', count: 1, points: -2 }
-    ],
-    bonuses: [
-      { date: '2026-11-08 10:30', category: '用户满意度', item: '一般用户表扬', count: 1, points: 1 },
-      { date: '2026-11-11 16:10', category: '5S 管理', item: '拍照表扬', count: 1, points: 1 },
-      { date: '2026-11-15 14:00', category: '创新创优', item: '合理化建议被采纳', count: 1, points: 3 },
-      { date: '2026-11-22 09:40', category: '运维保障', item: '主动发现隐患', count: 1, points: 2 },
-      { date: '2026-11-30 17:00', category: '用户满意度', item: '招标方满意度', count: 0, points: 1 },
-      { date: '2026-11-30 17:10', category: '学科建设', item: '论文 / 知识成果 / 专利 / 技能比武', count: 0, points: 2 },
-      { date: '2026-11-30 17:20', category: '运维指标', item: '季度无超期', count: 0, points: 2 }
-    ],
+    /* 7–11 月月度明细：趋势下钻与月度考核共用，合计与 monthTrend 一致。 */
+    months: {
+      '2026-07': {
+        label: '2026 年 7 月',
+        deductions: [
+          { date: '2026-07-09 17:40', category: '任务超期', item: '任务超期 2 次', count: 2, points: -2 },
+          { date: '2026-07-16 11:20', category: '变更管理', item: '变更未按标准流程 1 次', count: 1, points: -3 },
+          { date: '2026-07-23 16:10', category: '过程管理', item: '过程管理数据/记录更新不及时 1 次', count: 1, points: -2 }
+        ],
+        bonuses: [
+          { date: '2026-07-06 10:20', category: '用户满意度', item: '一般用户表扬', count: 1, points: 1 },
+          { date: '2026-07-21 09:50', category: '运维保障', item: '主动发现隐患', count: 1, points: 2 }
+        ],
+        safetyEvents: [
+          {
+            id: 'SE-202607-001', date: '2026-07-17 14:30', level: '黄灯',
+            category: '信息安全', indicator: '未关机电脑',
+            item: '办公终端非工作时间未关机 2 台', impact: '已现场关机，无业务影响', points: -1
+          }
+        ]
+      },
+      '2026-08': {
+        label: '2026 年 8 月',
+        deductions: [
+          { date: '2026-08-07 18:10', category: '任务超期', item: '任务超期 2 次', count: 2, points: -2 },
+          { date: '2026-08-13 10:40', category: '变更管理', item: '变更未按标准流程 1 次', count: 1, points: -3 },
+          { date: '2026-08-25 16:30', category: '过程管理', item: '过程管理数据/记录更新不及时 1 次', count: 1, points: -2 }
+        ],
+        bonuses: [
+          { date: '2026-08-05 11:00', category: '用户满意度', item: '一般用户表扬', count: 1, points: 1 },
+          { date: '2026-08-12 15:20', category: '5S 管理', item: '拍照表扬', count: 1, points: 1 },
+          { date: '2026-08-26 10:10', category: '运维保障', item: '主动发现隐患', count: 1, points: 2 }
+        ],
+        safetyEvents: [
+          {
+            id: 'SE-202608-001', date: '2026-08-14 10:20', level: '黄灯',
+            category: '工业安全', indicator: '人员行为',
+            item: '现场作业未按规定佩戴标识 1 人次', impact: '已现场纠正，无业务影响', points: -1
+          }
+        ]
+      },
+      '2026-09': {
+        label: '2026 年 9 月',
+        deductions: [
+          { date: '2026-09-04 17:30', category: '任务超期', item: '任务超期 2 次', count: 2, points: -2 },
+          { date: '2026-09-11 10:20', category: '变更管理', item: '变更未按标准流程 1 次', count: 1, points: -3 },
+          { date: '2026-09-22 15:40', category: '过程管理', item: '过程管理数据/记录更新不及时 1 次', count: 1, points: -2 }
+        ],
+        bonuses: [
+          { date: '2026-09-03 16:40', category: '5S 管理', item: '拍照表扬', count: 1, points: 1 },
+          { date: '2026-09-18 10:30', category: '创新创优', item: '合理化建议被采纳', count: 1, points: 3 }
+        ],
+        safetyEvents: [
+          {
+            id: 'SE-202609-001', date: '2026-09-09 15:40', level: '黄灯',
+            category: '内部工单抽查', indicator: 'IT100工单偏差',
+            item: '工单关闭描述不完整 2 条', impact: '已补充说明，无业务影响', points: -1
+          }
+        ]
+      },
+      '2026-10': {
+        label: '2026 年 10 月',
+        deductions: [
+          { date: '2026-10-12 17:20', category: '任务超期', item: '任务超期 2 次', count: 2, points: -2 },
+          { date: '2026-10-20 11:10', category: '变更管理', item: '变更未按标准流程 1 次', count: 1, points: -3 },
+          { date: '2026-10-28 16:00', category: '过程管理', item: '过程管理数据/记录更新不及时 1 次', count: 1, points: -2 }
+        ],
+        bonuses: [
+          { date: '2026-10-08 10:10', category: '用户满意度', item: '一般用户表扬', count: 1, points: 1 },
+          { date: '2026-10-16 15:00', category: '5S 管理', item: '拍照表扬', count: 1, points: 1 },
+          { date: '2026-10-27 09:30', category: '运维保障', item: '主动发现隐患', count: 1, points: 2 }
+        ],
+        safetyEvents: [
+          {
+            id: 'SE-202610-001', date: '2026-10-22 16:10', level: '黄灯',
+            category: '信息安全', indicator: '弱口令事件',
+            item: '弱口令账号 1 个', impact: '已强制改密，无业务影响', points: -1
+          }
+        ]
+      },
+      '2026-11': {
+        label: '2026 年 11 月',
+        deductions: [
+          { date: '2026-11-16 18:00', category: '任务超期', item: '任务超期 2 次', count: 2, points: -2 },
+          { date: '2026-11-12 15:30', category: '变更管理', item: '变更未按标准流程 1 次', count: 1, points: -3 },
+          { date: '2026-11-20 10:10', category: '过程管理', item: '过程管理数据/记录更新不及时 1 次', count: 1, points: -2 }
+        ],
+        bonuses: [
+          { date: '2026-11-08 10:30', category: '用户满意度', item: '一般用户表扬', count: 1, points: 1 },
+          { date: '2026-11-11 16:10', category: '5S 管理', item: '拍照表扬', count: 1, points: 1 },
+          { date: '2026-11-15 14:00', category: '创新创优', item: '合理化建议被采纳', count: 1, points: 3 },
+          { date: '2026-11-22 09:40', category: '运维保障', item: '主动发现隐患', count: 1, points: 2 },
+          { date: '2026-11-30 17:00', category: '用户满意度', item: '招标方满意度', count: 0, points: 1 },
+          { date: '2026-11-30 17:10', category: '学科建设', item: '论文 / 知识成果 / 专利 / 技能比武', count: 0, points: 2 },
+          { date: '2026-11-30 17:20', category: '运维指标', item: '季度无超期', count: 0, points: 2 }
+        ],
+        safetyEvents: [
+          {
+            id: 'SE-202611-001', date: '2026-11-08 14:20', level: '黄灯',
+            category: '工业安全', indicator: '文档规范',
+            item: '文档记录填写不规范 1 项', impact: '已现场纠正，无业务影响', points: -1
+          }
+        ]
+      }
+    },
+    /* 工单按提交日期归属月份：月度取本月，季度取季度内已结算月份。 */
     tickets: [
+      {
+        id: 'IT100-202607-014', system: 'SAP', type: '事件', item: '报表导出任务失败',
+        submitted: '2026-07-18 09:40', responded: '2026-07-18 10:05', completed: '2026-07-20 15:20',
+        timelyResponse: true, overdue: true, points: -2,
+        deductions: [{ reason: 'IT100 超期完成', points: -2 }]
+      },
+      {
+        id: 'IT100-202608-021', system: 'SAP', type: '服务请求', item: '成本中心权限维护',
+        submitted: '2026-08-19 14:10', responded: '2026-08-19 14:35', completed: '2026-08-21 17:40',
+        timelyResponse: true, overdue: true, points: -2,
+        deductions: [{ reason: 'IT100 超期完成', points: -2 }]
+      },
+      {
+        id: 'IT100-202609-009', system: '统一身份', type: '事件', item: '账号锁定解锁延迟',
+        submitted: '2026-09-16 09:10', responded: '2026-09-16 11:05', completed: '2026-09-16 11:40',
+        timelyResponse: false, overdue: false, points: -1,
+        deductions: [{ reason: 'IT100 未及时响应', points: -1 }]
+      },
       {
         id: 'IT100-202610-018', system: 'SAP', type: '事件', item: '财务凭证打印异常',
         submitted: '2026-10-09 09:12', responded: '2026-10-09 10:05', completed: '2026-10-09 10:40',
@@ -1376,13 +1486,6 @@ window.ITO_DATA = (() => {
       { type: '关键区域', item: '核心机房巡检', date: '2026-11-03', impact: '无影响', points: 0 },
       { type: '重要节点', item: '月度结账保障', date: '2026-11-30', impact: '无影响', points: 0 },
       { type: '关键区域', item: '配电室倒闸配合', date: '2026-11-12', impact: '无影响', points: 0 }
-    ],
-    safetyEvents: [
-      {
-        id: 'SE-202611-001', date: '2026-11-08 14:20', level: '黄灯',
-        category: '工业安全', indicator: '文档规范',
-        item: '文档记录填写不规范 1 项', impact: '已现场纠正，无业务影响', points: -1
-      }
     ],
     safetyStandards: [
       {
