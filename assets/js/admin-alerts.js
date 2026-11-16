@@ -45,9 +45,9 @@
       condition: function (t) { return '近 7 天巡检异常项 ≥ ' + t; }
     },
     {
-      key: 'slaThreshold', label: 'SLA 达成率', unit: '%', threshold: 97, messageType: '报表',
-      hint: 'SLA 达成率低于阈值时通知领导层与运维主管',
-      condition: function (t) { return 'SLA 达成率 < ' + t + '%'; }
+      key: 'slaThreshold', label: '任务 SLA 达成率', unit: '%', threshold: 97, messageType: '报表',
+      hint: '任务 SLA 达成率低于阈值时通知领导层与运维主管',
+      condition: function (t) { return '任务 SLA 达成率 < ' + t + '%'; }
     },
     {
       key: 'dutyHandover', label: '值班交接', unit: '分钟', threshold: 15, messageType: '值班',
@@ -148,7 +148,7 @@
     if (rule.type === 'slaThreshold') {
       const value = Number((st.metrics || {}).sla != null ? st.metrics.sla : D.dashboard.sla);
       if (!(value < threshold)) return out;
-      out.push({ key: 'SLA-' + pad((st.metrics || {}).sla), name: 'SLA 达成率', value: value });
+      out.push({ key: 'SLA-' + pad((st.metrics || {}).sla), name: '任务 SLA 达成率', value: value });
       return out;
     }
 
@@ -190,7 +190,7 @@
         ' 条异常巡检记录待整改，请专业组主管确认整改责任人与时限。';
     }
     if (rule.type === 'slaThreshold') {
-      return '当前 SLA 达成率 ' + first.value + '%，低于阈值 ' + threshold + '%，请关注审批积压与超期任务。';
+      return '当前任务 SLA 达成率 ' + first.value + '%，低于阈值 ' + threshold + '%，请关注审批积压与超期任务。';
     }
     if (rule.type === 'dutyHandover') {
       return '第 ' + first.weekNo + ' 周值班交接截至 ' + first.deadline.slice(11) + ' 仍未确认（当前状态：' +

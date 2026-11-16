@@ -87,27 +87,40 @@
     }
   }
 
-  /* ── SLA metrics ───────────────────────────── */
-  const SLA = window.ITO_DATA && window.ITO_DATA.dashboard && window.ITO_DATA.dashboard.slaMetrics;
-  if (SLA) {
-    const setSlaText = (id, value) => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = value;
-    };
-    const score = Number(SLA.score) || 0;
-    const delta = Number(SLA.delta) || 0;
-    setSlaText('slaScore', score.toFixed(1));
-    setSlaText('slaGrade', '综合得分 · ' + (SLA.grade || '—') + ' 级');
-    setSlaText('slaOnTime', Number(SLA.onTimeRate || 0).toFixed(1) + '%');
-    setSlaText('slaAvg', SLA.avgClosureText || '6h 12m');
-    setSlaText('slaOverdue', Number(SLA.overdueRate || 0).toFixed(1) + '%');
-    setSlaText('slaFootDelta', '11 月 · ' + (delta >= 0 ? '高于目标 ' : '低于目标 ') + Math.abs(delta).toFixed(1) + ' 分');
+  /* ── 09 monthly assessment ─────────────────── */
+  const TASK_SLA = window.ITO_DATA && window.ITO_DATA.dashboard && window.ITO_DATA.dashboard.slaMetrics;
+  const setAssessText = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  };
+  const assess = window.ITO && window.ITO.assessmentModel ? window.ITO.assessmentModel('month') : null;
+  const assessQuarter = window.ITO && window.ITO.assessmentModel ? window.ITO.assessmentModel('quarter') : null;
+  if (assess) {
+    const taskRef = assess.taskSla || {};
+    setAssessText('assessScore', String(assess.total));
+    setAssessText('assessGrade', assess.statusText);
+    setAssessText('assessSla', assess.sla + ' / ' + assess.baseSla);
+    setAssessText('assessSlaNote', '含加分 +' + assess.bonus);
+    setAssessText('assessSafety', assess.safety + ' / ' + assess.baseSafety);
+    setAssessText('assessSafetyNote', assess.safetySummary && assess.safetySummary.yellow
+      ? '黄灯 ' + assess.safetySummary.yellow + ' 项'
+      : '无扣分');
+    setAssessText('assessOnTime', Number(taskRef.onTimeRate || 0).toFixed(1) + '%');
+    setAssessText('assessOnTimeNote', '超期 ' + Number(taskRef.overdueRate || 0).toFixed(1) + '%');
+    if (assessQuarter) {
+      setAssessText('assessQuarterFoot', '季度 ' + assessQuarter.total + ' 分 · ' + assessQuarter.statusText);
+    }
     const arc = document.querySelector('.sla-gauge .gauge-value');
     if (arc) {
       const circumference = 2 * Math.PI * 54;
       const arcLength = circumference * 0.75;
-      arc.style.strokeDasharray = (arcLength * Math.max(0, Math.min(100, score)) / 100).toFixed(2) + ' ' + circumference.toFixed(2);
+      arc.style.strokeDasharray = (arcLength * Math.max(0, Math.min(100, assess.total)) / 100).toFixed(2) + ' ' + circumference.toFixed(2);
     }
+  } else if (TASK_SLA) {
+    setAssessText('assessScore', Number(TASK_SLA.score || 0).toFixed(1));
+    setAssessText('assessGrade', '任务时效参考 · ' + (TASK_SLA.grade || 'A') + ' 级');
+    setAssessText('assessOnTime', Number(TASK_SLA.onTimeRate || 0).toFixed(1) + '%');
+    setAssessText('assessOnTimeNote', '超期 ' + Number(TASK_SLA.overdueRate || 0).toFixed(1) + '%');
   }
 
   /* ── 01 health triage ──────────────────────── */

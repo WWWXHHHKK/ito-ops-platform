@@ -4984,3 +4984,146 @@ button.oh-attach-chip:hover { border-color: rgba(235, 97, 42, 0.35); background:
   .assign-fit-key { margin-left: 0; width: 100%; }
   .assign-split-summary { align-items: flex-start; flex-direction: column; gap: 2px; }
 }
+
+/* ── assessment · monthly / quarterly ───────── */
+.assess-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 16px;
+}
+.assess-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+.assess-switch button {
+  height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.assess-switch button:hover { color: var(--ink); }
+.assess-switch button.is-on {
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+}
+.assess-period {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.assess-kpis { margin-bottom: 16px; }
+.assess-kpis .kpi-meta .assess-ref {
+  display: block;
+  margin-top: 4px;
+  color: var(--dim);
+  font-size: 10px;
+  line-height: 1.45;
+}
+.assess-trend-card { margin-bottom: 16px; }
+.assess-trend-card .assess-trend-body { height: 238px; min-height: 238px; }
+.assess-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.assess-card { min-width: 0; margin-bottom: 16px; }
+.assess-grid-2 > .assess-card { margin-bottom: 0; }
+.assess-card .table-head { align-items: flex-start; }
+.assess-table { min-width: 520px; font-size: 11px; }
+.assess-table th { white-space: nowrap; }
+.assess-table td { vertical-align: middle; }
+.assess-ticket-table { min-width: 1080px; }
+.assess-points { font-family: var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.assess-points.neg { color: var(--red); }
+.assess-points.pos { color: var(--green); }
+.assess-total-row td {
+  background: #FAF8F5;
+  color: var(--ink);
+  font-weight: 650;
+}
+.assess-note {
+  margin: 0;
+  padding: 9px 16px 12px;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+.assess-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #F7F6F4;
+  color: var(--ink-2);
+  font-size: 9.5px;
+  white-space: nowrap;
+}
+.assess-chip.ok { border-color: #CBE7D6; background: #EFF9F3; color: #287A4B; }
+.assess-chip.bad { border-color: #F0C8BA; background: #FFF3EE; color: #9E2F1A; }
+.assess-chip.warn { border-color: #F0DDB8; background: #FFFAF0; color: #8A5B12; }
+.assess-chip.info { border-color: #CFE2F3; background: #F1F7FD; color: #2A5F8A; }
+.assess-cap {
+  display: inline-block;
+  margin-left: 4px;
+  color: #9A6718;
+  font-size: 9px;
+}
+.assess-safety-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px 4px;
+}
+.assess-safety-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #FAF8F5;
+  color: var(--muted);
+  font-size: 10px;
+}
+.assess-safety-chip b { font-family: var(--font-num); color: var(--ink); font-size: 12px; }
+.assess-safety-chip.warn { border-color: #F0DDB8; background: #FFFAF0; color: #8A5B12; }
+.assess-safety-chip.bad { border-color: #F0C8BA; background: #FFF3EE; color: #9E2F1A; }
+.assess-safety-chip.veto { border-color: #E7C3C3; background: #FDF1F1; color: #9E2F1A; }
+.assess-safety-chip.score { border-color: #CBE7D6; background: #EFF9F3; color: #287A4B; }
+.assess-safety-chip.score b { color: #287A4B; }
+.assess-standards-table { min-width: 760px; }
+.assess-standards-table td { vertical-align: top; line-height: 1.55; }
+.assess-standards-table .std-green { color: #287A4B; }
+.assess-standards-table .std-yellow { color: #8A5B12; }
+.assess-standards-table .std-red { color: #9E2F1A; }
+.assess-modal-note {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+@media (max-width: 1180px) {
+  .assess-grid-2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .assess-toolbar { align-items: flex-start; flex-direction: column; }
+  .assess-trend-card .assess-trend-body { height: 220px; min-height: 220px; }
+  .assess-safety-summary { padding-top: 10px; }
+}

@@ -1401,6 +1401,13 @@ button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; box-
   stroke-linecap: round;
   stroke-dasharray: 254.40 339.29;
 }
+.gauge-pass {
+  stroke: var(--yellow);
+  stroke-width: 2;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 3px rgba(245, 185, 66, 0.55));
+  pointer-events: none;
+}
 .gauge-center {
   position: absolute;
   inset: 0;

@@ -591,8 +591,8 @@ window.ITO_DATA = (() => {
       lastFiredAt: '', fireCount: 0, lastSignature: ''
     },
     {
-      id: 'R-04', name: 'SLA 达成率预警', type: 'slaThreshold', threshold: 97, unit: '%',
-      scope: 'all', severity: '严重', condition: 'SLA 达成率 < 97%', channel: '站内',
+      id: 'R-04', name: '任务 SLA 达成率预警', type: 'slaThreshold', threshold: 97, unit: '%',
+      scope: 'all', severity: '严重', condition: '任务 SLA 达成率 < 97%', channel: '站内',
       dedupeMinutes: 30, enabled: true,
       createdAt: '2026-09-04 09:00', createdBy: '系统',
       updatedAt: '2026-09-04 09:00', updatedBy: '系统',
@@ -1281,6 +1281,115 @@ window.ITO_DATA = (() => {
     };
   });
 
+  /* ── 月度 / 季度考核演示数据 ───────────────────
+     固定 2026-11 / 2026 Q4 口径，不随演示日期平移。
+     总分 = SLA 80 + 安质环 20，合格线 95。 */
+  const assessment = {
+    target: 95,
+    baseSla: 80,
+    baseSafety: 20,
+    bonusCap: 2,
+    weeklyLogNote: '周日志：0.5 分口径与整数考核冲突，本期按 0 处理，本期无扣分。',
+    period: {
+      month: { key: '2026-11', label: '2026 年 11 月', short: '11 月', start: '2026-11-01', end: '2026-11-30' },
+      quarter: { key: '2026-Q4', label: '2026 Q4', short: 'Q4', start: '2026-10-01', end: '2026-12-31', months: ['2026-10', '2026-11', '2026-12'] }
+    },
+    monthTrend: [
+      { key: '2026-07', label: '7 月', total: 93, sla: 74, safety: 19 },
+      { key: '2026-08', label: '8 月', total: 94, sla: 75, safety: 19 },
+      { key: '2026-09', label: '9 月', total: 95, sla: 76, safety: 19 },
+      { key: '2026-10', label: '10 月', total: 95, sla: 76, safety: 19 },
+      { key: '2026-11', label: '11 月', total: 96, sla: 77, safety: 19 }
+    ],
+    deductions: [
+      { date: '2026-11-16', category: '任务超期', item: '任务超期 2 次', count: 2, points: -2 },
+      { date: '2026-11-12', category: '变更管理', item: '变更未按标准流程 1 次', count: 1, points: -3 },
+      { date: '2026-11-20', category: '过程管理', item: '过程管理数据/记录更新不及时 1 次', count: 1, points: -2 }
+    ],
+    bonuses: [
+      { date: '2026-11-08', category: '用户满意度', item: '一般用户表扬', count: 1, points: 1 },
+      { date: '2026-11-11', category: '5S 管理', item: '拍照表扬', count: 1, points: 1 },
+      { date: '2026-11-15', category: '创新创优', item: '合理化建议被采纳', count: 1, points: 3 },
+      { date: '2026-11-22', category: '运维保障', item: '主动发现隐患', count: 1, points: 2 },
+      { date: '2026-11-30', category: '用户满意度', item: '招标方满意度', count: 0, points: 1 },
+      { date: '2026-11-30', category: '学科建设', item: '论文 / 知识成果 / 专利 / 技能比武', count: 0, points: 2 },
+      { date: '2026-11-30', category: '运维指标', item: '季度无超期', count: 0, points: 2 }
+    ],
+    tickets: [
+      {
+        id: 'IT100-202610-018', system: 'SAP', type: '事件', item: '财务凭证打印异常',
+        submitted: '2026-10-09 09:12', responded: '2026-10-09 10:05', completed: '2026-10-09 10:40',
+        timelyResponse: false, overdue: false, points: -1,
+        deductions: [{ reason: 'IT100 未及时响应', points: -1 }]
+      },
+      {
+        id: 'IT100-202611-006', system: 'SAP', type: '事件', item: '月结凭证过账失败',
+        submitted: '2026-11-05 08:50', responded: '2026-11-05 10:20', completed: '2026-11-07 16:30',
+        timelyResponse: false, overdue: true, points: -3,
+        deductions: [
+          { reason: 'IT100 未及时响应', points: -1 },
+          { reason: 'IT100 超期完成', points: -2 }
+        ]
+      },
+      {
+        id: 'IT100-202611-012', system: 'OA', type: '服务请求', item: '流程表单字段调整',
+        submitted: '2026-11-06 09:30', responded: '2026-11-06 09:55', completed: '2026-11-06 11:20',
+        timelyResponse: true, overdue: false, points: 0, deductions: []
+      },
+      {
+        id: 'IT100-202611-018', system: '邮件系统', type: '事件', item: '邮箱容量告警',
+        submitted: '2026-11-08 14:10', responded: '2026-11-08 14:18', completed: '2026-11-08 15:00',
+        timelyResponse: true, overdue: false, points: 0, deductions: []
+      },
+      {
+        id: 'IT100-202611-024', system: 'SAP', type: '服务请求', item: '报表权限开通',
+        submitted: '2026-11-10 10:00', responded: '2026-11-10 10:20', completed: '2026-11-10 11:30',
+        timelyResponse: true, overdue: false, points: 0, deductions: []
+      },
+      {
+        id: 'IT100-202611-031', system: '统一身份', type: '事件', item: '单点登录异常',
+        submitted: '2026-11-12 08:40', responded: '2026-11-12 08:55', completed: '2026-11-12 09:30',
+        timelyResponse: true, overdue: false, points: 0, deductions: []
+      },
+      {
+        id: 'IT100-202611-039', system: 'OA', type: '事件', item: '待办推送延迟',
+        submitted: '2026-11-14 16:10', responded: '2026-11-14 16:25', completed: '2026-11-14 17:10',
+        timelyResponse: true, overdue: false, points: 0, deductions: []
+      },
+      {
+        id: 'IT100-202611-046', system: '邮件系统', type: '服务请求', item: '共享邮箱扩容',
+        submitted: '2026-11-15 09:20', responded: '2026-11-15 09:40', completed: '2026-11-15 10:30',
+        timelyResponse: true, overdue: false, points: 0, deductions: []
+      }
+    ],
+    exams: [
+      { person: '赵明川', type: '工作负责人授权考试', date: '2026-11-04', result: '通过', points: 0 },
+      { person: '周文博', type: '准备工程师授权考试', date: '2026-11-06', result: '通过', points: 0 },
+      { person: '郭远山', type: 'RP1 授权考试', date: '2026-11-08', result: '通过', points: 0 },
+      { person: '梁思远', type: 'RP2 授权考试', date: '2026-11-10', result: '通过', points: 0 },
+      { person: '宋云开', type: '高风险作业授权考试', date: '2026-11-12', result: '通过', points: 0 },
+      { person: '唐正阳', type: '低压电工证复审', date: '2026-11-13', result: '通过', points: 0 },
+      { person: '许星河', type: '安规考试', date: '2026-11-14', result: '通过', points: 0 },
+      { person: '邓嘉树', type: '消防技能考试', date: '2026-11-15', result: '通过', points: 0 }
+    ],
+    keyNodes: [
+      { type: '关键区域', item: '核心机房巡检', date: '2026-11-03', impact: '无影响', points: 0 },
+      { type: '重要节点', item: '月度结账保障', date: '2026-11-30', impact: '无影响', points: 0 },
+      { type: '关键区域', item: '配电室倒闸配合', date: '2026-11-12', impact: '无影响', points: 0 }
+    ],
+    safetyEvents: [
+      { date: '2026-11-08', level: '黄灯', category: '文档规范', item: '文档记录填写不规范 1 项', impact: '已现场纠正，无业务影响', points: -1 }
+    ],
+    safetyStandards: [
+      { category: '工业安全', item: '现场作业安全', green: '无违章、防护到位', yellow: '一般违章 1 次，已整改', red: '严重违章或未整改' },
+      { category: '工业安全', item: '消防与应急', green: '通道畅通、器材有效', yellow: '记录不完整，已补录', red: '通道堵塞或器材失效' },
+      { category: '内部工单抽查', item: '响应及时性', green: '全部按时响应', yellow: '迟响应 1 单，已说明', red: '迟响应 ≥2 单或影响业务' },
+      { category: '内部工单抽查', item: '闭环质量', green: '一次通过、记录完整', yellow: '轻微退回 1 次', red: '重复退回或超期完成' },
+      { category: '信息安全', item: '账号与权限', green: '权限匹配、无共享账号', yellow: '权限申请记录不完整', red: '越权访问或账号外借' },
+      { category: '信息安全', item: '数据与文档', green: '脱敏、归档规范', yellow: '文档记录填写不规范', red: '敏感数据外泄' }
+    ]
+  };
+
   const data = {
     meta: {
       org: 'ITO 运维中心',
@@ -1305,6 +1414,8 @@ window.ITO_DATA = (() => {
   // A fixed demo date tests expiration against the normal snapshot deadlines.
   const authDateOffset = Math.round((parseDay(dayKey(new Date())) - parseDay(BASE_DAY)) / 86400000);
   shiftSnapshot(data, OFFSET_DAYS);
+  /* 考核周期固定为 2026-11 / 2026 Q4，日期不随演示日期平移。 */
+  data.assessment = assessment;
   data.meta.baseDay = BASE_DAY;
   data.meta.demoNow = DEMO_NOW;
   data.meta.today = TODAY;
@@ -1369,7 +1480,7 @@ window.ITO_DATA = (() => {
           .slice(0, 6).map(function (r) { return { key: r.id, name: r.plan }; });
       }
       if (rule.type === 'slaThreshold') {
-        return [{ key: 'SLA', name: 'SLA 达成率 ' + data.dashboard.sla + '%' }];
+        return [{ key: 'SLA', name: '任务 SLA 达成率 ' + data.dashboard.sla + '%' }];
       }
       if (rule.type === 'dutyHandover') {
         const wk = isoWeek(parseDay(DEMO_NOW.slice(0, 10)));

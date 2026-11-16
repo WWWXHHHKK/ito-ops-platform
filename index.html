@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>ITO 智能运维管理平台 · 运维驾驶舱</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%23EB612A'/><text x='50' y='69' font-size='54' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'>I</text></svg>">
-<link rel="stylesheet" href="assets/css/style.css?v=20261113z37" />
+<link rel="stylesheet" href="assets/css/style.css?v=20261113z38" />
 </head>
 <body>
 <div class="stage-shell">
@@ -138,8 +138,8 @@
 
         <section class="panel panel-sla">
           <div class="panel-head">
-            <div class="ph-left"><i class="ph-idx">09</i><h2>任务 SLA</h2><span class="ph-en">TASK SLA</span></div>
-            <span class="head-tag tag-ok"><i class="dot-teal"></i>11 月</span>
+            <div class="ph-left"><i class="ph-idx">09</i><h2>月度考核</h2><span class="ph-en">MONTHLY ASSESSMENT</span></div>
+            <span class="head-tag tag-ok" id="assessPeriodTag"><i class="dot-teal"></i>11 月</span>
           </div>
           <div class="panel-body sla-body">
             <div class="sla-gauge-wrap">
@@ -161,20 +161,21 @@
                   <g id="gaugeTicks"></g>
                   <circle class="gauge-track" cx="75" cy="75" r="54" transform="rotate(135 75 75)"/>
                   <circle class="gauge-value" cx="75" cy="75" r="54" transform="rotate(135 75 75)" stroke="url(#slaGrad)" filter="url(#slaGlow)" style="stroke-dasharray:234.11 339.29"/>
+                  <line class="gauge-pass" x1="124.45" y1="105.30" x2="132.12" y2="110.01"><title>合格线 95 分</title></line>
                 </svg>
-                <div class="gauge-center" title="SLA 综合得分 = 按期闭环率×60% + 超期控制率×25% + 时效达成率×15%">
-                  <strong id="slaScore">92.0</strong><span>分</span>
+                <div class="gauge-center" title="月度考核 = SLA 80 分 + 安质环 20 分；合格线 95 分">
+                  <strong id="assessScore">96</strong><span>分</span>
                 </div>
               </div>
-              <div class="sla-grade" id="slaGrade">综合得分 · A 级</div>
+              <div class="sla-grade" id="assessGrade">高于合格线 1 分</div>
             </div>
             <div class="sla-metrics">
-              <div class="sla-metric" data-drill="tasks" tabindex="0" role="link"><span>按期闭环率</span><b id="slaOnTime">89.0%</b><em class="up-good">+2.1%</em></div>
-              <div class="sla-metric" data-drill="tasks" tabindex="0" role="link"><span>平均闭环时长</span><b id="slaAvg">6h 12m</b><em class="down">-0.4h</em></div>
-              <div class="sla-metric" data-drill="tasks" data-query="status=超期" tabindex="0" role="link" title="超期率按近 30 天已闭环与在办口径计算"><span>超期率 · 11月</span><b id="slaOverdue">5.5%</b><em class="down">-0.8%</em></div>
+              <div class="sla-metric" data-drill="tasks" tabindex="0" role="link"><span>SLA 考核</span><b id="assessSla">77 / 80</b><em class="up-good" id="assessSlaNote">含加分 +7</em></div>
+              <div class="sla-metric" data-drill="tasks" tabindex="0" role="link"><span>安质环</span><b id="assessSafety">19 / 20</b><em class="neutral" id="assessSafetyNote">黄灯 1 项</em></div>
+              <div class="sla-metric" data-drill="tasks" data-query="status=超期" tabindex="0" role="link" title="任务按期率为任务时效参考，不计入考核总分"><span>任务按期率</span><b id="assessOnTime">88.9%</b><em class="neutral" id="assessOnTimeNote">超期 5.5%</em></div>
             </div>
           </div>
-          <div class="panel-foot"><span><i class="dot-teal"></i>综合目标 90 分</span><span id="slaFootDelta">11 月 · 高于目标 2.0 分</span></div>
+          <div class="panel-foot"><span><i class="dot-teal"></i>合格线 <b>95</b> 分</span><span id="assessQuarterFoot">季度 95 分 · 压线合格</span></div>
         </section>
 
         <section class="panel panel-res">
@@ -218,12 +219,13 @@
 <div class="topo-tip" id="topoTip" role="tooltip" aria-hidden="true"></div>
 
 <script src="vendor/echarts.min.js"></script>
-<script src="assets/js/ito-data.js?v=20261113z37"></script>
-<script src="assets/js/task-volume-data.js?v=20261113z37"></script>
-<script src="assets/js/ito-data-source.js?v=20261113z37"></script>
-<script src="assets/js/platform-panels.js?v=20261113z37"></script>
-<script src="assets/js/app.js?v=20261113z37"></script>
-<script src="assets/js/center-demo.js?v=20261113z37"></script>
+<script src="assets/js/ito-data.js?v=20261113z38"></script>
+<script src="assets/js/task-volume-data.js?v=20261113z38"></script>
+<script src="assets/js/assessment.js?v=20261113z38"></script>
+<script src="assets/js/ito-data-source.js?v=20261113z38"></script>
+<script src="assets/js/platform-panels.js?v=20261113z38"></script>
+<script src="assets/js/app.js?v=20261113z38"></script>
+<script src="assets/js/center-demo.js?v=20261113z38"></script>
 </body>
 </html>
 
