@@ -663,6 +663,11 @@ button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; box-
   clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
 }
 .head-tag.tag-ok { color: var(--green); border-color: rgba(47, 240, 168, 0.30); background: rgba(47, 240, 168, 0.07); }
+.head-tag.tag-danger { color: var(--red); border-color: rgba(255, 92, 114, 0.34); background: rgba(255, 92, 114, 0.08); }
+.head-tag[hidden] { display: none !important; }
+.panel-sla.is-red { --accent: var(--red); }
+.panel-sla.is-red .sla-metric.is-red b,
+.panel-sla.is-red .sla-metric.is-red em { color: var(--red); text-shadow: 0 0 10px rgba(255, 92, 114, 0.35); }
 .head-total { font-size: 9px; color: var(--muted); letter-spacing: 0.06em; white-space: nowrap; }
 .head-total b {
   font-family: var(--font-num);

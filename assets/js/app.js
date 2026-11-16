@@ -97,19 +97,25 @@
   const assessQuarter = window.ITO && window.ITO.assessmentModel ? window.ITO.assessmentModel('quarter') : null;
   if (assess) {
     const taskRef = assess.taskSla || {};
+    const hasRed = !!(assess.safetySummary && assess.safetySummary.red > 0);
     setAssessText('assessScore', String(assess.total));
-    setAssessText('assessGrade', assess.statusText);
     setAssessText('assessSla', assess.sla + ' / ' + assess.baseSla);
     setAssessText('assessSlaNote', '含加分 +' + assess.bonus);
     setAssessText('assessSafety', assess.safety + ' / ' + assess.baseSafety);
-    setAssessText('assessSafetyNote', assess.safetySummary && assess.safetySummary.yellow
-      ? '黄灯 ' + assess.safetySummary.yellow + ' 项'
-      : '无扣分');
+    setAssessText('assessSafetyNote', hasRed
+      ? '红灯 ' + assess.safetySummary.red + ' 项'
+      : (assess.safetySummary && assess.safetySummary.yellow ? '黄灯 ' + assess.safetySummary.yellow + ' 项' : '无扣分'));
     setAssessText('assessOnTime', Number(taskRef.onTimeRate || 0).toFixed(1) + '%');
     setAssessText('assessOnTimeNote', '超期 ' + Number(taskRef.overdueRate || 0).toFixed(1) + '%');
     if (assessQuarter) {
       setAssessText('assessQuarterFoot', '季度 ' + assessQuarter.total + ' 分 · ' + assessQuarter.statusText);
     }
+    const panel = document.querySelector('.panel-sla');
+    if (panel) panel.classList.toggle('is-red', hasRed);
+    const redTag = document.getElementById('assessRedTag');
+    if (redTag) redTag.hidden = !hasRed;
+    const safetyMetric = document.getElementById('assessSafetyMetric');
+    if (safetyMetric) safetyMetric.classList.toggle('is-red', hasRed);
     const arc = document.querySelector('.sla-gauge .gauge-value');
     if (arc) {
       const circumference = 2 * Math.PI * 54;
@@ -118,7 +124,6 @@
     }
   } else if (TASK_SLA) {
     setAssessText('assessScore', Number(TASK_SLA.score || 0).toFixed(1));
-    setAssessText('assessGrade', '任务时效参考 · ' + (TASK_SLA.grade || 'A') + ' 级');
     setAssessText('assessOnTime', Number(TASK_SLA.onTimeRate || 0).toFixed(1) + '%');
     setAssessText('assessOnTimeNote', '超期 ' + Number(TASK_SLA.overdueRate || 0).toFixed(1) + '%');
   }

@@ -1302,15 +1302,15 @@ window.ITO_DATA = (() => {
       { key: '2026-11', label: '11 月', total: 96, sla: 77, safety: 19 }
     ],
     deductions: [
-      { date: '2026-11-16', category: '任务超期', item: '任务超期 2 次', count: 2, points: -2 },
-      { date: '2026-11-12', category: '变更管理', item: '变更未按标准流程 1 次', count: 1, points: -3 },
-      { date: '2026-11-20', category: '过程管理', item: '过程管理数据/记录更新不及时 1 次', count: 1, points: -2 }
+      { date: '2026-11-16 18:00', category: '任务超期', item: '任务超期 2 次', count: 2, points: -2 },
+      { date: '2026-11-12 15:30', category: '变更管理', item: '变更未按标准流程 1 次', count: 1, points: -3 },
+      { date: '2026-11-20 10:10', category: '过程管理', item: '过程管理数据/记录更新不及时 1 次', count: 1, points: -2 }
     ],
     bonuses: [
-      { date: '2026-11-08', category: '用户满意度', item: '一般用户表扬', count: 1, points: 1 },
-      { date: '2026-11-11', category: '5S 管理', item: '拍照表扬', count: 1, points: 1 },
-      { date: '2026-11-15', category: '创新创优', item: '合理化建议被采纳', count: 1, points: 3 },
-      { date: '2026-11-22', category: '运维保障', item: '主动发现隐患', count: 1, points: 2 },
+      { date: '2026-11-08 10:30', category: '用户满意度', item: '一般用户表扬', count: 1, points: 1 },
+      { date: '2026-11-11 16:10', category: '5S 管理', item: '拍照表扬', count: 1, points: 1 },
+      { date: '2026-11-15 14:00', category: '创新创优', item: '合理化建议被采纳', count: 1, points: 3 },
+      { date: '2026-11-22 09:40', category: '运维保障', item: '主动发现隐患', count: 1, points: 2 },
       { date: '2026-11-30', category: '用户满意度', item: '招标方满意度', count: 0, points: 1 },
       { date: '2026-11-30', category: '学科建设', item: '论文 / 知识成果 / 专利 / 技能比武', count: 0, points: 2 },
       { date: '2026-11-30', category: '运维指标', item: '季度无超期', count: 0, points: 2 }
@@ -1378,15 +1378,121 @@ window.ITO_DATA = (() => {
       { type: '关键区域', item: '配电室倒闸配合', date: '2026-11-12', impact: '无影响', points: 0 }
     ],
     safetyEvents: [
-      { date: '2026-11-08', level: '黄灯', category: '文档规范', item: '文档记录填写不规范 1 项', impact: '已现场纠正，无业务影响', points: -1 }
+      {
+        id: 'SE-202611-001', date: '2026-11-08 14:20', level: '黄灯',
+        category: '工业安全', indicator: '文档规范',
+        item: '文档记录填写不规范 1 项', impact: '已现场纠正，无业务影响', points: -1
+      }
     ],
     safetyStandards: [
-      { category: '工业安全', item: '现场作业安全', green: '无违章、防护到位', yellow: '一般违章 1 次，已整改', red: '严重违章或未整改' },
-      { category: '工业安全', item: '消防与应急', green: '通道畅通、器材有效', yellow: '记录不完整，已补录', red: '通道堵塞或器材失效' },
-      { category: '内部工单抽查', item: '响应及时性', green: '全部按时响应', yellow: '迟响应 1 单，已说明', red: '迟响应 ≥2 单或影响业务' },
-      { category: '内部工单抽查', item: '闭环质量', green: '一次通过、记录完整', yellow: '轻微退回 1 次', red: '重复退回或超期完成' },
-      { category: '信息安全', item: '账号与权限', green: '权限匹配、无共享账号', yellow: '权限申请记录不完整', red: '越权访问或账号外借' },
-      { category: '信息安全', item: '数据与文档', green: '脱敏、归档规范', yellow: '文档记录填写不规范', red: '敏感数据外泄' }
+      {
+        category: '工业安全', item: '工业安全', scope: '因安质环相关原因，受到政府行政处罚并造成重大外部影响',
+        green: '违反次数=0', yellow: '—', red: '一票否决', status: '', note: ''
+      },
+      {
+        category: '工业安全', item: '人员伤亡', scope: '本单位发生三级以上工业安全事件、不发生死亡事故',
+        green: '违反次数=0', yellow: '—', red: '一票否决', status: '', note: ''
+      },
+      {
+        category: '工业安全', item: '安全生产', scope: '严格遵守电厂安全生产管理规定，违反电厂职业安全及辐射防护、经验反馈、质保相关要求',
+        green: '不规范问题=0',
+        yellow: '1、≥内部检查发现不规范问题>0；2、其他部门发现提出警告',
+        red: '1、内部检查发现不规范问题>3；2、其他部门发现通报次数>0',
+        status: '', note: ''
+      },
+      {
+        category: '工业安全', item: '管理巡视', scope: '工业安全巡视发现不符合项等',
+        green: '不符合项=0',
+        yellow: '1、≥内部检查发现不规范问题>0；2、其他部门发现提出警告',
+        red: '1、内部检查发现不规范问题>3；2、其他部门发现通报次数>0',
+        status: '', note: ''
+      },
+      {
+        category: '工业安全', item: '人员行为', scope: '违反电厂发布的人员行为规范要求的次数',
+        green: '次数=0',
+        yellow: '1、≥违反次数>0；2、其他部门发现提出警告',
+        red: '1、违反次数>3；2、其他部门发现通报次数>0',
+        status: '', note: ''
+      },
+      {
+        category: '工业安全', item: '工作过程', scope: '不符合电厂工作过程管理、安全管理、工作包管理等程序要求的次数',
+        green: '次数=0',
+        yellow: '1、≥不符合次数>0；2、其他部门发现提出警告',
+        red: '1、不符合次数>3；2、其他部门发现通报次数>0',
+        status: '', note: ''
+      },
+      {
+        category: '工业安全', item: '文档规范', scope: '文档记录填写不规范数量',
+        green: '数量=0',
+        yellow: '1、≥数量>0；2、其他部门发现提出警告',
+        red: '1、数量>3；2、其他部门发现通报次数>0',
+        status: '', note: ''
+      },
+      {
+        category: '工业安全', item: '计划关闭', scope: 'IT100生产计划、SAP维修大纲关闭率',
+        green: '关闭率100%', yellow: '≥已执行但未关闭数量>0', red: '未关闭数量>1',
+        status: '', note: ''
+      },
+      {
+        category: '工业安全', item: '人因事件', scope: '遵守程序，反对违章，发生人因事件',
+        green: '人因事件=0',
+        yellow: '1、≥内部检查发现违反次数>0；2、其他部门发现提出警告',
+        red: '1、内部检查发现违反次数>1；2、其他部门发现通报次数>0',
+        status: '', note: ''
+      },
+      {
+        category: '内部工单抽查', item: 'SAP工单偏差', scope: '内部自查发现问题数量',
+        green: '—', yellow: '—', red: '—', status: '1 个', note: '无异常'
+      },
+      {
+        category: '内部工单抽查', item: 'IT100工单偏差', scope: '内部自查发现问题数量',
+        green: '—', yellow: '—', red: '—', status: '—', note: '无异常'
+      },
+      {
+        category: '信息安全', item: '木马病毒事件', scope: '被通报发生感染木马、病毒的事件',
+        green: '未被通报', yellow: '被通报未被考核', red: '被通报且被考核',
+        status: '', note: ''
+      },
+      {
+        category: '信息安全', item: '弱口令事件', scope: '被通报发现应用、信息系统、服务器及终端等弱口令的事件',
+        green: '未被通报', yellow: '被通报未被考核', red: '被通报且被考核',
+        status: '', note: ''
+      },
+      {
+        category: '信息安全', item: '未关机电脑', scope: '被通报扫描到非工作时间未关机电脑的问题',
+        green: '未被通报', yellow: '被通报未被考核', red: '被通报且被考核',
+        status: '', note: ''
+      },
+      {
+        category: '信息安全', item: '非标软件', scope: '被通报存在非集团正版（许可）软件与高风险软件的问题',
+        green: '未被通报', yellow: '被通报未被考核', red: '被通报且被考核',
+        status: '', note: ''
+      },
+      {
+        category: '信息安全', item: '网络安全漏洞', scope: '集团下发漏洞预警排查情况',
+        green: '排查不涉及', yellow: '排查涉及，不影响考核', red: '排查涉及，影响考核',
+        status: '', note: ''
+      },
+      {
+        category: '信息安全', item: '信息报送', scope: '被通报存在信息传达、报送与任务完成不及时的问题',
+        green: '未被通报', yellow: '被通报未被考核', red: '被通报且被考核',
+        status: '', note: ''
+      },
+      {
+        category: '信息安全', item: '信息资产', scope: '被通报存在信息资产管理不善（互联网资产未报备、信息数据及个人数据泄露、电脑丢失等）问题',
+        green: '未被通报', yellow: '被通报未被考核', red: '被通报且被考核',
+        status: '', note: ''
+      },
+      {
+        category: '信息安全', item: '网络安全事件', scope: '发生网络安全事件情况',
+        green: '未发生', yellow: '未发生', red: '发生网络安全事件',
+        status: '', note: ''
+      },
+      {
+        category: '信息安全', item: '网络保障', scope: '重大敏感时期网络安全保障，结果收到上级单位通报',
+        green: '未被通报', yellow: '被通报未被考核', red: '通报且被考核',
+        status: '', note: ''
+      }
     ]
   };
 

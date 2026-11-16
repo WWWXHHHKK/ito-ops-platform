@@ -117,8 +117,8 @@
     });
     const yellow = safetyEvents.filter(function (event) { return event.level === '黄灯'; }).length;
     const red = safetyEvents.filter(function (event) { return event.level === '红灯'; }).length;
-    const veto = safetyEvents.filter(function (event) { return event.level === '一票否决'; }).length;
-    const safety = veto ? 0 : Math.max(0, BASE_SAFETY - yellow - red * 3);
+    const redEvents = safetyEvents.filter(function (event) { return event.level === '红灯'; });
+    const safety = Math.max(0, BASE_SAFETY - yellow - red * 3);
     const total = sla + safety;
     const qualified = total >= TARGET;
     const statusText = total > TARGET
@@ -164,7 +164,8 @@
       exams: (A.exams || []).filter(function (item) { return inPeriod(item.date, period); }),
       keyNodes: (A.keyNodes || []).filter(function (item) { return inPeriod(item.date, period); }),
       safetyEvents: safetyEvents,
-      safetySummary: { yellow: yellow, red: red, veto: veto, score: safety },
+      redEvents: redEvents,
+      safetySummary: { yellow: yellow, red: red, score: safety },
       safetyStandards: A.safetyStandards || [],
       weeklyLogNote: A.weeklyLogNote || '本期按 0 处理，本期无扣分。',
       trend: trend,
