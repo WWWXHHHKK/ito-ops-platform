@@ -901,9 +901,9 @@
       return '<tr class="assess-click-row" data-assess-ticket="' + U().esc(ticket.id) + '" tabindex="0" role="button">' +
         '<td class="mono assess-time">' + U().esc(ticket.id) + '</td>' +
         '<td>' + U().esc(ticket.system) + '</td>' +
-        '<td class="assess-cell-main">' + U().esc(ticket.item) + '</td>' +
+        '<td class="assess-cell-main" title="' + U().esc(ticket.item) + '">' + U().esc(ticket.item) + '</td>' +
         '<td class="mono assess-time">' + U().esc(assessTime(ticket.submitted)) + '</td>' +
-        '<td>' + U().esc(reasons) + '</td>' +
+        '<td title="' + U().esc(reasons) + '">' + U().esc(reasons) + '</td>' +
         '<td class="num assess-points neg">' + (Number(ticket.points) || 0) + '</td>' +
       '</tr>';
     }).join('');
