@@ -90,7 +90,7 @@
         const cls = c === 'bad' ? 'bad' : c === 'off' ? 'off' : 'ok';
         return '<i class="ig-cell ' + cls + (i === 6 ? ' due' : '') + '"></i>';
       }).join('');
-      return '<div class="insp-grid-row" data-drill="inspection" tabindex="0" role="link">' +
+      return '<div class="insp-grid-row">' +
         '<span class="ig-name"><b>' + esc(row.plan) + '</b><em>' + esc(row.cycle) + '</em></span>' +
         cells +
       '</div>';

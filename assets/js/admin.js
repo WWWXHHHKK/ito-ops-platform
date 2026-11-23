@@ -8,7 +8,7 @@
 
   window.ITO = window.ITO || {};
   const D = window.ITO_DATA;
-  const BUILD_VERSION = '20261120z89';
+  const BUILD_VERSION = '20261120z90';
   const DEMO_PARAM = new URLSearchParams(location.search).get('demo');
   const ASOF_PARAM = new URLSearchParams(location.search).get('asof');
   const DATA_SOURCE = window.ITO_DATA_SOURCE;
