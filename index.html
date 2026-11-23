@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>ITO 智能运维管理平台 · 运维驾驶舱</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%23EB612A'/><text x='50' y='69' font-size='54' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'>I</text></svg>">
-<link rel="stylesheet" href="assets/css/style.css?v=20261116z44" />
+<link rel="stylesheet" href="assets/css/style.css?v=20261120z89" />
 </head>
 <body>
 <div class="stage-shell">
@@ -51,6 +51,7 @@
       <div class="topbar-right">
         <span class="live-chip" id="liveChip"><i></i><em id="liveLabel">任务态势</em></span>
         <span class="env-badge"><b>DEMO</b>演示环境</span>
+        <span class="data-cutoff" id="dataCutoff" hidden>数据截止 11/30</span>
         <a class="admin-link" href="admin.html" title="进入运维管理后台">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3M7 9h4M7 13h7"/></svg>
           <span>管理后台</span>
@@ -138,8 +139,8 @@
 
         <section class="panel panel-sla">
           <div class="panel-head">
-            <div class="ph-left"><i class="ph-idx">09</i><h2>月度考核</h2><span class="ph-en">MONTHLY ASSESSMENT</span></div>
-            <span class="head-tag tag-ok" id="assessPeriodTag"><i class="dot-teal"></i>11 月</span>
+            <div class="ph-left"><i class="ph-idx">09</i><h2>季度考核</h2><span class="ph-en">QUARTERLY ASSESSMENT</span></div>
+            <span class="head-tag tag-ok" id="assessPeriodTag"><i class="dot-teal"></i>Q4</span>
             <span class="head-tag tag-danger" id="assessRedTag" hidden><i class="dot-red"></i>红色警告</span>
           </div>
           <div class="panel-body sla-body">
@@ -161,21 +162,21 @@
                   <circle class="gauge-deco inner" cx="75" cy="75" r="42"/>
                   <g id="gaugeTicks"></g>
                   <circle class="gauge-track" cx="75" cy="75" r="54" transform="rotate(135 75 75)"/>
-                  <circle class="gauge-value" cx="75" cy="75" r="54" transform="rotate(135 75 75)" stroke="url(#slaGrad)" filter="url(#slaGlow)" style="stroke-dasharray:234.11 339.29"/>
+                  <circle class="gauge-value" cx="75" cy="75" r="54" transform="rotate(135 75 75)" stroke="url(#slaGrad)" filter="url(#slaGlow)" style="stroke-dasharray:244.29 339.29"/>
                   <line class="gauge-pass" x1="124.45" y1="105.30" x2="132.12" y2="110.01"><title>合格线 95 分</title></line>
                 </svg>
-                <div class="gauge-center" title="月度考核 = SLA 80 分 + 安质环 20 分；合格线 95 分">
+                <div class="gauge-center" title="季度考核 = SLA 80 分 + 安质环 20 分；合格线 95 分">
                   <strong id="assessScore">96</strong><span>分</span>
                 </div>
               </div>
             </div>
             <div class="sla-metrics">
-              <div class="sla-metric"><span>SLA 考核</span><b id="assessSla">77 / 80</b><em class="up-good" id="assessSlaNote">含加分 +7</em></div>
-              <div class="sla-metric" id="assessSafetyMetric"><span>安质环</span><b id="assessSafety">19 / 20</b><em class="neutral" id="assessSafetyNote">黄灯 1 项</em></div>
+              <div class="sla-metric" data-drill="personal" data-query="tab=assessment&amp;detail=sla" role="link" tabindex="0" aria-label="查看本季度 SLA 考核明细"><span>SLA 考核</span><b id="assessSla">78 / 80</b><em id="assessSlaNote"><span class="up">本季度扣分 13</span> · <span class="up-good">加分 +11</span></em></div>
+              <div class="sla-metric" id="assessSafetyMetric" data-drill="personal" data-query="tab=assessment&amp;detail=safety" role="link" tabindex="0" aria-label="查看本季度安质环明细"><span>安质环</span><b id="assessSafety">18 / 20</b><em class="neutral" id="assessSafetyNote">黄灯 2 · 扣分 2</em></div>
               <div class="sla-metric" data-drill="tasks" data-query="status=超期" tabindex="0" role="link" title="任务按期率为任务时效参考，不计入考核总分"><span>任务按期率</span><b id="assessOnTime">88.9%</b><em class="neutral" id="assessOnTimeNote">超期 5.5%</em></div>
             </div>
           </div>
-          <div class="panel-foot"><span><i class="dot-teal"></i>合格线 <b>95</b> 分</span><span id="assessQuarterFoot">季度 95.5 分 · 高于合格线 0.5 分</span></div>
+          <div class="panel-foot"><span><i class="dot-teal"></i>合格线 <b>95</b> 分</span></div>
         </section>
 
         <section class="panel panel-res">
@@ -219,13 +220,13 @@
 <div class="topo-tip" id="topoTip" role="tooltip" aria-hidden="true"></div>
 
 <script src="vendor/echarts.min.js"></script>
-<script src="assets/js/ito-data.js?v=20261116z44"></script>
-<script src="assets/js/task-volume-data.js?v=20261116z44"></script>
-<script src="assets/js/assessment.js?v=20261116z44"></script>
-<script src="assets/js/ito-data-source.js?v=20261116z44"></script>
-<script src="assets/js/platform-panels.js?v=20261116z44"></script>
-<script src="assets/js/app.js?v=20261116z44"></script>
-<script src="assets/js/center-demo.js?v=20261116z44"></script>
+<script src="assets/js/ito-data.js?v=20261120z89"></script>
+<script src="assets/js/task-volume-data.js?v=20261120z89"></script>
+<script src="assets/js/assessment.js?v=20261120z89"></script>
+<script src="assets/js/ito-data-source.js?v=20261120z89"></script>
+<script src="assets/js/platform-panels.js?v=20261120z89"></script>
+<script src="assets/js/app.js?v=20261120z89"></script>
+<script src="assets/js/center-demo.js?v=20261120z89"></script>
 </body>
 </html>
 

@@ -117,7 +117,7 @@
     if (maintenanceList) {
       const today = new Date(D.meta.today.replace(/-/g, '/'));
       const horizon = 30;
-      const scale = '<div class="mg-scale"><b>今天 ' + shortDate(D.meta.today) + '</b><span>未来 ' + horizon + ' 天</span></div>';
+      const scale = '<div class="mg-scale"><b>' + (D.meta.asofOverride ? '数据日 ' : '今天 ') + shortDate(D.meta.today) + '</b><span>未来 ' + horizon + ' 天</span></div>';
       const rows = D.maintenancePlans.map(plan => {
         const due = new Date(String(plan.next).replace(/-/g, '/'));
         const days = Math.max(0, Math.round((due - today) / 86400000));

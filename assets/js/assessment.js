@@ -90,7 +90,7 @@
       (ticket.deductions || []).forEach(function (item) {
         deductions.push({
           date: ticket.submitted,
-          category: 'IT100 / SAP',
+          category: '运维事项',
           item: item.reason,
           count: 1,
           points: int(item.points),
@@ -155,7 +155,13 @@
     const yellow = safetyEvents.filter(function (event) { return event.level === '黄灯'; }).length;
     const red = safetyEvents.filter(function (event) { return event.level === '红灯'; }).length;
     const redEvents = safetyEvents.filter(function (event) { return event.level === '红灯'; });
-    const safety = Math.max(0, BASE_SAFETY - yellow - red * 3);
+    const safetyDeduction = safetyEvents.reduce(function (total, event) {
+      return total + Math.abs(int(event.points));
+    }, 0);
+    /* 安质环按文档 26 条逐项扣分；红灯 / 一票否决归零。 */
+    const safety = (red > 0 || safetyEvents.some(function (event) { return event.veto; }))
+      ? 0
+      : Math.max(0, BASE_SAFETY - safetyDeduction);
     const total = sla + safety;
 
     const trend = (A.monthTrend || []).map(function (row) {
@@ -197,8 +203,10 @@
       keyNodes: (A.keyNodes || []).filter(function (item) { return inPeriod(item.date, period); }),
       safetyEvents: safetyEvents,
       redEvents: redEvents,
-      safetySummary: { yellow: yellow, red: red, score: safety },
+      safetyDeduction: safetyDeduction,
+      safetySummary: { yellow: yellow, yellowTotal: yellow, red: red, deduction: safetyDeduction, score: safety, redLine: red > 0 },
       safetyStandards: A.safetyStandards || [],
+      slaStandards: A.slaStandards || [],
       monthRows: [],
       trend: trend,
       taskSla: taskReference()
@@ -213,26 +221,76 @@
     return model;
   }
 
-  /* 季度取季度内已结算月份的均分，不累加历史月份明细。 */
-  function buildQuarter() {
-    const period = periodOf('quarter');
-    const keys = (period.months || []).filter(function (key) {
+  /* 季度取季度内已结算月份的均分，同时保留当前季度已发生的扣分 / 加分记录。 */
+  function buildQuarter(periodArg) {
+    const period = periodArg || periodOf('quarter');
+    const quarterKeys = period.months || [];
+    const settledKeys = quarterKeys.filter(function (key) {
       return !!(A.months && A.months[key]);
     });
-    const rows = keys.map(buildMonth);
+    const pendingKeys = quarterKeys.filter(function (key) {
+      return !(A.months && A.months[key]);
+    });
+    const rows = settledKeys.map(buildMonth);
     if (!rows.length) {
       const empty = buildPeriod('quarter', period, {});
       empty.isAverage = true;
+      empty.monthCount = quarterKeys.length;
+      empty.settledCount = 0;
+      empty.pendingMonths = pendingKeys.map(function (key) { return monthPeriod(key); });
       return empty;
     }
 
-    const sla = round1(sum(rows, function (row) { return row.sla; }) / rows.length);
-    const safety = round1(sum(rows, function (row) { return row.safety; }) / rows.length);
-    const total = round1(sla + safety);
-    const yellow = round1(sum(rows, function (row) { return row.safetySummary.yellow; }) / rows.length);
+    const deduction = sum(rows, function (row) { return row.deduction; });
+    /* 季度考核：月度只提供事件，加分在季度层按项合并后再封顶。 */
+    const bonusMap = {};
+    rows.forEach(function (row) {
+      (row.bonusRows || []).forEach(function (item) {
+        const key = item.item;
+        if (!bonusMap[key]) {
+          bonusMap[key] = {
+            date: item.date,
+            category: item.category,
+            item: item.item,
+            count: 0,
+            points: int(item.points),
+            used: 0,
+            awarded: 0,
+            capped: false
+          };
+        }
+        bonusMap[key].count += int(item.count);
+        if (item.date < bonusMap[key].date) bonusMap[key].date = item.date;
+      });
+    });
+    const bonusRows = Object.keys(bonusMap).map(function (key) {
+      const row = bonusMap[key];
+      row.capped = row.count > BONUS_CAP;
+      row.used = Math.min(BONUS_CAP, row.count);
+      row.awarded = row.used * row.points;
+      return row;
+    }).sort(function (a, b) {
+      return String(a.date).localeCompare(String(b.date)) || String(a.category).localeCompare(String(b.category), 'zh');
+    });
+    const bonus = bonusRows.reduce(function (total, item) { return total + int(item.awarded); }, 0);
+    const sla = Math.max(0, Math.min(BASE_SLA, BASE_SLA + bonus - deduction));
     const red = sum(rows, function (row) { return row.safetySummary.red; });
+    const redLine = red > 0;
+    const safetyDeduction = sum(rows, function (row) { return row.safetyDeduction || 0; });
+    const safety = redLine ? 0 : Math.max(0, BASE_SAFETY - safetyDeduction);
+    const total = sla + safety;
+    const yellow = round1(sum(rows, function (row) { return row.safetySummary.yellow; }) / rows.length);
+    const yellowTotal = sum(rows, function (row) { return row.safetySummary.yellow; });
     const safetyEvents = rows.reduce(function (list, row) { return list.concat(row.safetyEvents); }, []);
     const redEvents = rows.reduce(function (list, row) { return list.concat(row.redEvents); }, []);
+    const deductionRows = rows.reduce(function (list, row) {
+      return list.concat(row.deductionRows.map(function (item) {
+        return Object.assign({}, item, { monthKey: row.period.key, monthLabel: row.shortLabel });
+      }));
+    }, []).sort(function (a, b) {
+      return String(a.date).localeCompare(String(b.date)) || String(a.category).localeCompare(String(b.category), 'zh');
+    });
+    const tickets = rows.reduce(function (list, row) { return list.concat(row.tickets); }, []);
 
     return {
       kind: 'quarter',
@@ -249,21 +307,26 @@
       sla: sla,
       safety: safety,
       total: total,
-      deduction: 0,
-      bonus: 0,
+      deduction: deduction,
+      bonus: bonus,
       qualified: total >= TARGET,
       statusText: statusOf(total),
       statusShort: statusShortOf(total),
-      deductionRows: [],
-      bonusRows: [],
-      tickets: [],
+      deductionRows: deductionRows,
+      bonusRows: bonusRows,
+      tickets: tickets,
       exams: [],
       keyNodes: [],
       safetyEvents: safetyEvents,
       redEvents: redEvents,
-      safetySummary: { yellow: yellow, red: red, score: safety },
+      safetyDeduction: safetyDeduction,
+      safetySummary: { yellow: yellow, yellowTotal: yellowTotal, red: red, deduction: safetyDeduction, score: safety, redLine: redLine },
       safetyStandards: A.safetyStandards || [],
+      slaStandards: A.slaStandards || [],
       trend: (A.monthTrend || []).map(function (row) { return Object.assign({}, row); }),
+      monthCount: quarterKeys.length,
+      settledCount: rows.length,
+      pendingMonths: pendingKeys.map(function (key) { return monthPeriod(key); }),
       monthRows: rows.map(function (row) {
         return {
           key: row.period.key,
@@ -271,7 +334,9 @@
           short: row.shortLabel,
           sla: row.sla,
           safety: row.safety,
-          total: row.total
+          total: row.total,
+          deduction: row.deduction,
+          bonus: row.bonus
         };
       }),
       taskSla: taskReference()
@@ -279,20 +344,24 @@
   }
 
   ITO.assessmentModel = function (kind) {
-    return kind === 'quarter' ? buildQuarter() : buildMonth(periodOf('month').key);
+    return kind === 'quarter' ? buildQuarter(periodOf('quarter')) : buildMonth(periodOf('month').key);
+  };
+
+  ITO.assessmentQuarter = function (key) {
+    const period = (A.quarters || []).find(function (item) { return item.key === key; });
+    return period ? buildQuarter(period) : null;
   };
 
   ITO.assessmentMonth = function (key) {
-    const target = (A.monthTrend || []).some(function (row) { return row.key === key; })
-      ? key
-      : periodOf('month').key;
+    const target = (A.months && A.months[key]) ? key : periodOf('month').key;
     return buildMonth(target);
   };
 
   ITO.assessmentPeriods = function () {
     return {
       month: periodOf('month'),
-      quarter: periodOf('quarter')
+      quarter: periodOf('quarter'),
+      quarters: A.quarters || []
     };
   };
 })();

@@ -125,7 +125,7 @@
           const executor = executorEl.value;
           const cycle = cycleEl.value;
           const next = nextEl.value;
-          const now = D.meta.demoNow;
+          const now = ITO.nowStamp();
           const cf = ITO.readCustomFields ? ITO.readCustomFields(root, 'inspectionPlan', editing ? plan.extra : null) : { values: {}, errors: [] };
           if (cf.errors.length) { U().toast(cf.errors[0], 'warn'); return; }
           const data = {
@@ -218,7 +218,7 @@
             id: id, plan: plan.name, group: plan.group,
             owner: root.querySelector('#exOwner').value,
             hours: hours,
-            time: ITO.state.logs[0].time,
+            time: ITO.nowStamp(),
             result: result,
             items: Math.max(1, Number(root.querySelector('#exItems').value) || 1),
             abnormal: abnormal,
@@ -246,10 +246,11 @@
     const st = S();
     const plan = st.inspectionPlans.find(function (p) { return p.id === planId; });
     if (!plan) return;
+    const now = ITO.nowStamp();
     plan.status = plan.status === '启用' ? '停用' : '启用';
-    plan.statusChangedAt = D.meta.demoNow;
+    plan.statusChangedAt = now;
     plan.statusChangedBy = st.user.name;
-    plan.updatedAt = D.meta.demoNow;
+    plan.updatedAt = now;
     plan.updatedBy = st.user.name;
     plan.audit = plan.audit || [];
     plan.audit.push({ time: plan.statusChangedAt, actor: plan.statusChangedBy, action: plan.status === '启用' ? '启用计划' : '停用计划' });
@@ -356,6 +357,9 @@
       return;
     }
 
+    const customFieldHtml = customRecord && customModule && ITO.customFieldRows
+      ? ITO.customFieldRows(customModule, customRecord) : '';
+
     U().detailModal({
       title: title,
       sub: sub,
@@ -363,8 +367,8 @@
         '<div class="detail-grid">' + rows.map(function (row) {
           return '<div class="detail-field"><label>' + row[0] + '</label><div>' + row[1] + '</div></div>';
         }).join('') + '</div>' +
-        (customRecord && customModule && ITO.fieldDefsFor && ITO.fieldDefsFor(customModule).length
-          ? '<div class="detail-section"><h4>扩展字段</h4><div class="table-wrap"><table class="data-table"><tbody>' + ITO.customFieldRows(customModule, customRecord) + '</tbody></table></div></div>'
+        (customFieldHtml
+          ? '<div class="detail-section"><h4>扩展字段</h4><div class="table-wrap"><table class="data-table"><tbody>' + customFieldHtml + '</tbody></table></div></div>'
           : '') +
         (records.length ? '<div class="detail-section"><h4>最近记录</h4><div class="mini-list">' + records.map(function (r) {
           const recKind = kind === 'inspection-plan' ? 'inspection-record' : 'maintenance-record';
@@ -474,7 +478,7 @@
           '<button class="btn btn-ghost btn-sm" id="ipPlanExportBtn" type="button">' + U().icon('download') + '导出计划</button></div></div>' +
         '<div class="table-wrap"><table class="data-table ops-table ops-plan-table"><thead><tr><th>编号</th><th>计划</th><th>专业组</th><th>周期</th><th>负责人</th><th>执行人</th><th>标准工时</th><th>下次执行</th><th>状态</th>' +
           planCustomHeaders.map(function (h) { return '<th>' + U().esc(h) + '</th>'; }).join('') +
-          '<th style="text-align:right">操作</th></tr></thead>' +
+          '<th>操作</th></tr></thead>' +
         '<tbody>' + (planRows || '<tr><td colspan="' + (10 + planCustomHeaders.length) + '">' + U().emptyState('暂无巡检计划', '新建计划后会出现在这里', 'clipboard') + '</td></tr>') + '</tbody></table></div>' +
       '</section>' +
 
@@ -626,7 +630,7 @@
           const executor = executorEl.value;
           const cycle = cycleEl.value;
           const next = nextEl.value;
-          const now = D.meta.demoNow;
+          const now = ITO.nowStamp();
           const cf = ITO.readCustomFields ? ITO.readCustomFields(root, 'maintenancePlan', editing ? plan.extra : null) : { values: {}, errors: [] };
           if (cf.errors.length) { U().toast(cf.errors[0], 'warn'); return; }
           const data = {
@@ -704,7 +708,7 @@
           if (cf.errors.length) { U().toast(cf.errors[0], 'warn'); return; }
           st.maintenanceRecords.unshift({
             id: id, plan: plan.name, group: plan.group, owner: root.querySelector('#mxOwner').value, hours: hours,
-            time: st.logs[0].time, result: result, vendor: root.querySelector('#mxVendor').value.trim() || plan.vendor, note: note,
+            time: ITO.nowStamp(), result: result, vendor: root.querySelector('#mxVendor').value.trim() || plan.vendor, note: note,
             extra: cf.values
           });
           ITO.completePlanTask(plan.id, 'maintenance', hours);
@@ -723,10 +727,11 @@
     const st = S();
     const plan = st.maintenancePlans.find(function (p) { return p.id === planId; });
     if (!plan) return;
+    const now = ITO.nowStamp();
     plan.status = plan.status === '启用' ? '停用' : '启用';
-    plan.statusChangedAt = D.meta.demoNow;
+    plan.statusChangedAt = now;
     plan.statusChangedBy = st.user.name;
-    plan.updatedAt = D.meta.demoNow;
+    plan.updatedAt = now;
     plan.updatedBy = st.user.name;
     plan.audit = plan.audit || [];
     plan.audit.push({ time: plan.statusChangedAt, actor: plan.statusChangedBy, action: plan.status === '启用' ? '启用计划' : '停用计划' });
@@ -813,7 +818,7 @@
           '<button class="btn btn-ghost btn-sm" id="mpPlanExportBtn" type="button">' + U().icon('download') + '导出计划</button></div></div>' +
         '<div class="table-wrap"><table class="data-table ops-table ops-plan-table"><thead><tr><th>编号</th><th>计划</th><th>专业组</th><th>周期</th><th>厂商</th><th>负责人</th><th>执行人</th><th>标准工时</th><th>下次执行</th><th>状态</th>' +
           planCustomHeaders.map(function (h) { return '<th>' + U().esc(h) + '</th>'; }).join('') +
-          '<th style="text-align:right">操作</th></tr></thead>' +
+          '<th>操作</th></tr></thead>' +
         '<tbody>' + (planRows || '<tr><td colspan="' + (11 + planCustomHeaders.length) + '">' + U().emptyState('暂无维保计划', '新建计划后会出现在这里', 'wrench') + '</td></tr>') + '</tbody></table></div>' +
       '</section>' +
 
@@ -1923,9 +1928,9 @@
       }
 
       function refreshKeepScroll() {
-        const y = window.scrollY || 0;
+        const y = ITO.getScrollTop ? ITO.getScrollTop() : 0;
         ITO.refresh();
-        window.scrollTo(0, y);
+        if (ITO.setScrollTop) ITO.setScrollTop(y);
       }
 
       function attachmentListHtml(list) {

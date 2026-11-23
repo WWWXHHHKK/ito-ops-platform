@@ -14,6 +14,22 @@
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const STILL = new URLSearchParams(window.location.search).has('still');
   if (STILL) document.documentElement.classList.add('still');
+  const params = new URLSearchParams(window.location.search);
+  const ASOF = params.get('asof');
+  const DEMO = params.get('demo');
+  const dateParam = ASOF
+    ? 'asof=' + encodeURIComponent(ASOF)
+    : (DEMO ? 'demo=' + encodeURIComponent(DEMO) : '');
+  const withDemo = (href) => dateParam
+    ? href + (href.indexOf('?') > -1 ? '&' : '?') + dateParam
+    : href;
+  const adminLink = $('.admin-link');
+  if (adminLink) adminLink.setAttribute('href', withDemo('admin.html'));
+  const cutoff = document.getElementById('dataCutoff');
+  if (cutoff && window.ITO_DATA && ITO_DATA.meta.asofOverride) {
+    cutoff.hidden = false;
+    cutoff.textContent = '数据截止 ' + String(ITO_DATA.meta.asof || ITO_DATA.meta.today).slice(5).replace('-', '/');
+  }
 
   /* ── 1920 × 1080 stage fit ─────────────────── */
   function fitStage() {
@@ -29,12 +45,14 @@
   const dateEl = $('#date');
 
   function tickClock() {
-    const demoNow = window.ITO_DATA && ITO_DATA.meta && ITO_DATA.meta.demoOverride
-      ? String(ITO_DATA.meta.demoNow || '').replace(/-/g, '/')
+    const now = new Date();
+    const display = window.ITO_DATA && ITO_DATA.meta;
+    const demoDate = display && (display.displayToday || (display.demoOverride ? display.today : ''))
+      ? String(display.displayToday || display.today || '').replace(/-/g, '/')
       : '';
-    const now = demoNow ? new Date(demoNow) : new Date();
+    const dateNow = demoDate ? new Date(demoDate) : now;
     clockEl.textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-    dateEl.textContent = `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(now.getDate())} ${WEEK[now.getDay()]}`;
+    dateEl.textContent = `${dateNow.getFullYear()}.${pad(dateNow.getMonth() + 1)}.${pad(dateNow.getDate())} ${WEEK[dateNow.getDay()]}`;
   }
   tickClock();
   setInterval(tickClock, 1000);
@@ -87,29 +105,28 @@
     }
   }
 
-  /* ── 09 monthly assessment ─────────────────── */
+  /* ── 09 quarterly assessment ───────────────── */
   const TASK_SLA = window.ITO_DATA && window.ITO_DATA.dashboard && window.ITO_DATA.dashboard.slaMetrics;
   const setAssessText = (id, value) => {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
   };
-  const assess = window.ITO && window.ITO.assessmentModel ? window.ITO.assessmentModel('month') : null;
-  const assessQuarter = window.ITO && window.ITO.assessmentModel ? window.ITO.assessmentModel('quarter') : null;
+  const assess = window.ITO && window.ITO.assessmentModel ? window.ITO.assessmentModel('quarter') : null;
   if (assess) {
     const taskRef = assess.taskSla || {};
     const hasRed = !!(assess.safetySummary && assess.safetySummary.red > 0);
     setAssessText('assessScore', String(assess.total));
     setAssessText('assessSla', assess.sla + ' / ' + assess.baseSla);
-    setAssessText('assessSlaNote', '含加分 +' + assess.bonus);
+    const slaNoteEl = document.getElementById('assessSlaNote');
+    if (slaNoteEl) {
+      slaNoteEl.innerHTML = '本季度扣分 <span class="up">' + (assess.deduction || 0) + '</span> · 加分 <span class="up-good">+' + (assess.bonus || 0) + '</span>';
+    }
     setAssessText('assessSafety', assess.safety + ' / ' + assess.baseSafety);
     setAssessText('assessSafetyNote', hasRed
-      ? '红灯 ' + assess.safetySummary.red + ' 项'
-      : (assess.safetySummary && assess.safetySummary.yellow ? '黄灯 ' + assess.safetySummary.yellow + ' 项' : '无扣分'));
+      ? '红灯触发 · 安质环归零'
+      : '黄灯 ' + assess.safetySummary.yellowTotal + ' · 扣分 ' + (assess.safetyDeduction || 0));
     setAssessText('assessOnTime', Number(taskRef.onTimeRate || 0).toFixed(1) + '%');
     setAssessText('assessOnTimeNote', '超期 ' + Number(taskRef.overdueRate || 0).toFixed(1) + '%');
-    if (assessQuarter) {
-      setAssessText('assessQuarterFoot', '季度 ' + assessQuarter.total + ' 分 · ' + assessQuarter.statusText);
-    }
     const panel = document.querySelector('.panel-sla');
     if (panel) panel.classList.toggle('is-red', hasRed);
     const redTag = document.getElementById('assessRedTag');
@@ -520,7 +537,7 @@
     const route = el && el.getAttribute('data-drill');
     if (!route) return;
     const query = el.getAttribute('data-query');
-    location.href = 'admin.html#/' + route + (query ? '?' + query : '');
+    location.href = withDemo('admin.html') + '#/' + route + (query ? '?' + query : '');
   }
 
   document.addEventListener('click', e => {

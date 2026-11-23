@@ -222,7 +222,7 @@
             type: '通知',
             title: title,
             body: body,
-            time: D.meta.demoNow,
+            time: ITO.nowStamp(),
             read: false,
             audience: { groups: groups, people: people },
             sender: st.user.name
@@ -423,7 +423,7 @@
           const threshold = Number(thresholdEl.value);
           if (!type || !(threshold > 0)) { U().toast('请填写有效的触发阈值', 'warn'); return; }
           const enabled = statusEl.value === '启用';
-          const now = D.meta.demoNow;
+          const now = ITO.nowStamp();
           const data = {
             name: name,
             type: type.key,
@@ -481,13 +481,14 @@
     const st = S();
     const rule = st.alertRules.find(function (r) { return r.id === id; });
     if (!rule) return;
+    const now = ITO.nowStamp();
     rule.enabled = !rule.enabled;
-    rule.statusChangedAt = D.meta.demoNow;
+    rule.statusChangedAt = now;
     rule.statusChangedBy = st.user.name;
-    rule.updatedAt = D.meta.demoNow;
+    rule.updatedAt = now;
     rule.updatedBy = st.user.name;
     rule.audit = rule.audit || [];
-    rule.audit.push({ time: D.meta.demoNow, actor: st.user.name, action: rule.enabled ? '启用规则' : '停用规则' });
+    rule.audit.push({ time: now, actor: st.user.name, action: rule.enabled ? '启用规则' : '停用规则' });
     ITO.log(rule.enabled ? '启用预警规则' : '停用预警规则', rule.id + ' ' + rule.name, '配置');
     U().toast('规则已' + (rule.enabled ? '启用' : '停用'));
     ITO.refresh();

@@ -163,6 +163,23 @@
     }).slice().sort(function (a, b) { return (a.sort || 0) - (b.sort || 0); });
   };
 
+  /* 历史详情：停用字段仅在记录中确有值时随详情只读展示。 */
+  ITO.fieldDefsForRecord = function (module, scope, record) {
+    const want = scope || 'main';
+    const extra = record && record.extra ? record.extra : {};
+    return fields().filter(function (f) {
+      if (f.module !== module) return false;
+      if (f.enabled === false) {
+        if (!Object.prototype.hasOwnProperty.call(extra, f.key)) return false;
+        const value = extra[f.key];
+        if (value == null || value === '' || (Array.isArray(value) && !value.length)) return false;
+      }
+      if (module !== 'task') return true;
+      const s = fieldScope(f);
+      return s === 'both' || s === want;
+    }).slice().sort(function (a, b) { return (a.sort || 0) - (b.sort || 0); });
+  };
+
   function fieldOptions(f) {
     if (f.source === 'dict' && f.dictId) return ITO.dictValues(f.dictId, true);
     return String(f.options || '').split(/[\n,，、]/).map(function (s) { return s.trim(); }).filter(Boolean);
@@ -321,7 +338,8 @@
     return '<input type="text"' + common + ' value="' + U().esc(value) + '">' + (f.unit ? '<span class="form-hint">单位：' + U().esc(f.unit) + '</span>' : '');
   }
 
-  ITO.customFieldForm = function (module, record, scope) {
+  ITO.customFieldForm = function (module, record, scope, options) {
+    const opts = options || {};
     const list = ITO.fieldDefsFor(module, scope);
     if (!list.length) return '';
     const groups = {};
@@ -331,7 +349,9 @@
     });
     return Object.keys(groups).map(function (groupName) {
       return '<div class="oh-form-section custom-field-section">' +
-        '<div class="subtask-head"><div><h4>' + U().esc(groupName) + '</h4><span>自定义字段 · 由「字典配置 · 字段定义」生成</span></div></div>' +
+        '<div class="subtask-head"><div><h4>' + U().esc(groupName) + '</h4>' +
+        (opts.hideHint ? '' : '<span>自定义字段 · 由「字典配置 · 字段定义」生成</span>') +
+        '</div></div>' +
         '<div class="form-grid cols-3">' + groups[groupName].map(function (f) {
           const span = f.width === 3 ? ' full' : (f.width === 2 ? ' span-2' : '');
           const condition = f.dependsOn
@@ -524,7 +544,7 @@
   }
 
   ITO.customFieldRows = function (module, record, scope) {
-    const list = ITO.fieldDefsFor(module, scope).filter(function (f) {
+    const list = ITO.fieldDefsForRecord(module, scope, record).filter(function (f) {
       if (!f.dependsOn) return true;
       return conditionMatches(record && record.extra ? record.extra[f.dependsOn] : '', f.dependsValue);
     });

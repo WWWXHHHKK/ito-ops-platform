@@ -295,6 +295,119 @@
     return [];
   }
 
+  /* 工时负载人员下钻：本人任务工时流水 + 值班出勤记录。 */
+  function personDetail(name) {
+    const st = S();
+    const model = loadModel();
+    const row = model.rows.find(function (r) { return r.person.name === name; });
+    if (!row) return;
+    const period = model.period;
+    const person = row.person;
+    const group = ITO.getGroup(person.group) || {};
+    const role = person.title || '';
+
+    const logs = [];
+    (st.tasks || []).forEach(function (task) {
+      if (task.canceled || task.draft) return;
+      (task.subs || []).forEach(function (sub) {
+        if (sub.owner !== name || sub.status === '已取消') return;
+        const all = workLogsOf(sub).slice().sort(function (a, b) {
+          return String(a.date).localeCompare(String(b.date));
+        });
+        let cumulative = 0;
+        let picked = 0;
+        all.forEach(function (log) {
+          const hours = Number(log.hours) || 0;
+          cumulative = Math.round((cumulative + hours) * 10) / 10;
+          if (!inPeriod(log.date, period, 'week')) return;
+          picked += 1;
+          logs.push({
+            taskId: task.id,
+            taskName: task.name,
+            subId: sub.id,
+            subName: sub.name,
+            date: log.date,
+            hours: hours,
+            cumulative: cumulative,
+            status: sub.status
+          });
+        });
+        if (picked) return;
+        const actual = actualHoursOf(sub);
+        const fallbackDate = String(sub.completedAt || sub.due || '').slice(0, 10);
+        if (actual > 0 && inPeriod(fallbackDate, period, 'week')) {
+          logs.push({
+            taskId: task.id,
+            taskName: task.name,
+            subId: sub.id,
+            subName: sub.name,
+            date: fallbackDate,
+            hours: actual,
+            cumulative: Math.round(actual * 10) / 10,
+            status: sub.status
+          });
+        }
+      });
+    });
+    logs.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+
+    const calls = (st.duty.calls || []).filter(function (c) { return c.person === name; });
+    const weekCalls = calls.filter(function (c) { return inPeriod(c.date, period, 'week'); })
+      .slice().sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+    const monthCalls = calls.filter(function (c) { return inPeriod(c.date, period, 'month'); });
+    const weekDays = new Set(weekCalls.map(function (c) { return c.date; })).size;
+    const weekHours = Math.round(weekCalls.reduce(function (n, c) { return n + (Number(c.hours) || 0); }, 0) * 10) / 10;
+    const monthDays = new Set(monthCalls.map(function (c) { return c.date; })).size;
+    const monthHours = Math.round(monthCalls.reduce(function (n, c) { return n + (Number(c.hours) || 0); }, 0) * 10) / 10;
+
+    const chips = summary([
+      { icon: 'chart', value: row.week.toFixed(1) + ' h', label: '本周计划工时' },
+      { icon: 'clock', value: row.weekActual.toFixed(1) + ' h', label: '本周实际工时', tone: 'blue' },
+      { icon: 'check', value: row.monthActual.toFixed(1) + ' h', label: '本月实际工时', tone: 'green' },
+      { icon: 'users', value: weekDays + ' 天 · ' + weekHours + ' h', label: '本周出勤', tone: weekDays ? 'yellow' : '' }
+    ]);
+
+    const workTable = logs.length
+      ? '<div class="table-wrap workload-detail-scroll"><table class="data-table"><thead><tr>' +
+          '<th>任务</th><th>日期</th><th class="num">本次工时</th><th class="num">累计工时</th><th>状态</th>' +
+        '</tr></thead><tbody>' + logs.map(function (log) {
+          return '<tr>' +
+            '<td><div class="cell-task"><b>' + U().esc(log.subName) + '</b><small>' + U().esc(log.taskName) + ' · ' + U().esc(log.subId) + '</small></div></td>' +
+            '<td class="num">' + U().esc(log.date || '—') + '</td>' +
+            '<td class="num">' + log.hours + ' h</td>' +
+            '<td class="num">' + log.cumulative + ' h</td>' +
+            '<td>' + U().badge(log.status) + '</td></tr>';
+        }).join('') + '</tbody></table></div>'
+      : U().emptyState('本周暂无任务工时', '本人任务产生工时后会出现在这里', 'clock');
+
+    const attTable = weekCalls.length
+      ? '<div class="table-wrap workload-detail-scroll"><table class="data-table"><thead><tr>' +
+          '<th>日期</th><th>岗位</th><th>事由</th><th class="num">工时</th>' +
+        '</tr></thead><tbody>' + weekCalls.map(function (c) {
+          return '<tr><td class="num">' + U().esc(c.date || '—') + '</td>' +
+            '<td>' + U().esc(c.role || '—') + '</td>' +
+            '<td>' + U().esc(c.reason || '现场处置') + '</td>' +
+            '<td class="num">' + (Number(c.hours) || 0) + ' h</td></tr>';
+        }).join('') + '</tbody></table></div>'
+      : U().emptyState('本周暂无出勤', '值班出勤按天计入工时负载', 'users');
+
+    const body = chips +
+      '<div class="detail-section"><h4>本周任务工时</h4>' + workTable + '</div>' +
+      '<div class="detail-section"><h4>出勤记录<span class="workload-att-note">本月合计 ' + monthDays + ' 天 · ' + monthHours + ' h</span></h4>' + attTable + '</div>';
+
+    U().detailModal({
+      title: person.name,
+      sub: (person.uid ? person.uid + ' · ' : '') + (group.name || '') + (role ? ' · ' + role : ''),
+      body: body,
+      foot: '<button class="btn btn-ghost" data-close type="button">关闭</button>',
+      onMount: function (close, root) {
+        root.querySelector('[data-close]').addEventListener('click', close);
+      }
+    });
+  }
+
+  ITO.openWorkloadPerson = personDetail;
+
   function handoverDetails(h) {
     return '<p>班次 ' + U().esc(h.week.start + ' 至 ' + h.week.end) + ' · 接班人 ' + U().esc(h.incoming) + '</p>' +
       (h.record ? '<p>交接记录：' + U().esc(h.record) + '</p><p>提交：' + U().esc(h.person + ' · ' + h.submittedAt) + '</p>' : '') +
@@ -483,8 +596,8 @@
       const overloaded = rows.filter(function (r) { return r.weekRate >= 100 || r.monthRate >= 100; }).length;
       const body = rows.map(function (r) {
         const state = loadState(Math.max(r.weekRate, r.monthRate));
-        return '<tr>' +
-          '<td><div class="person-cell"><div><b>' + U().esc(r.person.name) + '</b><small>' + U().esc(r.person.title || '') + '</small></div></div></td>' +
+        return '<tr class="workload-person-row" data-person="' + U().esc(r.person.name) + '" tabindex="0" role="button" aria-label="查看 ' + U().esc(r.person.name) + ' 的工时与出勤">' +
+          '<td><div class="person-cell"><div><b>' + U().esc(r.person.name) + '</b><small>' + U().esc(r.person.title || '') + '</small></div><span class="workload-row-chevron" aria-hidden="true">›</span></div></td>' +
           '<td class="workload-uid mono">' + U().esc(r.person.uid || '—') + '</td>' +
           '<td>' + U().groupPill(r.group) + '</td>' +
           '<td class="num">' + r.weekTasks + '</td>' +
@@ -542,6 +655,16 @@
       if (group) group.addEventListener('change', function () {
         st.ui.workloadGroup = group.value;
         ITO.refresh();
+      });
+      U().$$('.workload-table tbody tr[data-person]').forEach(function (row) {
+        const open = function () { personDetail(row.dataset.person); };
+        row.addEventListener('click', open);
+        row.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            open();
+          }
+        });
       });
     }
   };

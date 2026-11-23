@@ -30,11 +30,14 @@
     const leader = [];
     const summary = [];
     const allScope = leaderView();
+    const isLeader = st.role === 'leader';
+    const isSuper = st.role === 'super';
     const groupId = currentGroupId();
     st.tasks.forEach(function (t) {
       if (t.canceled || t.draft) return;
       t.subs.forEach(function (s) {
-        if (s.status === '待分发' && (allScope || s.group === groupId)) {
+        const dispatchMine = isSuper || (isLeader ? t.initiator === st.user.name : t.owner === st.user.name);
+        if (s.status === '待分发' && dispatchMine) {
           dispatch.push({ task: t, sub: s });
         }
         if ((s.status === '审批中' || s.status === '已挂起') &&
@@ -59,6 +62,16 @@
     { key: 'dispatch', name: '待派发', hint: '选择执行人 · 派发后进入执行中', bodyId: 'dispatchCol', empty: ['没有待派发任务', '所有任务都已派发', 'send'] },
     { key: 'approval', name: '待审批', hint: '负责人审批 / 领导审批 / 汇总报审 · 按类型分块', bodyId: 'approvalCol', empty: ['没有待审批任务', '审批队列已清空', 'shield'] }
   ];
+
+  function queueDefs() {
+    const dispatch = Object.assign({}, DISPATCH_QUEUES[0]);
+    if (S().role === 'leader') {
+      dispatch.name = '待负责人派发';
+      dispatch.hint = '已下发至负责人，等待落实执行人';
+      dispatch.empty = ['暂无待负责人派发的任务', '已下发任务都已落实执行人', 'send'];
+    }
+    return [dispatch, DISPATCH_QUEUES[1]];
+  }
   const QUEUE_PAGE_SIZE = 10;
 
   function approvalMerged() {
@@ -130,20 +143,23 @@
     render: function () {
       const q = queue();
       const total = q.dispatch.length + q.approval.length + q.leader.length + q.summary.length;
+      const isLeader = S().role === 'leader';
 
       return U().pageHead({
         title: '派发与审批',
-        sub: '待派发与待审批 · 当前 ' + total + ' 项待处理',
+        sub: isLeader
+          ? '处理待审批事项，跟踪下发任务的派发进度'
+          : '待派发与待审批 · 当前 ' + total + ' 项待处理',
         actions: '<button class="btn btn-primary" id="dispatchNewTask" type="button">' + U().icon('plus') + '新建任务</button>' +
           '<button class="btn btn-ghost" id="queueExportBtn" type="button">' + U().icon('download') + '导出队列</button>'
       }) +
       U().taskTabs('dispatch') +
       '<div class="dispatch-overview">' +
-        '<div class="summary-chip"><span class="icon">' + U().icon('send') + '</span><div><b>' + q.dispatch.length + '</b><span>待派发</span></div></div>' +
+        '<div class="summary-chip"><span class="icon">' + U().icon('send') + '</span><div><b>' + q.dispatch.length + '</b><span>' + (isLeader ? '待负责人派发' : '待派发') + '</span></div></div>' +
         '<div class="summary-chip"><span class="icon blue">' + U().icon('shield') + '</span><div><b>' + approvalMerged().length + '</b><span>待审批</span></div></div>' +
       '</div>' +
       '<div class="dispatch-grid">' +
-        DISPATCH_QUEUES.map(function (def) {
+        queueDefs().map(function (def) {
           const list = queueList(def.key);
           const pages = Math.max(1, Math.ceil(list.length / QUEUE_PAGE_SIZE));
           const pageNum = Math.min(Math.max(1, ITO.pagerState['q-' + def.key] || 1), pages);
@@ -182,7 +198,7 @@
           const col = pagerBtn.closest('[data-queue]');
           if (!col) return;
           const key = col.dataset.queue;
-          const def = DISPATCH_QUEUES.find(function (d) { return d.key === key; });
+          const def = queueDefs().find(function (d) { return d.key === key; });
           if (!def) return;
           const list = queueList(key);
           const pages = Math.max(1, Math.ceil(list.length / QUEUE_PAGE_SIZE));
@@ -204,7 +220,7 @@
         const q = queue();
         const rows = [['队列', '主任务编号', '主任务', '任务编号', '任务', '专业组', '负责人', '执行人', '截止时间', '授权', '开票', '审批状态']];
         q.dispatch.forEach(function (x) {
-          rows.push(['待分发', x.task.id, x.task.name, x.sub.id, x.sub.name, (ITO.getGroup(x.sub.group) || {}).name, x.task.owner, x.sub.owner, x.sub.due, x.sub.auth, x.sub.ticket ? '是' : '否', '—']);
+          rows.push([S().role === 'leader' ? '待负责人派发' : '待分发', x.task.id, x.task.name, x.sub.id, x.sub.name, (ITO.getGroup(x.sub.group) || {}).name, x.task.owner, x.sub.owner, x.sub.due, x.sub.auth, x.sub.ticket ? '是' : '否', '—']);
         });
         q.approval.forEach(function (x) {
           rows.push(['负责人审批', x.task.id, x.task.name, x.sub.id, x.sub.name, (ITO.getGroup(x.sub.group) || {}).name, x.task.owner, x.sub.owner, x.sub.due, x.sub.auth, x.sub.ticket ? '是' : '否', x.sub.approval ? x.sub.approval.status : '—']);
@@ -552,6 +568,9 @@
       const groupTask = !!(group && t.group === group.id);
       if (leader) {
         // 领导层团队任务：全部专业组
+      } else if (st.role === 'manager') {
+        // 主管的「我管理的任务」只收我发起 / 我负责
+        if (!launchedByMe && !ownedByMe) return;
       } else if (!groupTask && !launchedByMe && !ownedByMe) {
         return;
       }
@@ -580,7 +599,9 @@
         if (sub.auth && sub.auth !== '—' && sub.auth !== '无需授权' && auths.indexOf(sub.auth) === -1) auths.push(sub.auth);
       });
       const tags = (t.tags || []).slice(0, 2);
-      const canReassign = x.source !== 'launched' && U().isTaskEditable(t) &&
+      const hasReassignTarget = !(t.subs || []).length ||
+        (t.subs || []).some(function (sub) { return ['待分发', '执行中'].indexOf(sub.status) > -1; });
+      const canReassign = U().isTaskEditable(t) && hasReassignTarget &&
         ['待分发', '执行中'].indexOf(U().mainStatus(t)) > -1;
       return '<tr data-detail-task="' + t.id + '" style="cursor:pointer">' +
         '<td><div class="cell-task"><b>' + U().esc(t.name) + '</b><small>' + U().esc(t.id + ' · ' + t.type + ' · ' + (x.source === 'team' ? '团队任务' : x.source === 'group' ? '本组任务' : x.source === 'launched' ? '我发起' : x.source === 'own' ? '我负责' : '发起+负责')) + '</small></div></td>' +
@@ -593,7 +614,9 @@
         '<td class="num" style="white-space:nowrap">' + U().shortDate(t.due) + '</td>' +
         '<td>' + U().badge(U().displayStatus(t)) + '</td>' +
         '<td style="text-align:center"><div class="row-actions">' +
-          (canReassign ? '<button class="btn btn-ghost btn-sm" type="button" data-my-reassign="' + t.id + '">改派</button>' : '<span class="muted">—</span>') +
+          (canReassign
+            ? '<button class="btn btn-ghost btn-sm" type="button" data-my-reassign="' + t.id + '">改派</button>'
+            : '<button class="btn btn-ghost btn-sm" type="button" data-my-detail="' + t.id + '">查看</button>') +
         '</div></td></tr>';
     }).join('');
   }
@@ -608,6 +631,9 @@
   P.mine = {
     render: function () {
       const st = S();
+      const myGroup = currentGroup(st);
+      const isLeader = st.role === 'leader' || st.role === 'super';
+      const isManager = st.role === 'manager';
       const myExecItems = myItems();
       const items = scopeItems(st);
       const open = items.filter(function (x) { return x.sub.status !== '已完成'; });
@@ -616,10 +642,8 @@
       const hours = Math.round(items.reduce(function (n, x) {
         return n + (ITO.actualHoursOf ? ITO.actualHoursOf(x.sub) : (Number(x.sub.hours) || 0));
       }, 0) * 10) / 10;
-      const myGroup = currentGroup(st);
-      const isLeader = st.role === 'leader' || st.role === 'super';
       const pageTitle = isLeader ? '团队任务' : '我的任务';
-      const isLead = st.role === 'manager' || st.role === 'leader' || st.role === 'super';
+      const isLead = isManager || isLeader;
       const unifiedList = mineUnifiedList(st);
       const managedFiltered = isLead ? mineManagedList(st) : managedList(st);
       const plansFiltered = isLead ? mineRegularItems(st) : [];
@@ -654,8 +678,8 @@
 
       '<div class="mine-overview">' +
         '<section class="card chart-card">' +
-          '<div class="chart-head"><div><h3 class="chart-title">' + (isLeader ? '团队闭环趋势' : (st.role === 'manager' ? '个人与团队闭环趋势' : '个人闭环趋势')) + '</h3><p class="chart-sub">近 5 个月闭环主任务 · 按任务所属月份</p></div>' +
-            '<span class="head-tag">' + (isLeader ? 'TEAM' : (st.role === 'manager' ? 'PERSONAL / TEAM' : 'PERSONAL')) + '</span></div>' +
+          '<div class="chart-head"><div><h3 class="chart-title">' + (isLeader ? '团队闭环趋势' : (isManager ? '个人与团队闭环趋势' : '个人闭环趋势')) + '</h3><p class="chart-sub">近 5 个月闭环主任务 · 按任务所属月份</p></div>' +
+            '<span class="head-tag">' + (isLeader ? 'TEAM' : (isManager ? 'PERSONAL / TEAM' : 'PERSONAL')) + '</span></div>' +
           '<div class="chart-body" id="myChart" role="img" aria-label="近 5 个月闭环主任务趋势图，可按月份查看任务明细"></div>' +
         '</section>' +
         '<div class="mine-kpi-stack">' +
@@ -1213,6 +1237,10 @@
       const nav = document.getElementById('mineAnchorNav');
       if (nav) {
         let pinnedUntil = 0;
+        const stickyTop = function (el) {
+          const value = parseFloat(getComputedStyle(el).top);
+          return isNaN(value) ? 72 : value;
+        };
         const setActive = function (key) {
           const navNow = document.getElementById('mineAnchorNav');
           if (!navNow) return;
@@ -1227,19 +1255,26 @@
           if (!sec) return;
           setActive(btn.dataset.anchor);
           pinnedUntil = Date.now() + 900;
-          const stickTop = parseFloat(getComputedStyle(nav).top) || 72;
-          const y = sec.getBoundingClientRect().top + (window.scrollY || 0) - (stickTop + nav.offsetHeight + 12);
-          window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+          const stickTop = stickyTop(nav);
+          const host = ITO.scrollHost ? ITO.scrollHost() : document.querySelector('.app-body');
+          if (!host) return;
+          const hostRect = host.getBoundingClientRect();
+          const scale = host.clientHeight ? hostRect.height / host.clientHeight : 1;
+          const y = host.scrollTop + (sec.getBoundingClientRect().top - hostRect.top) / scale - (stickTop + nav.offsetHeight + 12);
+          if (ITO.scrollToY) ITO.scrollToY(y, 'smooth');
+          else host.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
         });
         const spy = function () {
           const navNow = document.getElementById('mineAnchorNav');
           if (!navNow) return;
-          const stickTop = parseFloat(getComputedStyle(navNow).top) || 72;
-          navNow.classList.toggle('is-stuck', navNow.getBoundingClientRect().top <= stickTop + 1);
+          const host = ITO.scrollHost ? ITO.scrollHost() : document.querySelector('.app-body');
+          const hostTop = host && host !== document.documentElement && host !== document.body
+            ? host.getBoundingClientRect().top : 0;
+          navNow.classList.toggle('is-stuck', navNow.getBoundingClientRect().top <= hostTop + 1);
           if (Date.now() < pinnedUntil) return;
           const btns = Array.prototype.slice.call(navNow.querySelectorAll('[data-anchor]'));
           let current = btns.length ? btns[0].dataset.anchor : null;
-          const atBottom = (window.innerHeight + window.scrollY) >= (document.documentElement.scrollHeight - 2);
+          const atBottom = host ? (host.clientHeight + host.scrollTop) >= (host.scrollHeight - 2) : false;
           if (atBottom) current = btns.length ? btns[btns.length - 1].dataset.anchor : current;
           else {
             btns.forEach(function (b) {
@@ -1250,7 +1285,8 @@
           btns.forEach(function (b) { b.classList.toggle('active', b.dataset.anchor === current); });
         };
         if (!window.__mineSpyBound) {
-          window.addEventListener('scroll', function () { if (window.__mineSpyFn) window.__mineSpyFn(); }, { passive: true });
+          const scrollEl = (ITO.scrollHost ? ITO.scrollHost() : document.querySelector('.app-body')) || window;
+          scrollEl.addEventListener('scroll', function () { if (window.__mineSpyFn) window.__mineSpyFn(); }, { passive: true });
           window.addEventListener('resize', function () { if (window.__mineSpyFn) window.__mineSpyFn(); });
           window.__mineSpyBound = true;
         }

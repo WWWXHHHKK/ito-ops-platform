@@ -398,6 +398,33 @@
     return { items: items, total: items.length, done: done.length, overdue: overdue.length, doing: items.length - done.length };
   }
 
+  function reportAiHtml(scope, opts, m, prev, medals, personName, group, month) {
+    const engine = window.ITO.aiReport;
+    if (!engine || !engine.build) return '';
+    const overdueItems = (m.items || []).filter(function (x) {
+      return U().isOverdue(x.sub) || U().isLateClosed(x.sub);
+    });
+    const ai = engine.build({
+      scope: scope,
+      month: opts.month,
+      monthLabel: month,
+      personName: personName,
+      groupName: group ? group.name : '',
+      m: m,
+      prev: prev,
+      overdueItems: overdueItems,
+      medals: medals,
+      variant: Number(opts.aiVariant) || 0
+    });
+    return '<section class="ai-read">' +
+      '<div class="ai-head"><b>AI 月报解读</b><span class="ai-chip">AI 生成</span></div>' +
+      '<div class="ai-list">' + ai.insights.map(function (item) {
+        return '<div class="ai-item"><b>' + U().esc(item.label) + '</b><p>' + U().esc(item.text) + '</p></div>';
+      }).join('') + '</div>' +
+      '<div class="ai-note">' + U().esc(ai.basis) + ' · ' + U().esc(ai.note) + '</div>' +
+      '</section>';
+  }
+
   function reportHtml(scope, opts) {
     const st = S();
     const m = collectReport(scope, opts);
@@ -405,7 +432,7 @@
     const group = opts.group ? ITO.getGroup(opts.group) : null;
     const personName = (scope === 'person' || scope === 'employee') ? opts.person : (scope === 'me' ? st.user.name : '');
     const month = (monthChoices().find(function (x) { return x.key === opts.month; }) || {}).label || opts.month;
-    const titleMap = { me: '个人运维月报', person: '个人运维月报', employee: '员工月报', group: '专业组月报', initiated: '个人月报' };
+    const titleMap = { me: '个人月报', person: '组员月报', employee: '员工月报', group: '专业组月报', initiated: '个人月报' };
     const title = titleMap[scope] || '运维月报';
     const rangeLabel = (scope === 'person' || scope === 'employee') ? (personName || '—') :
       scope === 'group' ? (group ? group.name : '全部专业组') :
@@ -431,6 +458,17 @@
         '</td><td>' + E(x.sub.level || x.task.level) + '</td><td>' + (x.sub.hours || 0) + ' h</td><td>' + E(x.sub.due) +
         '</td><td>' + E(U().isOverdue(x.sub) ? '超期' : x.sub.status) + '</td></tr>';
     }).join('');
+    const prev = window.ITO.aiReport
+      ? collectReport(scope, Object.assign({}, opts, { month: window.ITO.aiReport.shiftMonth(opts.month, -1) }))
+      : null;
+    const aiHtml = window.ITO.aiReport
+      ? reportAiHtml(scope, opts, m, prev, medals, personName, group, month)
+      : '';
+    const medalsHtml = medals.length
+      ? '<h2>属性勋章</h2><div class="medals">' + medals.map(medalCard).join('') + '</div>'
+      : '';
+    const taskHtml = '<h2>任务明细</h2><div class="detail"><table><thead><tr><th>任务</th><th>UID</th><th>执行人</th><th>类型</th><th>等级</th><th>工时</th><th>截止时间</th><th>状态</th></tr></thead><tbody>' +
+      (tableRows || '<tr><td colspan="8">当前筛选暂无任务</td></tr>') + '</tbody></table></div>';
     return '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>ITO ' + E(title) + ' · ' + E(month) + '</title>' +
       '<style>body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:#1D1D1F;margin:0;padding:40px;background:#F5F4F2}' +
       '.sheet{max-width:1000px;margin:0 auto;background:#fff;border-radius:18px;padding:42px 46px;box-shadow:0 20px 60px rgba(0,0,0,.08)}' +
@@ -438,6 +476,14 @@
       '.sub{color:#8A8A8E;font-size:12px;margin-top:8px}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:22px}' +
       '.kpi{background:#fff;border:1px solid #F0E7DF;border-top:3px solid #EB612A;border-radius:10px;padding:14px 16px}.kpi b{display:block;font-size:22px;letter-spacing:-.01em}.kpi span{display:block;font-size:10px;color:#8A8A8E;margin-top:4px}' +
       '.kpi.g{border-top-color:#1FAE5C}.kpi.g b{color:#1FAE5C}.kpi.b{border-top-color:#0A72E8}.kpi.b b{color:#0A72E8}.kpi.r{border-top-color:#CF4B18}.kpi.r b{color:#CF4B18}' +
+      '.ai-read{background:linear-gradient(135deg,#FFF8F3,#FFFDFB);border:1px solid #F3E2D6;border-left:3px solid #EB612A;border-radius:12px;padding:14px 18px 12px;margin:16px 0 2px}' +
+      '.ai-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}.ai-head b{font-size:13px;letter-spacing:.01em}' +
+      '.ai-chip{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:5px;background:#FFF0E7;color:#C2501C;font-size:9px;font-weight:650;letter-spacing:.04em}' +
+      '.ai-item{display:grid;grid-template-columns:64px 1fr;gap:10px;padding:6px 0;border-top:1px dashed rgba(235,97,42,.14)}' +
+      '.ai-list .ai-item:first-child{border-top:0}' +
+      '.ai-item b{font-size:10px;color:#C2501C;font-weight:650;line-height:1.6;white-space:nowrap}' +
+      '.ai-item p{margin:0;font-size:11px;line-height:1.7;color:#4A4A4F}' +
+      '.ai-note{font-size:9.5px;color:#AEAEB2;margin-top:2px}' +
       '.medals{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}' +
       '.medal{background:linear-gradient(145deg,#FFF8F3,#FFF4EC);border:1px solid rgba(235,97,42,.14);border-radius:10px;padding:12px 14px}' +
       '.medal .mt{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.medal .mt b{font-size:12.5px}' +
@@ -446,12 +492,14 @@
       '.medal.t{background:linear-gradient(145deg,#F5F9FF,#EDF4FE);border-color:rgba(10,114,232,.14)}.medal.t .st{color:#0A72E8}.medal .kind{font-size:9px;color:#0A72E8;letter-spacing:.06em}' +
       '.medal .auth-mark,.tag .auth-mark{display:inline-flex;align-items:center;height:17px;padding:0 6px;border-radius:5px;background:#FFF0E7;color:#C2501C;font-size:9px;font-weight:650;font-style:normal;white-space:nowrap}' +
       'table{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}' +
-      'th{text-align:left;color:#8A8A8E;font-weight:600;padding:8px 9px;background:#F7F6F4;border-bottom:1px solid #eee}' +
-      'td{padding:8px 9px;border-bottom:1px solid #f1f1f1;color:#4A4A4F}.foot{margin-top:30px;font-size:10px;color:#AEAEB2;display:flex;justify-content:space-between}' +
+      'th{text-align:center;color:#8A8A8E;font-weight:600;padding:8px 9px;background:#F7F6F4;border-bottom:1px solid #eee}th:first-child{text-align:left}' +
+      'td{padding:8px 9px;border-bottom:1px solid #f1f1f1;color:#4A4A4F;text-align:center}td:first-child{text-align:left}.foot{margin-top:30px;font-size:10px;color:#AEAEB2;display:flex;justify-content:space-between}' +
       (opts.fixed ?
         'html,body{height:100%}body{padding:0;box-sizing:border-box;overflow:hidden}' +
-        '.sheet{max-width:none;width:100%;height:100%;box-sizing:border-box;padding:26px 30px 18px;display:flex;flex-direction:column;border-radius:0;box-shadow:none}' +
-        '.detail{flex:1;min-height:0;overflow:auto}.foot{flex:0 0 auto;margin-top:12px}' : '') +
+        '.sheet{max-width:none;width:100%;height:100%;box-sizing:border-box;padding:26px 30px 18px;display:flex;flex-direction:column;border-radius:0;box-shadow:none;overflow:hidden}' +
+        '.report-body{flex:1 1 auto;min-height:0;overflow:auto;padding-right:6px}' +
+        '.report-body thead th{position:sticky;top:0;z-index:2;box-shadow:inset 0 -1px 0 #eee}' +
+        '.foot{flex:0 0 auto;margin-top:12px}' : '') +
       '</style></head><body><div class="sheet"><h1>' + E(title) + '</h1>' +
       '<div class="sub">' + E(rangeLabel) + ' · ' + E(month) + ' · 生成于 ' + E(D.meta.today) + '</div>' +
       '<div class="kpis">' +
@@ -459,9 +507,7 @@
         '<div class="kpi g"><b>' + m.done + '</b><span>已完成</span></div>' +
         '<div class="kpi b"><b>' + m.doing + '</b><span>进行中</span></div>' +
         '<div class="kpi r"><b>' + m.overdue + '</b><span>超期</span></div></div>' +
-      (medals.length ? '<h2>属性勋章</h2><div class="medals">' + medals.map(medalCard).join('') + '</div>' : '') +
-      '<h2>任务明细</h2><div class="detail"><table><thead><tr><th>任务</th><th>UID</th><th>执行人</th><th>类型</th><th>等级</th><th>工时</th><th>截止</th><th>状态</th></tr></thead><tbody>' +
-      (tableRows || '<tr><td colspan="8">当前筛选暂无任务</td></tr>') + '</tbody></table></div>' +
+      '<div class="report-body">' + aiHtml + medalsHtml + taskHtml + '</div>' +
       '<div class="foot"><span>ITO 运维中心 · ' + E(title) + '</span><span>演示数据，仅用于产品演示</span></div></div></body></html>';
   }
 
@@ -551,6 +597,7 @@
       st.ui.reportScope = scopes[0].id;
     }
     if (!st.ui.reportMonth) st.ui.reportMonth = monthChoices()[0].key;
+    if (st.ui.reportAiVariant == null) st.ui.reportAiVariant = 0;
     if (st.ui.reportGroup == null) st.ui.reportGroup = st.role === 'manager' ? ((myGroup() || {}).id || '') : '';
     if (st.ui.reportEmpGroup == null) st.ui.reportEmpGroup = '';
     if (!st.ui.reportPerson || !st.staff.some(function (p) { return p.name === st.ui.reportPerson; })) {
@@ -563,7 +610,9 @@
     const groupOrder = {};
     S().groups.forEach(function (g, i) { groupOrder[g.id] = i; });
     return pool.slice().sort(function (a, b) {
-      return (groupOrder[a.group] - groupOrder[b.group]) || a.name.localeCompare(b.name, 'zh');
+      return (groupOrder[a.group] - groupOrder[b.group]) ||
+        String(a.uid || '').localeCompare(String(b.uid || '')) ||
+        a.name.localeCompare(b.name, 'zh');
     }).map(function (p) {
       const group = ITO.getGroup(p.group) || {};
       const role = group.manager === p.name ? '主管' : (group.leader === p.name ? '组长' : '');
@@ -610,7 +659,10 @@
           '<span id="prEmpGroupWrap" hidden><select id="prEmpGroup" aria-label="员工范围专业组">' + empGroupOptions + '</select></span>' +
           '<span id="prPersonWrap" hidden><select id="prPerson" aria-label="人员" data-picker="1">' + personOptions + '</select></span>' +
         '</div>' +
-        '<button class="btn btn-ghost" id="personalDownloadBtn" type="button">' + U().icon('download') + '下载月报</button>' +
+        '<div class="report-head-actions">' +
+          '<button class="btn btn-ghost ai-report-btn" id="personalAiBtn" type="button">' + U().icon('spark') + 'AI 重新解读</button>' +
+          '<button class="btn btn-ghost" id="personalDownloadBtn" type="button">' + U().icon('download') + '下载月报</button>' +
+        '</div>' +
       '</div>' +
       '<iframe class="report-frame report-inline-frame" id="personalReportFrame" title="月报预览"></iframe>' +
     '</section>';
@@ -629,88 +681,14 @@
     return n > 0 ? '+' + n : String(n);
   }
 
-  /* 记分项为整数，季度均分允许一位小数。 */
+  /* 记分项与季度分数均为整数。 */
   function assessNum(value) {
     const n = Number(value) || 0;
     return Number.isInteger(n) ? String(n) : n.toFixed(1);
   }
 
-  /* 与团队闭环趋势一致的品牌橙纵向渐变。 */
-  function assessGradient(from, to) {
-    if (!window.echarts || !window.echarts.graphic) return to;
-    return new window.echarts.graphic.LinearGradient(0, 0, 0, 1, [
-      { offset: 0, color: from },
-      { offset: 1, color: to }
-    ]);
-  }
-
   function assessMoment(value) {
     return U().esc(assessTime(value));
-  }
-
-  function assessmentTrendOption(rows) {
-    const labels = (rows || []).map(function (row) { return row.label; });
-    const totals = (rows || []).map(function (row) { return row.total; });
-    return {
-      animationDuration: 600,
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow', shadowStyle: { color: 'rgba(235,97,42,.06)' } },
-        backgroundColor: 'rgba(29,29,31,.92)',
-        borderWidth: 0,
-        padding: [9, 12],
-        textStyle: { color: '#fff', fontSize: 11 },
-        formatter: function (params) {
-          const item = params && params[0];
-          if (!item) return '';
-          return item.marker + item.name + '<br/><b>' + item.value + '</b> 分' +
-            '<br/><span style="opacity:.62">点击查看 ' + item.name + '考核</span>';
-        }
-      },
-      grid: { left: 8, right: 34, top: 30, bottom: 4, containLabel: true },
-      xAxis: {
-        type: 'category',
-        data: labels,
-        axisLine: { lineStyle: { color: 'rgba(29,29,31,.10)' } },
-        axisTick: { show: false },
-        axisLabel: { color: '#AEAEB2', fontSize: 10 }
-      },
-      yAxis: {
-        type: 'value',
-        min: 90,
-        max: 100,
-        interval: 2,
-        splitLine: { lineStyle: { color: 'rgba(29,29,31,.055)', type: 'dashed' } },
-        axisLabel: { color: '#AEAEB2', fontSize: 9 }
-      },
-      series: [{
-        name: '考核总分',
-        type: 'bar',
-        barMaxWidth: 56,
-        data: totals,
-        itemStyle: {
-          color: assessGradient('#F28D5E', '#EB612A'),
-          borderRadius: [5, 5, 0, 0]
-        },
-        emphasis: {
-          itemStyle: { color: assessGradient('#E07A4C', '#D0531F') }
-        },
-        label: {
-          show: true,
-          position: 'top',
-          color: '#6E645B',
-          fontSize: 10,
-          fontWeight: 600
-        },
-        markLine: {
-          silent: true,
-          symbol: 'none',
-          lineStyle: { color: '#C9C2BA', type: 'dashed', width: 1 },
-          label: { formatter: '合格线 95', color: '#8F857C', fontSize: 9, position: 'insideStartTop' },
-          data: [{ yAxis: 95 }]
-        }
-      }]
-    };
   }
 
   function ensureAssessmentRedNotice(a) {
@@ -726,7 +704,7 @@
       type: '通知',
       title: '安质环红色通报',
       body: '【' + a.label + '】' + (event.category || '安质环') + ' / ' + (event.indicator || '') +
-        '：' + event.item + '，红灯扣 3 分，已触发红色警告。',
+        '：' + event.item + '，触发红线，安质环得分归零，已生成红色警告。',
       time: D.meta.demoNow,
       read: false,
       sender: '系统',
@@ -775,7 +753,7 @@
     }).join('');
     U().modal({
       title: 'SLA 考核明细',
-      sub: (a.isQuarter ? '2026 Q4' : '2026 年 11 月') + ' · ' + a.sla + ' / ' + a.baseSla + ' 分',
+      sub: a.label + ' · ' + a.sla + ' / ' + a.baseSla + ' 分',
       xwide: true,
       body: '<div class="assess-sla-scroll">' +
         '<div class="assess-detail-equation">基础 ' + a.baseSla + ' + 加分 ' + assessPoints(a.bonus) +
@@ -861,8 +839,8 @@
     const tone = a.qualified ? 'ok' : 'bad';
     const tiles = '<div class="assess-month-summary">' +
       '<div class="assess-month-tile is-' + tone + '"><span>考核总分</span><b>' + assessNum(a.total) + '<em>/ 100</em></b><i>' + U().esc(a.statusText) + '</i></div>' +
-      '<div class="assess-month-tile"><span>SLA 考核</span><b>' + assessNum(a.sla) + '<em>/ ' + a.baseSla + '</em></b><i>加分 ' + assessPoints(a.bonus) + ' · 扣分 ' + a.deduction + '</i></div>' +
-      '<div class="assess-month-tile"><span>安质环</span><b>' + assessNum(a.safety) + '<em>/ ' + a.baseSafety + '</em></b><i>黄灯 ' + a.safetySummary.yellow + ' · 红灯 ' + a.safetySummary.red + '</i></div>' +
+      '<div class="assess-month-tile"><span>SLA 考核</span><b>' + assessNum(a.sla) + '<em>/ ' + a.baseSla + '</em></b><i>加分 <span class="assess-points pos">' + assessPoints(a.bonus) + '</span> · 扣分 <span class="assess-points neg">' + a.deduction + '</span></i></div>' +
+      '<div class="assess-month-tile"><span>安质环</span><b>' + assessNum(a.safety) + '<em>/ ' + a.baseSafety + '</em></b><i>' + (a.safetySummary.red > 0 ? '红灯触发 · 归零' : '灯状态：黄灯 ' + a.safetySummary.yellow + ' · 扣分 ' + (a.safetyDeduction || 0)) + '</i></div>' +
       '<div class="assess-month-tile"><span>合格判定</span><b>' + (a.qualified ? '达标' : '未达标') + '</b><i>合格线 ' + a.target + ' 分</i></div>' +
     '</div>';
 
@@ -907,60 +885,83 @@
 
   function openAssessmentQuarter(a) {
     if (!a || !a.isQuarter) return;
-    const rows = (a.monthRows || []).map(function (row) {
-      return '<tr class="assess-click-row" data-assess-month="' + U().esc(row.key) + '" tabindex="0" role="button" title="查看 ' + U().esc(row.label) + '明细">' +
-        '<td>' + U().esc(row.label) + '</td>' +
-        '<td class="num">' + assessNum(row.sla) + '</td>' +
-        '<td class="num">' + assessNum(row.safety) + '</td>' +
-        '<td class="num"><b>' + assessNum(row.total) + '</b></td>' +
-        '<td>' + (row.total >= a.target ? assessChip('达标', 'ok') : assessChip('未达标', 'bad')) + '</td>' +
-      '</tr>';
-    }).join('');
-
     const list = a.monthRows || [];
     const count = list.length;
-    const slaSum = list.map(function (row) { return assessNum(row.sla); }).join(' + ');
-    const totalSum = list.map(function (row) { return assessNum(row.total); }).join(' + ');
-    const formula = count
-      ? '季度总分 = (' + totalSum + ') ÷ ' + count + ' = ' + assessNum(a.total) +
-        '；SLA = (' + slaSum + ') ÷ ' + count + ' = ' + assessNum(a.sla)
-      : '季度暂无已结算月份';
+    const redLine = a.safetySummary.red > 0;
     const monthLabels = list.map(function (row) { return row.short || row.label; }).join(' / ');
 
     const tone = a.qualified ? 'ok' : 'bad';
     const tiles = '<div class="assess-month-summary">' +
       '<div class="assess-month-tile is-' + tone + '"><span>季度总分</span><b>' + assessNum(a.total) + '<em>/ 100</em></b><i>' + U().esc(a.statusText) + '</i></div>' +
-      '<div class="assess-month-tile"><span>SLA 考核</span><b>' + assessNum(a.sla) + '<em>/ ' + a.baseSla + '</em></b><i>月度均分</i></div>' +
-      '<div class="assess-month-tile"><span>安质环</span><b>' + assessNum(a.safety) + '<em>/ ' + a.baseSafety + '</em></b><i>月度均分</i></div>' +
-      '<div class="assess-month-tile"><span>已结算月份</span><b>' + count + '<em>个月</em></b><i>' + U().esc(monthLabels || '—') + '</i></div>' +
+      '<div class="assess-month-tile"><span>SLA 考核</span><b>' + assessNum(a.sla) + '<em>/ ' + a.baseSla + '</em></b><i>扣分 <span class="assess-points neg">' + a.deduction + '</span> · 加分 <span class="assess-points pos">' + assessPoints(a.bonus) + '</span></i></div>' +
+      '<div class="assess-month-tile"><span>安质环</span><b>' + assessNum(a.safety) + '<em>/ ' + a.baseSafety + '</em></b><i>' + (redLine ? '红灯触发 · 归零' : '灯状态：黄灯 ' + a.safetySummary.yellowTotal + ' · 扣分 ' + (a.safetyDeduction || 0)) + '</i></div>' +
+      '<div class="assess-month-tile"><span>已结算月份</span><b>' + count + '<em> / ' + a.monthCount + '</em></b><i>' + U().esc(monthLabels || '—') + (a.pendingMonths && a.pendingMonths.length ? ' · ' + U().esc(a.pendingMonths.map(function (m) { return m.short; }).join('、')) + '待考核' : '') + '</i></div>' +
     '</div>';
 
+    const deductionRows = (a.deductionRows || []).map(function (row) {
+      return '<tr>' +
+        '<td>' + U().esc(row.monthLabel || '—') + '</td>' +
+        '<td class="mono assess-time">' + assessMoment(row.date) + '</td>' +
+        '<td>' + U().esc(row.category) + '</td>' +
+        '<td>' + U().esc(row.item) + '</td>' +
+        '<td class="num">' + row.count + '</td>' +
+        '<td class="num assess-points neg">' + row.points + '</td>' +
+      '</tr>';
+    }).join('');
+    const bonusRows = (a.bonusRows || []).map(function (row) {
+      return '<tr>' +
+        '<td>' + U().esc(row.category) + '</td>' +
+        '<td>' + U().esc(row.item) + '</td>' +
+        '<td class="num">' + row.used + (row.capped ? ' <span class="assess-cap">封顶</span>' : '') + '</td>' +
+        '<td class="num assess-points pos">' + assessPoints(row.awarded) + '</td>' +
+      '</tr>';
+    }).join('');
+    const safetyRows = (a.safetyEvents || []).map(function (event) {
+      return '<tr>' +
+        '<td class="mono assess-time">' + assessMoment(event.date) + '</td>' +
+        '<td>' + U().esc(event.category) + '</td>' +
+        '<td>' + U().esc(event.indicator || '—') + '</td>' +
+        '<td>' + U().esc(event.item) + '</td>' +
+        '<td>' + U().esc(event.impact || '—') + '</td>' +
+        '<td class="num assess-points neg">' + (Number(event.points) || 0) + '</td>' +
+      '</tr>';
+    }).join('');
+
     U().modal({
-      title: '季度考核明细',
-      sub: a.label + ' · 总分 ' + assessNum(a.total) + ' / 100 · SLA ' + assessNum(a.sla) + ' / ' + a.baseSla,
+      title: a.label + ' · 季度考核明细',
       xwide: true,
       body: '<div class="assess-month-scroll is-auto">' + tiles +
-        '<div class="assess-detail-equation">' + U().esc(formula) + '。季度按已结算月份平均，记分项为整数，均分保留一位小数。</div>' +
+        '<p class="assess-month-hint">季度考核计分；月度仅作事件归集，不单独形成月度得分。加分按季度合并后，单项最多计 2 次。</p>' +
         '<div class="assess-detail-section">' +
-          '<div class="assess-detail-title"><h4>月度构成</h4></div>' +
-          '<div class="table-wrap"><table class="data-table assess-month-table"><thead><tr><th>月份</th><th class="num">SLA</th><th class="num">安质环</th><th class="num">总分</th><th>判定</th></tr></thead><tbody>' +
-            (rows || '<tr><td colspan="5">' + U().emptyState('暂无已结算月份', '季度内还没有可用的月度明细', 'chart') + '</td></tr>') +
+          '<div class="assess-detail-title"><h4>本季度扣分记录</h4><span class="table-note">合计 <b class="assess-points neg">-' + a.deduction + '</b> 分</span><button class="btn btn-ghost btn-sm" data-sla-standards type="button">查看 SLA 标准</button></div>' +
+          '<div class="table-wrap"><table class="data-table assess-detail-table"><thead><tr><th>月份</th><th>时间</th><th>类别</th><th>事项</th><th class="num">次数</th><th class="num">扣分</th></tr></thead><tbody>' +
+            (deductionRows || '<tr><td colspan="6">' + U().emptyState('本季度暂无扣分', '已结算月份没有扣分记录', 'check') + '</td></tr>') +
+            '<tr class="assess-total-row"><td colspan="5">季度扣分合计</td><td class="num assess-points neg">-' + a.deduction + '</td></tr>' +
           '</tbody></table></div>' +
-          '<p class="assess-month-hint">点击任意月份查看该月完整明细。</p>' +
+        '</div>' +
+        '<div class="assess-detail-section">' +
+          '<div class="assess-detail-title"><h4>本季度加分汇总</h4><span class="table-note">合计 <b class="assess-points pos">' + assessPoints(a.bonus) + '</b> 分</span></div>' +
+          '<div class="table-wrap"><table class="data-table assess-detail-table"><thead><tr><th>类别</th><th>加分项</th><th class="num">计次</th><th class="num">加分</th></tr></thead><tbody>' +
+            (bonusRows || '<tr><td colspan="4">' + U().emptyState('本季度暂无加分', '已结算月份没有加分记录', 'award') + '</td></tr>') +
+          '</tbody></table></div>' +
+        '</div>' +
+        '<div class="assess-detail-section">' +
+          '<div class="assess-detail-title"><h4>本季度安质环事件</h4><button class="btn btn-ghost btn-sm" data-safety-standards type="button">查看安质环标准</button></div>' +
+          '<div class="table-wrap"><table class="data-table assess-month-safety-table"><thead><tr><th>时间</th><th>运维项</th><th>指标</th><th>事项</th><th>影响情况</th><th class="num">扣分</th></tr></thead><tbody>' +
+            (safetyRows || '<tr><td colspan="6">' + U().emptyState('本季度无安质环事件', '已结算月份没有黄灯 / 红灯事件', 'check') + '</td></tr>') +
+          '</tbody></table></div>' +
         '</div>' +
       '</div>',
       foot: '<button class="btn btn-ghost" data-close type="button">关闭</button>',
       onMount: function (close, root) {
         root.querySelector('[data-close]').addEventListener('click', close);
-        Array.prototype.forEach.call(root.querySelectorAll('[data-assess-month]'), function (row) {
-          const open = function () {
-            close();
-            openAssessmentMonth(row.dataset.assessMonth);
-          };
-          row.addEventListener('click', open);
-          row.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
-          });
+        const slaStd = root.querySelector('[data-sla-standards]');
+        if (slaStd) slaStd.addEventListener('click', function () {
+          openSlaStandards(a);
+        });
+        const std = root.querySelector('[data-safety-standards]');
+        if (std) std.addEventListener('click', function () {
+          openAssessmentStandards(a);
         });
       }
     });
@@ -980,10 +981,10 @@
     }).join('');
     U().modal({
       title: '安质环详情',
-      sub: (a.isQuarter ? '2026 Q4' : '2026 年 11 月') + ' · ' + a.safety + ' / ' + a.baseSafety + ' 分',
+      sub: a.label + ' · ' + a.safety + ' / ' + a.baseSafety + ' 分',
       xwide: true,
       body: (red ? '<div class="assess-red-banner">' + U().icon('alert') +
-          '<span>本期存在红灯事件，已触发红色警告并生成站内通报。</span></div>' : '') +
+          '<span>本期存在红灯事件，触发红线，安质环得分归零，并生成站内通报。</span></div>' : '') +
         '<div class="assess-safety-summary">' +
           '<span class="assess-safety-chip warn">黄灯 <b>' + a.safetySummary.yellow + '</b></span>' +
           '<span class="assess-safety-chip bad">红灯 <b>' + a.safetySummary.red + '</b></span>' +
@@ -998,36 +999,77 @@
         root.querySelector('[data-close]').addEventListener('click', close);
         const std = root.querySelector('[data-safety-standards]');
         if (std) std.addEventListener('click', function () {
-          close();
           openAssessmentStandards(a);
         });
       }
     });
   }
 
+  function slaStandardsTable(list) {
+    const rows = list.map(function (row) {
+      return '<tr>' +
+        '<td class="num">' + U().esc(row.seq || '—') + '</td>' +
+        '<td>' + U().esc(row.category || '—') + '</td>' +
+        '<td>' + U().esc(row.sub || '—') + '</td>' +
+        '<td>' + U().esc(row.requirement || '—') + '</td>' +
+        '<td>' + U().esc(row.indicator || '—') + '</td>' +
+        '<td>' + U().esc(row.standard || '—') + '</td>' +
+      '</tr>';
+    }).join('');
+    return '<div class="table-wrap"><table class="data-table assess-standard-table assess-sla-standard-table"><thead><tr>' +
+      '<th>序号</th><th>类别</th><th>分项</th><th>衡量要求</th><th>SLA 指标</th><th>考核标准</th>' +
+      '</tr></thead><tbody>' +
+      (rows || '<tr><td colspan="6">' + U().emptyState('暂无标准', '请检查考核数据', 'shield') + '</td></tr>') +
+      '</tbody></table></div>';
+  }
+
+  function openSlaStandards(a) {
+    const list = a.slaStandards || [];
+    const deductions = list.filter(function (row) { return row.kind === 'deduction'; });
+    const bonuses = list.filter(function (row) { return row.kind === 'bonus'; });
+    U().modal({
+      title: 'SLA 季度考核标准',
+      sub: '扣分项 ' + deductions.length + ' 条 · 加分项 ' + bonuses.length + ' 条 · 基础分 ' + a.baseSla,
+      xxwide: true,
+      body: '<p class="assess-modal-note">合计分数 = 基础 ' + a.baseSla + ' + 加分 - 扣分，封顶 ' + a.baseSla + '；加分项每项最多计 2 次。标准按季度考核文档原文录入。</p>' +
+        '<div class="assess-standards-scroll">' +
+          '<div class="assess-standards-section">' +
+            '<div class="assess-detail-title"><h4>扣分项</h4><span class="table-note">' + deductions.length + ' 条</span></div>' +
+            slaStandardsTable(deductions) +
+          '</div>' +
+          '<div class="assess-standards-section">' +
+            '<div class="assess-detail-title"><h4>加分项</h4><span class="table-note">' + bonuses.length + ' 条 · 每项最多计 2 次</span></div>' +
+            slaStandardsTable(bonuses) +
+          '</div>' +
+        '</div>',
+      foot: '<button class="btn btn-ghost" data-close type="button">关闭</button>',
+      onMount: function (close, root) {
+        root.querySelector('[data-close]').addEventListener('click', close);
+      }
+    });
+  }
+
   function openAssessmentStandards(a) {
     const rows = (a.safetyStandards || []).map(function (row) {
-      return '<tr>' +
-        '<td><b>' + U().esc(row.category) + '</b></td>' +
-        '<td>' + U().esc(row.item) + '</td>' +
-        '<td class="assess-scope">' + U().esc(row.scope) + '</td>' +
-        '<td class="std-green">' + U().esc(row.green || '—') + '</td>' +
-        '<td class="std-yellow">' + U().esc(row.yellow || '—') + '</td>' +
-        '<td class="std-red">' + U().esc(row.red || '—') + '</td>' +
-        '<td class="assess-status-cell">' + U().esc(row.status || '—') + '</td>' +
-        '<td>' + U().esc(row.note || '—') + '</td>' +
+      return '<tr' + (row.veto ? ' class="is-veto"' : '') + '>' +
+        '<td class="num">' + U().esc(row.seq || '—') + '</td>' +
+        '<td>' + U().esc(row.item || '—') + '</td>' +
+        '<td>' + U().esc(row.standard || '—') + '</td>' +
+        '<td>' + (row.veto
+          ? '<span class="assess-veto-badge">一票否决</span>'
+          : '<span class="is-veto-muted">按标准扣分</span>') + '</td>' +
       '</tr>';
     }).join('');
     U().modal({
-      title: '安质环管理指标',
-      sub: '共 ' + (a.safetyStandards || []).length + ' 条 · 工业安全 / 内部工单抽查 / 信息安全',
-      xwide: true,
-      body: '<p class="assess-modal-note">红灯 -3 分；「一票否决」仅为红灯列情形描述，不单独设状态。指标标准保持原表文字。</p>' +
-        '<div class="table-wrap assess-standards-wrap"><table class="data-table assess-standards-table"><thead><tr>' +
-          '<th>运维项</th><th>指标</th><th>计算范围</th><th>绿灯</th><th>黄灯</th><th>红灯</th><th>指标颜色</th><th>异常描述 / 处理情况</th>' +
+      title: '安质环季度考核标准',
+      sub: '共 ' + (a.safetyStandards || []).length + ' 条 · 权重 ' + a.baseSafety + ' 分 · 一票否决归零',
+      xxwide: true,
+      body: '<p class="assess-modal-note">一票否决项出现时安质环总分归零；其余项按次累计扣分，最高扣 ' + a.baseSafety + ' 分。标准按季度考核文档原文录入。</p>' +
+        '<div class="assess-standards-scroll"><div class="table-wrap"><table class="data-table assess-standard-table assess-safety-standard-table"><thead><tr>' +
+          '<th>序号</th><th>考核内容</th><th>评分标准</th><th>类型</th>' +
         '</tr></thead><tbody>' +
-          (rows || '<tr><td colspan="8">' + U().emptyState('暂无指标标准', '请在考核数据中维护', 'shield') + '</td></tr>') +
-        '</tbody></table></div>',
+          (rows || '<tr><td colspan="4">' + U().emptyState('暂无标准', '请检查考核数据', 'shield') + '</td></tr>') +
+        '</tbody></table></div></div>',
       foot: '<button class="btn btn-ghost" data-close type="button">关闭</button>',
       onMount: function (close, root) {
         root.querySelector('[data-close]').addEventListener('click', close);
@@ -1041,38 +1083,32 @@
       return U().emptyState('考核数据未加载', '请确认 assessment.js 已加载', 'chart');
     }
     st.ui = st.ui || {};
-    const kind = st.ui.assessmentPeriod === 'quarter' ? 'quarter' : 'month';
-    const a = ITO.assessmentModel(kind);
+    const a = ITO.assessmentModel('quarter');
     ensureAssessmentRedNotice(a);
     const red = a.safetySummary.red > 0;
-
-    const monthNotes = function (field, base) {
-      return (a.monthRows || []).map(function (row) {
-        return row.short + ' ' + assessNum(row[field]) + '/' + base;
-      }).join(' · ') || '—';
-    };
-    const passText = a.qualified ? '合格' : '未达标';
+    const periodSpan = (function () {
+      const start = String(a.period.start || '').slice(5, 7);
+      const end = String(a.period.end || '').slice(5, 7);
+      return Number(start) + '–' + Number(end) + ' 月';
+    })();
+    const passText = a.qualified ? '达标' : '未达标';
     const passClass = a.qualified ? 'is-ok' : 'is-bad';
-    const slaNote = a.isQuarter
-      ? monthNotes('sla', a.baseSla)
-      : '加分 ' + assessPoints(a.bonus) + ' · 扣分 ' + (a.deduction ? '-' + a.deduction : '0');
-    const safetyNote = a.isQuarter
-      ? monthNotes('safety', a.baseSafety)
-      : '黄灯 ' + a.safetySummary.yellow + ' · 红灯 ' + a.safetySummary.red;
+    const slaNote = '本季度扣分 <span class="assess-points neg">' + (a.deduction || 0) + '</span> · 加分 <span class="assess-points pos">' + assessPoints(a.bonus) + '</span>';
+    const safetyNote = red
+      ? '红灯触发 · 安质环归零'
+      : '黄灯 ' + a.safetySummary.yellowTotal + ' · 扣分 ' + (a.safetyDeduction || 0);
 
-    const totalCard = '<article class="card kpi-card assess-kpi-total" data-tone="green">' +
-      '<div class="kpi-label">' + U().icon('award') + '<span>考核总分</span></div>' +
+    const totalCard = '<article class="card kpi-card assess-kpi-total" data-tone="' + (a.qualified ? 'green' : 'amber') + '">' +
+      '<div class="kpi-label">' + U().icon('award') + '<span>季度考核总分</span></div>' +
       '<div class="kpi-value">' + assessNum(a.total) + '<span class="unit">分</span></div>' +
       '<div class="kpi-meta"><span class="assess-kpi-pass ' + passClass + '">' + passText + '</span></div>' +
     '</article>';
-    const slaCard = '<article class="card kpi-card assess-sla-card" data-tone="blue" data-assess-sla-card role="button" tabindex="0" title="' +
-      (a.isQuarter ? '查看季度月度构成' : '查看扣分与加分明细') + '">' +
+    const slaCard = '<article class="card kpi-card assess-sla-card" data-tone="blue" data-assess-sla-card role="button" tabindex="0" title="查看季度扣分与加分明细">' +
       '<div class="kpi-label">' + U().icon('shield') + '<span>SLA 考核</span><em class="assess-card-link">查看明细</em></div>' +
       '<div class="kpi-value">' + assessNum(a.sla) + '<span class="unit"> / ' + a.baseSla + '</span></div>' +
-      '<div class="kpi-meta"><span>' + U().esc(slaNote) + '</span></div>' +
+      '<div class="kpi-meta"><span>' + slaNote + '</span></div>' +
     '</article>';
-    const safetyCard = '<article class="card kpi-card assess-safety-kpi' + (red ? ' is-red' : '') + '" data-tone="amber" data-assess-safety-card role="button" tabindex="0" title="' +
-      (a.isQuarter ? '查看季度月度构成' : '查看安质环详情') + '">' +
+    const safetyCard = '<article class="card kpi-card assess-safety-kpi' + (red ? ' is-red' : '') + '" data-tone="amber" data-assess-safety-card role="button" tabindex="0" title="查看季度安质环明细">' +
       '<div class="kpi-label">' + U().icon('check') + '<span>安质环</span><em class="assess-card-link">查看明细</em></div>' +
       '<div class="kpi-value">' + assessNum(a.safety) + '<span class="unit"> / ' + a.baseSafety + '</span></div>' +
       '<div class="kpi-meta"><span>' + U().esc(safetyNote) + '</span>' +
@@ -1080,21 +1116,46 @@
     '</article>';
 
     const toolbar = '<div class="assess-toolbar">' +
-      '<div class="assess-switch" role="tablist" aria-label="考核周期">' +
-        '<button class="' + (kind === 'month' ? 'is-on' : '') + '" data-assess-period="month" type="button">本月</button>' +
-        '<button class="' + (kind === 'quarter' ? 'is-on' : '') + '" data-assess-period="quarter" type="button">本季度</button>' +
-      '</div>' +
-      '<span class="assess-period">数据截止 11 月底</span>' +
+      '<span class="assess-period">' + U().esc(a.label) + ' · ' + periodSpan + ' · 当前累计</span>' +
     '</div>';
 
-    const trendCard = '<section class="card chart-card assess-trend-card">' +
-      '<div class="chart-head"><div><h3 class="chart-title">月度考核趋势</h3><p class="chart-sub">7–11 月 · 点击柱子查看当月考核</p></div><span class="head-tag">TOTAL / 100</span></div>' +
-      '<div class="chart-body assess-trend-body" id="assessTrendChart"></div>' +
+    const quarterPeriods = (ITO.assessmentPeriods().quarters || []).slice().sort(function (x, y) {
+      return String(y.key).localeCompare(String(x.key));
+    });
+    const historyRows = quarterPeriods.map(function (period) {
+      const q = ITO.assessmentQuarter(period.key);
+      if (!q) return '';
+      const qSpan = Number(String(q.period.start).slice(5, 7)) + '–' + Number(String(q.period.end).slice(5, 7)) + ' 月';
+      return '<tr class="assess-click-row" data-assess-quarter="' + U().esc(q.period.key) + '" tabindex="0" role="button" title="查看 ' + U().esc(q.label) + ' 明细">' +
+        '<td>' + U().esc(q.label) + ' · ' + qSpan + '</td>' +
+        '<td>' + q.settledCount + ' / ' + q.monthCount + '</td>' +
+        '<td>' + assessNum(q.total) + '</td>' +
+        '<td>' + assessNum(q.sla) + '</td>' +
+        '<td>' + assessNum(q.safety) + '</td>' +
+        '<td class="assess-points neg">' + (q.deduction ? '-' + q.deduction : '0') + '</td>' +
+        '<td class="assess-points pos">' + assessPoints(q.bonus) + '</td>' +
+        '<td>' + (q.qualified ? assessChip('达标', 'ok') : assessChip('未达标', 'bad')) + '</td>' +
+      '</tr>';
+    }).join('');
+
+    const historyCard = '<section class="card table-card assess-history-card">' +
+      '<div class="table-head"><div><h3>季度考核记录</h3><p class="table-note">Q1–Q4 季度记录 · 扣分 / 加分按季度累计 · 点击行查看明细</p></div>' +
+        '<span class="table-note">' + quarterPeriods.length + ' 个季度</span></div>' +
+      '<div class="table-wrap"><table class="data-table assess-history-table"><thead><tr>' +
+        '<th>季度</th><th>已结算</th><th>总分</th><th>SLA</th><th>安质环</th><th>扣分</th><th>加分</th><th>判定</th>' +
+      '</tr></thead><tbody>' + historyRows + '</tbody></table></div>' +
+    '</section>';
+
+    const trendCard = '<section class="card assess-trend-card">' +
+      '<div class="chart-head"><div><h3 class="chart-title">季度考核趋势</h3><p class="chart-sub">Q1–Q4 总分 · 评分区间 90–100 · 合格线 95</p></div>' +
+        '<span class="head-tag">QUARTER</span></div>' +
+      '<div class="assess-trend-body" id="assessTrendChart" role="img" aria-label="Q1–Q4 季度考核总分趋势"></div>' +
     '</section>';
 
     return toolbar +
       '<div class="kpi-grid personal-kpis assess-kpis">' + totalCard + slaCard + safetyCard + '</div>' +
-      trendCard;
+      trendCard +
+      historyCard;
   }
 
   P.personal = {
@@ -1106,7 +1167,8 @@
       const isLeader = st.role === 'leader' || st.role === 'super';
       const isManager = st.role === 'manager';
       const canAssess = isLeader || isManager;
-      let tab = st.ui.personalTab || 'stats';
+      const routeTab = st.routeParams && st.routeParams.tab;
+      let tab = (routeTab === 'assessment' && canAssess) ? 'assessment' : (st.ui.personalTab || 'stats');
       if (tab === 'assessment' && !canAssess) tab = 'stats';
       const title = isLeader ? '运营统计' : (isManager ? '团队统计' : '个人统计');
       const scopeText = isLeader ? '全部专业组' : (isManager ? (group ? group.name : '本组') : '本人');
@@ -1146,25 +1208,25 @@
       U().$$('[data-personal-tab]').forEach(function (btn) {
         btn.addEventListener('click', function () {
           st.ui.personalTab = btn.dataset.personalTab;
+          if (st.routeParams && st.routeParams.tab) {
+            st.routeParams = Object.assign({}, st.routeParams);
+            delete st.routeParams.tab;
+            if (location.hash.indexOf('?') > -1) history.replaceState(null, '', '#/personal');
+          }
           ITO.refresh();
         });
       });
 
-      if ((st.ui.personalTab || 'stats') === 'assessment') {
-        U().$$('[data-assess-period]').forEach(function (btn) {
-          btn.addEventListener('click', function () {
-            st.ui.assessmentPeriod = btn.dataset.assessPeriod;
-            ITO.refresh();
-          });
-        });
-        const kind = st.ui.assessmentPeriod === 'quarter' ? 'quarter' : 'month';
-        const a = ITO.assessmentModel(kind);
+      const canAssess = st.role === 'leader' || st.role === 'super' || st.role === 'manager';
+      const routeTab = st.routeParams && st.routeParams.tab;
+      const routeDetail = st.routeParams && st.routeParams.detail;
+      const effectiveTab = (routeTab === 'assessment' && canAssess) ? 'assessment' : (st.ui.personalTab || 'stats');
+      if (effectiveTab === 'assessment') {
+        const a = ITO.assessmentModel('quarter');
+        const openSla = function () { openAssessmentSla(a); };
+        const openSafety = function () { openAssessmentSafety(a); };
         const slaCard = document.querySelector('[data-assess-sla-card]');
         if (slaCard) {
-          const openSla = function () {
-            if (a.isQuarter) openAssessmentQuarter(a);
-            else openAssessmentSla(a);
-          };
           slaCard.addEventListener('click', openSla);
           slaCard.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSla(); }
@@ -1172,37 +1234,87 @@
         }
         const safetyCard = document.querySelector('[data-assess-safety-card]');
         if (safetyCard) {
-          const openSafety = function () {
-            if (a.isQuarter) openAssessmentQuarter(a);
-            else openAssessmentSafety(a);
-          };
           safetyCard.addEventListener('click', openSafety);
           safetyCard.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSafety(); }
           });
         }
-        const chart = U().chart('assessTrendChart', assessmentTrendOption(a.trend));
-        const trendNode = document.getElementById('assessTrendChart');
-        if (chart && trendNode && typeof chart.getZr === 'function') {
-          const zr = chart.getZr();
-          const trendRows = a.trend || [];
-          const indexAt = function (offsetX) {
-            const idx = Math.round(Number(chart.convertFromPixel({ xAxisIndex: 0 }, offsetX)));
-            return Number.isFinite(idx) && idx >= 0 && idx < trendRows.length ? idx : -1;
+        U().$$('[data-assess-quarter]').forEach(function (row) {
+          const open = function () {
+            const q = ITO.assessmentQuarter(row.dataset.assessQuarter);
+            if (q) openAssessmentQuarter(q);
           };
-          zr.off('click');
-          zr.off('mousemove');
-          zr.off('globalout');
-          zr.on('click', function (e) {
-            const idx = indexAt(e.offsetX);
-            if (idx >= 0) openAssessmentMonth(trendRows[idx].key);
+          row.addEventListener('click', open);
+          row.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
           });
-          zr.on('mousemove', function (e) {
-            trendNode.style.cursor = indexAt(e.offsetX) >= 0 ? 'pointer' : '';
-          });
-          zr.on('globalout', function () {
-            trendNode.style.cursor = '';
-          });
+        });
+        if (routeDetail === 'sla' || routeDetail === 'safety') {
+          setTimeout(function () {
+            if (st.route !== 'personal' || !st.routeParams || st.routeParams.detail !== routeDetail) return;
+            if (routeDetail === 'sla') openAssessmentSla(a);
+            else openAssessmentSafety(a);
+            st.routeParams = Object.assign({}, st.routeParams);
+            delete st.routeParams.detail;
+            history.replaceState(null, '', '#/personal?tab=assessment');
+          }, 160);
+        }
+        const trendPeriods = (ITO.assessmentPeriods().quarters || []).slice().sort(function (x, y) {
+          return String(x.key).localeCompare(String(y.key));
+        });
+        const trendRows = trendPeriods.map(function (p) { return ITO.assessmentQuarter(p.key); }).filter(Boolean);
+        const trendChart = U().chart('assessTrendChart', {
+          animation: false,
+          tooltip: {
+            trigger: 'axis',
+            backgroundColor: 'rgba(29,29,31,.92)',
+            borderWidth: 0,
+            padding: [8, 12],
+            textStyle: { color: '#fff', fontSize: 11 },
+            formatter: function (params) {
+              const p = Array.isArray(params) ? params[0] : params;
+              if (!p) return '';
+              return '<b>' + p.axisValue + '</b><br/>季度总分：' + p.value + ' / 100';
+            }
+          },
+          grid: { left: 10, right: 20, top: 24, bottom: 10, containLabel: true },
+          xAxis: {
+            type: 'category',
+            data: trendRows.map(function (r) { return r.shortLabel || r.label; }),
+            axisLine: { lineStyle: { color: 'rgba(29,29,31,.12)' } },
+            axisTick: { show: false },
+            axisLabel: { color: '#8A8A8E', fontSize: 10 }
+          },
+          yAxis: {
+            type: 'value',
+            min: 90,
+            max: 100,
+            interval: 2,
+            axisLine: { show: false },
+            axisTick: { show: false },
+            axisLabel: { color: '#8A8A8E', fontSize: 10 },
+            splitLine: { lineStyle: { color: 'rgba(29,29,31,.06)', type: 'dashed' } }
+          },
+          series: [{
+            type: 'bar',
+            name: '季度总分',
+            barWidth: 28,
+            data: trendRows.map(function (r) { return r.total; }),
+            itemStyle: { color: '#EB612A', borderRadius: [4, 4, 0, 0] },
+            label: { show: true, position: 'top', color: '#4A4A4F', fontSize: 10, fontWeight: 600 },
+            markLine: {
+              silent: true,
+              symbol: 'none',
+              lineStyle: { color: '#9C8F86', type: 'dashed', width: 1 },
+              label: { show: true, position: 'insideEndTop', formatter: '合格线 95', color: '#8A8A8E', fontSize: 9 },
+              data: [{ yAxis: 95 }]
+            }
+          }]
+        });
+        if (trendChart) {
+          window.setTimeout(function () {
+            try { trendChart.resize(); } catch (e) { /* noop */ }
+          }, 80);
         }
         return;
       }
@@ -1283,7 +1395,8 @@
           month: monthSel.value,
           group: groupSel.value,
           empGroup: empGroupSel.value,
-          person: personSel.value
+          person: personSel.value,
+          aiVariant: Number(st.ui.reportAiVariant) || 0
         };
       }
 
@@ -1300,12 +1413,27 @@
 
       [scopeSel, monthSel, groupSel, empGroupSel, personSel].forEach(function (el) {
         el.addEventListener('change', function () {
+          st.ui.reportAiVariant = 0;
           if (el === empGroupSel) fillEmployeePerson(empGroupSel.value, '');
           if (el === scopeSel) syncVisibility();
           refreshFrame();
         });
       });
       refreshFrame();
+
+      const aiBtn = document.getElementById('personalAiBtn');
+      if (aiBtn) aiBtn.addEventListener('click', function () {
+        if (aiBtn.classList.contains('is-loading')) return;
+        aiBtn.classList.add('is-loading');
+        aiBtn.innerHTML = U().icon('spark') + 'AI 分析中…';
+        window.setTimeout(function () {
+          if (st.ui.personalTab !== 'report' || st.route !== 'personal') return;
+          st.ui.reportAiVariant = ((Number(st.ui.reportAiVariant) || 0) + 1) % 3;
+          refreshFrame();
+          aiBtn.classList.remove('is-loading');
+          aiBtn.innerHTML = U().icon('spark') + 'AI 重新解读';
+        }, 420);
+      });
 
       const download = document.getElementById('personalDownloadBtn');
       if (download) download.addEventListener('click', function () {

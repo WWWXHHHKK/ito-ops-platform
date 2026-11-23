@@ -493,6 +493,88 @@
     });
   };
 
+  function groupTrendSeries(gid) {
+    const st = S();
+    const hist = D.groupHistory || { months: [] };
+    const base = (hist[gid] || []).slice();
+    const currentMonthKey = String(D.meta.today || '').slice(0, 7);
+    if (base.length && hist.months && hist.months[hist.months.length - 1] === currentMonthKey) {
+      base[base.length - 1] = st.staff.filter(function (p) { return p.group === gid; }).length;
+    }
+    return base;
+  }
+
+  function groupTrendRange(gid) {
+    const values = groupTrendSeries(gid).filter(function (v) { return typeof v === 'number'; });
+    const lo = values.length ? Math.min.apply(null, values) : 8;
+    const hi = values.length ? Math.max.apply(null, values) : 10;
+    const min = Math.max(6, lo - 1);
+    const max = Math.min(10, hi + 1);
+    return { min: min, max: max - min < 1 ? Math.min(10, min + 1) : max };
+  }
+
+  function groupTrendCount(gid) {
+    return S().staff.filter(function (p) { return p.group === gid; }).length;
+  }
+
+  function groupTrendOption(gid, single) {
+    const hist = D.groupHistory || { months: [] };
+    const g = ITO.getGroup(gid) || { name: gid, color: '#EB612A' };
+    const range = groupTrendRange(gid);
+    const areaColor = single && window.echarts && window.echarts.graphic
+      ? new window.echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: g.color + '33' },
+          { offset: 1, color: g.color + '00' }
+        ])
+      : null;
+    return {
+      animation: false,
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: 'rgba(29,29,31,.92)',
+        borderWidth: 0,
+        padding: [7, 10],
+        textStyle: { color: '#fff', fontSize: 10 },
+        formatter: function (params) {
+          const list = Array.isArray(params) ? params : [params];
+          if (!list.length) return '';
+          return '<b>' + list[0].axisValue + '</b><br/>' + g.name + '：' + list[0].value + ' 人';
+        }
+      },
+      grid: { left: 4, right: 10, top: 12, bottom: 25, containLabel: true },
+      xAxis: {
+        type: 'category',
+        boundaryGap: false,
+        data: hist.months.map(function (m) { return Number(m.slice(5)) + ' 月'; }),
+        axisLine: { lineStyle: { color: 'rgba(29,29,31,.1)' } },
+        axisTick: { show: false },
+        axisLabel: { show: true, interval: 0, hideOverlap: false, color: '#8A8A8E', fontSize: 8, margin: 6 }
+      },
+      yAxis: {
+        type: 'value',
+        min: range.min,
+        max: range.max,
+        interval: 1,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { show: true, color: '#8A8A8E', fontSize: 8, formatter: '{value}', margin: 5 },
+        splitLine: { lineStyle: { color: 'rgba(29,29,31,.055)', type: 'dashed' } }
+      },
+      series: [{
+        name: g.name,
+        type: 'line',
+        smooth: 0.2,
+        symbol: 'circle',
+        symbolSize: 4,
+        clip: false,
+        data: groupTrendSeries(gid),
+        lineStyle: { width: 2, color: g.color },
+        areaStyle: areaColor ? { color: areaColor } : null,
+        itemStyle: { color: g.color, borderColor: '#fff', borderWidth: 1 }
+      }]
+    };
+  }
+
   P.groups = {
     render: function () {
       const st = S();
@@ -510,7 +592,7 @@
       staff.sort(function (a, b) {
         return (groupOrder[a.group] - groupOrder[b.group]) ||
           (memberRank(a) - memberRank(b)) ||
-          String(a.joined || '').localeCompare(String(b.joined || '')) ||
+          String(a.uid || '').localeCompare(String(b.uid || '')) ||
           a.name.localeCompare(b.name, 'zh');
       });
 
@@ -535,7 +617,8 @@
         const role = g && g.manager === p.name ? '主管' : (g && g.leader === p.name ? '组长' : '成员');
         const roleCls = role === '主管' ? 'manager' : role === '组长' ? 'leader' : 'member';
         return '<tr data-member="' + p.uid + '" style="cursor:pointer">' +
-          '<td><div class="person-cell"><div><b>' + U().esc(p.name) + '</b><small>' + p.uid + '</small></div></div></td>' +
+          '<td class="mono">' + p.uid + '</td>' +
+          '<td><div class="person-cell"><b>' + U().esc(p.name) + '</b></div></td>' +
           '<td>' + U().groupPill(p.group) + '</td>' +
           '<td><span class="role-chip ' + roleCls + '">' + role + '</span></td>' +
           '<td>' + p.tags.map(function (t) { return '<span class="tag-inline">' + U().esc(t) + '</span>'; }).join('') + '</td>' +
@@ -549,6 +632,25 @@
       const scopeFull = activeGroup ? (activeGroup.fullStrength || scopeNow) : totalFull;
       const scopePct = scopeFull ? Math.round(scopeNow / scopeFull * 100) : 0;
       const scopeBar = Math.min(100, scopePct);
+      const chartActions =
+        '<div class="group-chart-actions">' +
+          (activeGroup ? '<button class="btn btn-ghost btn-sm group-trend-back" id="groupTrendBack" type="button">返回全部专业组</button>' : '') +
+          '<span class="head-tag">HEADCOUNT</span>' +
+        '</div>';
+      const chartBody = activeGroup
+        ? '<div class="chart-body group-trend-single" id="groupLoadChart" role="img" aria-label="' + U().esc(activeGroup.name) + '近 6 个月人数变化"></div>'
+        : '<div class="chart-body group-trend-grid">' + st.groups.map(function (g) {
+            return '<div class="group-mini">' +
+              '<div class="group-mini-head"><span class="group-mini-dot" style="background:' + g.color + '"></span><b>' + U().esc(g.name) + '</b>' +
+                '<span class="group-mini-count">' + groupTrendCount(g.id) + ' 人</span></div>' +
+              '<div class="group-mini-chart" id="groupTrend-' + g.id + '" data-gid="' + g.id + '" role="img" aria-label="' + U().esc(g.name) + '近 6 个月人数变化"></div>' +
+            '</div>';
+          }).join('') + '</div>';
+      const staffFoot = '<div class="group-staff-foot"><span>' +
+        (activeGroup
+          ? U().esc(activeGroup.name) + '在册 <b>' + scopeNow + '</b> 人 · 满编 <b>' + scopeFull + '</b>'
+          : '全部在册 <b>' + scopeNow + '</b> 人 · <b>' + st.groups.length + '</b> 个专业组') +
+        '</span><span>' + (activeGroup ? '<b>' + scopePct + '%</b>' : '满配 <b>' + scopeFull + '</b> 人') + '</span></div>';
 
       return U().pageHead({
         title: '组织架构',
@@ -561,9 +663,9 @@
 
       '<div class="groups-layout">' +
         '<section class="card chart-card">' +
-          '<div class="chart-head"><div><h3 class="chart-title">' + (activeGroup ? activeGroup.name + '人员变动' : '人员变动情况') + '</h3><p class="chart-sub">近 6 个月' + (activeGroup ? activeGroup.name : '各组') + '人数变化</p></div>' +
-            '<span class="head-tag">HEADCOUNT</span></div>' +
-          '<div class="chart-body" id="groupLoadChart" role="img" aria-label="专业组负荷对比图，展示各组在办任务与负荷指数"></div>' +
+          '<div class="chart-head"><div><h3 class="chart-title">' + (activeGroup ? activeGroup.name + '人员变动' : '人员变动情况') + '</h3><p class="chart-sub">近 6 个月' + (activeGroup ? activeGroup.name : '各组') + '人数变化 · 人员规模保持稳定</p></div>' +
+            chartActions + '</div>' +
+          chartBody +
           '<div class="group-chart-foot">' +
             '<span>当前 <b>' + scopeNow + '</b> / 满配 <b>' + scopeFull + '</b></span>' +
             '<div class="group-chart-bar"><i style="width:' + scopeBar + '%;background:' + (activeGroup ? activeGroup.color : 'linear-gradient(90deg, var(--brand), #F59A6B)') + '"></i></div>' +
@@ -573,8 +675,9 @@
         '<section class="card staff-panel">' +
           '<div class="staff-head"><div class="staff-head-left"><h3>成员名录</h3><span class="count">' + staff.length + ' 人</span></div>' +
             '<span class="table-note">' + (activeGroup ? activeGroup.name : '全部专业组') + '</span></div>' +
-          '<div class="table-wrap"><table class="data-table"><thead><tr><th>成员</th><th>专业组</th><th>角色</th><th>标签</th><th>入组</th></tr></thead>' +
+          '<div class="table-wrap"><table class="data-table"><thead><tr><th>人员编号</th><th>成员</th><th>专业组</th><th>角色</th><th>标签</th><th>入组时间</th></tr></thead>' +
           '<tbody>' + rows + '</tbody></table></div>' +
+          staffFoot +
         '</section>' +
       '</div>';
     },
@@ -583,56 +686,22 @@
       const st = S();
       const filter = st.ui.groupFilter || '';
 
-      const hist = D.groupHistory || { months: [], app: [], comm: [], online: [], infra: [] };
-      // 当前月点位实时联动：成员数量变化后，折线末点跟随 st.staff 在册数（过去 5 个月保持快照）
-      const currentMonthKey = D.meta.today.slice(0, 7);
-      const isCurrentMonth = hist.months.length > 0 && hist.months[hist.months.length - 1] === currentMonthKey;
-      const liveCount = {};
-      st.groups.forEach(function (g) {
-        liveCount[g.id] = st.staff.filter(function (p) { return p.group === g.id; }).length;
+      const trendCharts = filter
+        ? [{ id: 'groupLoadChart', gid: filter, single: true }]
+        : st.groups.map(function (g) { return { id: 'groupTrend-' + g.id, gid: g.id, single: false }; });
+      trendCharts.forEach(function (item) {
+        const inst = U().chart(item.id, groupTrendOption(item.gid, item.single));
+        if (inst) {
+          window.setTimeout(function () {
+            try { inst.resize(); } catch (e) { /* noop */ }
+          }, 80);
+        }
       });
-      const seriesData = function (gid) {
-        const base = (hist[gid] || []).slice();
-        if (isCurrentMonth && base.length) base[base.length - 1] = liveCount[gid];
-        return base;
-      };
-      const histValues = st.groups.reduce(function (list, g) { return list.concat(seriesData(g.id)); }, []);
-      const histMax = Math.max(3, Math.max.apply(null, histValues.concat([0])));
-      const seriesGroups = filter ? st.groups.filter(function (g) { return g.id === filter; }) : st.groups;
-      U().chart('groupLoadChart', {
-        tooltip: {
-          trigger: 'axis', backgroundColor: 'rgba(29,29,31,.92)',
-          borderWidth: 0, padding: [9, 12], textStyle: { color: '#fff', fontSize: 12 },
-          formatter: function (params) {
-            const list = Array.isArray(params) ? params : [params];
-            if (!list.length) return '';
-            return '<b>' + list[0].axisValue + '</b><br/>' + list.map(function (p) {
-              return p.marker + p.seriesName + '：' + p.value + ' 人';
-            }).join('<br/>');
-          }
-        },
-        legend: { show: true, right: 4, top: 0, itemWidth: 12, itemHeight: 8, itemGap: 14, textStyle: { color: '#6E6E73', fontSize: 10 } },
-        grid: { left: 8, right: 16, top: 34, bottom: 6, containLabel: true },
-        xAxis: {
-          type: 'category', boundaryGap: false, data: hist.months.map(function (m) { return Number(m.slice(5)) + ' 月'; }),
-          axisLine: { lineStyle: { color: 'rgba(29,29,31,.12)' } }, axisTick: { show: false },
-          axisLabel: { color: '#8A8A8E', fontSize: 10 }
-        },
-        yAxis: {
-          type: 'value', min: 0, max: histMax, interval: histMax > 6 ? 2 : 1,
-          axisLine: { show: false }, axisTick: { show: false },
-          axisLabel: { color: '#8A8A8E', fontSize: 10, formatter: '{value} 人' },
-          splitLine: { lineStyle: { color: 'rgba(29,29,31,.06)', type: 'dashed' } }
-        },
-        series: seriesGroups.map(function (g) {
-          return {
-            name: g.name, type: 'line', smooth: 0.35, symbol: 'circle', symbolSize: 6,
-            data: seriesData(g.id),
-            lineStyle: { width: 2, color: g.color },
-            itemStyle: { color: g.color, borderColor: '#fff', borderWidth: 1 },
-            emphasis: { focus: 'series' }
-          };
-        })
+
+      const back = document.getElementById('groupTrendBack');
+      if (back) back.addEventListener('click', function () {
+        st.ui.groupFilter = '';
+        ITO.refresh();
       });
 
       U().$$('.group-card').forEach(function (card) {
@@ -826,6 +895,12 @@
     }).join('');
   }
 
+  function dutyNoteHtml(w) {
+    const note = String((w && w.extra && w.extra.dutyNote) || '').trim();
+    return '<h4>值班备注</h4><p class="duty-note-text">' +
+      (note ? U().esc(note) : '<span class="muted">暂无值班备注</span>') + '</p>';
+  }
+
   function dutySheetSubtitle(w) {
     return '【值班】' + w.start.slice(0, 4) + ' 年第 ' + w.weekNo + ' 周（' + cnDate(w.start) + '-' + cnDate(w.end) + '）值班表';
   }
@@ -844,8 +919,8 @@
     const width = 4 + customHeaders.length;
     const aoa = [
       ['ITO 运维中心 值班表' + (template ? '（模板）' : '')].concat(new Array(width - 1).fill('')),
-      [template ? '请填写姓名与值班手机；外部人员代码留空' : dutySheetSubtitle(w)].concat(new Array(width - 1).fill('')),
-      ['岗位', '代码', '姓名', '值班手机'].concat(customHeaders)
+      [template ? '请填写姓名与值班手机；通讯技术助理岗位编号固定为 TX-JS' : dutySheetSubtitle(w)].concat(new Array(width - 1).fill('')),
+      ['岗位', '岗位编号', '姓名', '值班手机'].concat(customHeaders)
     ];
     roster.forEach(function (r, i) {
       aoa.push([r.post || '', r.code || '', r.name || '', r.phone || ''].concat(i === 0 ? customValues : customHeaders.map(function () { return ''; })));
@@ -870,7 +945,7 @@
   function previewDutyExport(w, roster) {
     const customHeaders = dutyCustomHeaders(false);
     const customValues = dutyCustomValues(w, false);
-    const rows = [['岗位', '代码', '姓名', '值班手机'].concat(customHeaders)].concat(roster.map(function (r, i) {
+    const rows = [['岗位', '岗位编号', '姓名', '值班手机'].concat(customHeaders)].concat(roster.map(function (r, i) {
       return [r.post || '', r.code || '', r.name || '', r.phone || ''].concat(i === 0 ? customValues : customHeaders.map(function () { return ''; }));
     }));
     U().exportPreview({
@@ -886,13 +961,16 @@
     const hi = aoa.findIndex(function (row) {
       return (row || []).some(function (cell) { return String(cell || '').trim() === '岗位'; });
     });
-    const header = hi >= 0 ? aoa[hi] : ['岗位', '代码', '姓名', '值班手机'];
-    const indexOf = function (label, fallback) {
-      const idx = header.findIndex(function (cell) { return String(cell || '').trim() === label; });
+    const header = hi >= 0 ? aoa[hi] : ['岗位', '岗位编号', '姓名', '值班手机'];
+    const indexOf = function (labels, fallback) {
+      const names = Array.isArray(labels) ? labels : [labels];
+      const idx = header.findIndex(function (cell) {
+        return names.indexOf(String(cell || '').trim()) > -1;
+      });
       return idx >= 0 ? idx : fallback;
     };
     const pi = indexOf('岗位', 0);
-    const ci = indexOf('代码', 1);
+    const ci = indexOf(['岗位编号', '代码'], 1);
     const ni = indexOf('姓名', 2);
     const mi = indexOf('值班手机', 3);
     return aoa.slice(hi + 1).filter(function (row) {
@@ -904,7 +982,7 @@
         code: String(row[ci] || '').trim(),
         name: String(row[ni] || '').trim(),
         phone: String(row[mi] || '').trim(),
-        external: post.indexOf('工程公司') > -1
+        external: post.indexOf('通讯技术助理') > -1
       };
     });
   }
@@ -933,16 +1011,16 @@
               '<option value="异常"' + (status === '异常' ? ' selected' : '') + '>异常</option>' +
             '</select></label>' +
           '</div>' +
-          '<div class="table-wrap"><table class="duty-sheet-table"><thead><tr><th>岗位</th><th>代码</th><th>姓名</th><th>值班手机</th></tr></thead>' +
+          '<div class="table-wrap"><table class="duty-sheet-table"><thead><tr><th>岗位</th><th>岗位编号</th><th>姓名</th><th>值班手机</th></tr></thead>' +
           '<tbody id="dutySheetBody">' + dutySheetRowsHtml(roster, canEdit) + '</tbody></table></div>' +
           '<div class="duty-import-preview" id="dutyImportPreview" hidden>' +
             '<div class="duty-import-head"><b>导入预览</b><span id="dutyImportCount"></span></div>' +
-            '<div class="table-wrap"><table class="duty-sheet-table"><thead><tr><th>岗位</th><th>代码</th><th>姓名</th><th>值班手机</th></tr></thead><tbody id="dutyImportBody"></tbody></table></div>' +
+            '<div class="table-wrap"><table class="duty-sheet-table"><thead><tr><th>岗位</th><th>岗位编号</th><th>姓名</th><th>值班手机</th></tr></thead><tbody id="dutyImportBody"></tbody></table></div>' +
             '<div class="duty-import-actions"><button class="btn btn-ghost btn-sm" data-import-cancel type="button">取消预览</button><button class="btn btn-primary btn-sm" data-import-apply type="button">确认导入</button></div>' +
           '</div>' +
           '<div class="duty-import-preview" id="dutyExportPreview" hidden>' +
             '<div class="duty-import-head"><b>导出预览</b><span>导出文件包含大标题与周次</span></div>' +
-            '<div class="table-wrap"><table class="duty-sheet-table"><thead><tr><th>岗位</th><th>代码</th><th>姓名</th><th>值班手机</th></tr></thead><tbody id="dutyExportBody"></tbody></table></div>' +
+            '<div class="table-wrap"><table class="duty-sheet-table"><thead><tr><th>岗位</th><th>岗位编号</th><th>姓名</th><th>值班手机</th></tr></thead><tbody id="dutyExportBody"></tbody></table></div>' +
             '<div class="duty-import-actions"><button class="btn btn-ghost btn-sm" data-export-cancel type="button">取消</button><button class="btn btn-primary btn-sm" data-export-download type="button">下载 XLSX</button></div>' +
           '</div>' +
         '</div>',
@@ -1233,22 +1311,15 @@
       U().modal({
         title: '编辑值班表',
         sub: '第 ' + w.weekNo + ' 周 · ' + w.start + ' 至 ' + w.end,
-        inset: true,
+        xwide: true,
         body:
-          '<div class="duty-sheet-tools">' +
-            '<label class="duty-sheet-status">状态<select id="dutyEditStatus">' +
-              '<option value="正常"' + (status === '正常' ? ' selected' : '') + '>正常</option>' +
-              '<option value="异常"' + (status === '异常' ? ' selected' : '') + '>异常</option>' +
-            '</select></label>' +
-          '</div>' +
-          (ITO.customFieldForm ? ITO.customFieldForm('duty', w) : '') +
-          '<div class="table-wrap"><table class="duty-sheet-table"><thead><tr><th>岗位</th><th>代码</th><th>姓名</th><th>值班手机</th></tr></thead>' +
-          '<tbody id="dutyEditBody">' + dutySheetRowsHtml(draft, true) + '</tbody></table></div>',
+          '<div class="table-wrap"><table class="duty-sheet-table"><thead><tr><th>岗位</th><th>岗位编号</th><th>姓名</th><th>值班手机</th></tr></thead>' +
+          '<tbody id="dutyEditBody">' + dutySheetRowsHtml(draft, true) + '</tbody></table></div>' +
+          (ITO.customFieldForm ? ITO.customFieldForm('duty', w, null, { hideHint: true }) : ''),
         foot: '<button class="btn btn-ghost" data-cancel type="button">取消</button>' +
           '<span class="spacer"></span><button class="btn btn-primary" data-save type="button">保存值班表</button>',
         onMount: function (closeEdit, root) {
           const body = root.querySelector('#dutyEditBody');
-          const statusSel = root.querySelector('#dutyEditStatus');
           root.querySelector('[data-cancel]').addEventListener('click', closeEdit);
           root.querySelector('[data-save]').addEventListener('click', function () {
             let invalid = false;
@@ -1274,15 +1345,11 @@
             const cf = ITO.readCustomFields ? ITO.readCustomFields(root, 'duty', w.extra) : { values: {}, errors: [] };
             if (cf.errors.length) { U().toast(cf.errors[0], 'warn'); return; }
             roster = next;
-            status = statusSel.value;
             changed = true;
             w.dutyRoster = roster;
-            w.dutyStatus = status;
             w.extra = cf.values;
-            const customDetail = document.getElementById('dutyCustomDetail');
-            if (customDetail) {
-              customDetail.innerHTML = '<h4>扩展信息</h4><div class="table-wrap"><table class="data-table"><tbody>' + ITO.customFieldRows('duty', w) + '</tbody></table></div>';
-            }
+            const noteDetail = document.getElementById('dutyNoteDetail');
+            if (noteDetail) noteDetail.innerHTML = dutyNoteHtml(w);
             ITO.log('保存值班表', '第 ' + w.weekNo + ' 周 · ' + roster.length + ' 行', '值班');
             if (detailBody) detailBody.innerHTML = dutySheetRowsHtml(roster, false);
             if (detailSub) detailSub.textContent = '第 ' + w.weekNo + ' 周 · ' + w.start + ' 至 ' + w.end + ' · ' + status;
@@ -1298,7 +1365,7 @@
         title: '导入预览',
         sub: '识别到 ' + parsed.length + ' 行 · 确认后进入编辑，再保存',
         wide: true,
-        body: '<div class="table-wrap"><table class="duty-sheet-table"><thead><tr><th>岗位</th><th>代码</th><th>姓名</th><th>值班手机</th></tr></thead>' +
+        body: '<div class="table-wrap"><table class="duty-sheet-table"><thead><tr><th>岗位</th><th>岗位编号</th><th>姓名</th><th>值班手机</th></tr></thead>' +
           '<tbody>' + dutySheetRowsHtml(parsed, false) + '</tbody></table></div>' +
           '<p class="table-note" style="margin-top:10px">确认导入后将打开编辑层，可继续修改并保存。</p>',
         foot: '<button class="btn btn-ghost" data-cancel type="button">取消</button>' +
@@ -1326,11 +1393,9 @@
             '<button class="btn btn-ghost btn-sm" id="dutySheetExport" type="button">导出</button>' +
             (canEdit ? '<button class="btn btn-primary btn-sm" id="dutySheetEdit" type="button">编辑</button>' : '') +
           '</div>' +
-          '<div class="table-wrap"><table class="duty-sheet-table"><thead><tr><th>岗位</th><th>代码</th><th>姓名</th><th>值班手机</th></tr></thead>' +
+          '<div class="table-wrap"><table class="duty-sheet-table"><thead><tr><th>岗位</th><th>岗位编号</th><th>姓名</th><th>值班手机</th></tr></thead>' +
           '<tbody id="dutyDetailBody">' + dutySheetRowsHtml(roster, false) + '</tbody></table></div>' +
-          (ITO.fieldDefsFor && ITO.fieldDefsFor('duty').length
-            ? '<div class="detail-section" id="dutyCustomDetail"><h4>扩展信息</h4><div class="table-wrap"><table class="data-table"><tbody>' + ITO.customFieldRows('duty', w) + '</tbody></table></div></div>'
-            : '') +
+          '<div class="detail-section" id="dutyNoteDetail">' + dutyNoteHtml(w) + '</div>' +
         '</div>',
       foot: '<button class="btn btn-ghost" data-close type="button">关闭</button>',
       onClose: function () { if (changed) ITO.refresh(); },
@@ -1464,10 +1529,6 @@
     return canEditDuty(week);
   }
 
-  function dutyCallsOf(week) {
-    return ((S().duty && S().duty.calls) || []).filter(function (c) { return c.weekKey === week.key; });
-  }
-
   function dutyRoleCell(week, key) {
     const row = (week.dutyRoster || []).find(function (r) { return r.post === '通信值班-' + key; });
     if (!row) return '<td class="duty-role-cell"><span class="muted">—</span></td>';
@@ -1477,27 +1538,6 @@
       '<b>' + U().esc(row.name) + '</b>' +
       '<small>' + U().esc(group ? group.name : '通信组') + '</small>' +
     '</td>';
-  }
-
-  function openDutyCalls(weekKey) {
-    const w = weekByKey(weekKey);
-    if (!w) return;
-    const calls = dutyCallsOf(w).slice().sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
-    const rows = calls.map(function (c) {
-      return '<tr><td class="mono">' + U().esc(c.date) + '</td><td>' + U().esc(c.person) + '</td>' +
-        '<td>' + U().esc(c.role) + '</td><td>' + U().esc(c.reason) + '</td><td class="num">8 h</td></tr>';
-    }).join('');
-    U().detailModal({
-      title: '值班出勤记录',
-      sub: '第 ' + w.weekNo + ' 周 · ' + w.start + ' 至 ' + w.end + ' · ' + (calls.length ? calls.length + ' 天 / ' + (calls.length * 8) + 'h' : '暂无出勤'),
-      body: calls.length
-        ? '<div class="table-wrap"><table class="data-table duty-call-table"><thead><tr><th>日期</th><th>人员</th><th>岗位</th><th>事由</th><th>工时</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-        : U().emptyState('本周暂无出勤', '待命不计工时，出勤才按天计入', 'clock'),
-      foot: '<button class="btn btn-ghost" data-close type="button">关闭</button>',
-      onMount: function (close, root) {
-        root.querySelector('[data-close]').addEventListener('click', close);
-      }
-    });
   }
 
   P.duty = {
@@ -1512,7 +1552,6 @@
         const row = (current.dutyRoster || []).find(function (r) { return r.post === '通信值班-' + key; });
         return row ? row.name : '—';
       });
-      const currentCalls = dutyCallsOf(current).length;
       const commManager = (st.groups.find(function (g) { return g.id === 'comm'; }) || {}).manager;
       const assistant = memberOf(commManager) || {};
 
@@ -1520,15 +1559,10 @@
         const status = w.dutyStatus || '正常';
         const isCurrent = w.key === st.duty.currentKey;
         const isPast = w.key < st.duty.currentKey;
-        const calls = dutyCallsOf(w);
-        const callCell = calls.length
-          ? '<button class="duty-call-btn" data-calls="' + w.key + '" type="button"><b>' + calls.length + '</b> 天 · ' + (calls.length * 8) + 'h</button>'
-          : '<span class="muted">—</span>';
         return '<tr data-duty-week="' + w.key + '" class="duty-week-row' + (isCurrent ? ' is-current' : '') + (isPast ? ' is-past' : '') + '" style="cursor:pointer">' +
           '<td class="duty-week-no"><b>第 ' + w.weekNo + ' 周</b>' + (isCurrent ? '<small class="table-note" style="display:block">本周</small>' : '') + '</td>' +
           '<td class="duty-week-range">' + w.start.slice(5).replace('-', '/') + ' – ' + w.end.slice(5).replace('-', '/') + '</td>' +
           dutyRoleCell(w, '应急') + dutyRoleCell(w, '线路') + dutyRoleCell(w, '网络') + dutyRoleCell(w, '桌面') +
-          '<td class="duty-call-cell">' + callCell + '</td>' +
           '<td>' + U().badge(status, status === '正常' ? 'green' : 'red') + '</td>' +
         '</tr>';
       }).join('');
@@ -1542,12 +1576,12 @@
         { icon: 'calendar', value: '第 ' + current.weekNo + ' 周', label: '本周周期 · ' + weekRange(current) },
         { icon: 'users', value: U().esc(assistant.name || commManager || '—'), label: '通信助理 · ' + U().esc(assistant.phone || '—') + ' · 7×24 联系' },
         { icon: 'task', value: '4 人', label: currentRoles.join(' / '), tone: 'blue' },
-        { icon: 'clock', value: currentCalls + ' 天', label: (currentCalls * 8) + ' h · 本周出勤', tone: 'green' }
+        { icon: 'shield', value: U().esc(current.dutyStatus || '正常'), label: '本周值班状态 · 通信组', tone: 'green' }
       ]) +
       '<section class="card table-card">' +
-        '<div class="table-head"><div><h3>周值班表</h3><p class="table-note">通信组 4 个角色按周轮换 · 通信助理固定为联系人 · 待命不计工时，出勤按天 8h</p></div>' +
+        '<div class="table-head"><div><h3>周值班表</h3><p class="table-note">通信组 4 个角色按周轮换 · 通信助理固定为联系人 · 点击行查看值班表</p></div>' +
           '<span class="table-note">' + weeks.length + ' 周</span></div>' +
-        '<div class="table-wrap"><table class="data-table duty-week-table"><thead><tr><th>周次</th><th>日期范围</th><th>应急</th><th>线路</th><th>网络</th><th>桌面</th><th>出勤</th><th>状态</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+        '<div class="table-wrap"><table class="data-table duty-week-table duty-roster-table"><thead><tr><th>周次</th><th>日期范围</th><th>应急</th><th>线路</th><th>网络</th><th>桌面</th><th>状态</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '</section>' +
       '<div class="duty-notes two-col">' +
         '<div class="card duty-note"><b>值班表</b><span>点击周次打开 Excel 式值班表，可查看通信助理、应急、线路、网络、桌面与技术助理；有编辑权限时可调整人员并保存。</span></div>' +
@@ -1565,8 +1599,6 @@
             const p = memberOf(personCell.dataset.dutyPerson);
             if (p) { GROUP.profile(p.uid); return; }
           }
-          const callBtn = e.target.closest('[data-calls]');
-          if (callBtn) { openDutyCalls(callBtn.dataset.calls); return; }
           openDutySheet(tr.dataset.dutyWeek);
         });
       });

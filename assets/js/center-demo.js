@@ -316,16 +316,18 @@
   function render() {
     const st = state();
     const todayData = D.dashboard.today;
+    const asofCutoff = !!D.meta.asofOverride;
+    const asofDay = shortMd(D.meta.today);
 
     /* 04 today */
-    const top = panel(4, '今日态势', 'TODAY OPS',
+    const top = panel(4, asofCutoff ? asofDay + ' 态势' : '今日态势', 'TODAY OPS',
       '<div class="today-strip">' +
-        '<div class="today-kpi" data-drill="tasks" tabindex="0" role="link"><span>今日新增</span><b>' + todayData.created + '<em>件</em></b><small>今日累计</small></div>' +
-        '<div class="today-kpi" data-drill="tasks" data-query="status=已完成" tabindex="0" role="link"><span>今日闭环</span><b class="good">' + todayData.closed + '<em>件</em></b><small>占新增 ' + Math.round(todayData.closed / todayData.created * 100) + '%</small></div>' +
+        '<div class="today-kpi" data-drill="tasks" tabindex="0" role="link"><span>' + (asofCutoff ? '当日新增' : '今日新增') + '</span><b>' + todayData.created + '<em>件</em></b><small>' + (asofCutoff ? '数据日累计' : '今日累计') + '</small></div>' +
+        '<div class="today-kpi" data-drill="tasks" data-query="status=已完成" tabindex="0" role="link"><span>' + (asofCutoff ? '当日闭环' : '今日闭环') + '</span><b class="good">' + todayData.closed + '<em>件</em></b><small>占新增 ' + Math.round(todayData.closed / todayData.created * 100) + '%</small></div>' +
         '<div class="today-kpi" data-drill="tasks" tabindex="0" role="link"><span>净流入</span><b class="warn">+' + todayData.net + '<em>件</em></b><small>新增 − 闭环</small></div>' +
         '<div class="today-kpi" data-drill="dispatch" tabindex="0" role="link"><span>高风险作业</span><b class="crit">' + todayData.highRisk + '<em>项</em></b><small>重点跟踪</small></div>' +
       '</div>',
-      '<span class="head-tag">TODAY</span>'
+      '<span class="head-tag">' + (asofCutoff ? 'AS OF ' + asofDay : 'TODAY') + '</span>'
     );
 
     /* 05 flow sandbox */
@@ -456,7 +458,7 @@
       panel(8, '值班与授权', 'DUTY & AUTH',
         '<div class="duty-board">' +
           '<div class="duty-head" data-drill="duty" data-query="' + dq + '" tabindex="0" role="link">' +
-            '<b>本周值班</b><span>' + shortMd(dutyNow.start) + '–' + shortMd(dutyNow.end) + '</span>' +
+            '<b>' + (asofCutoff ? '值班周' : '本周值班') + '</b><span>' + shortMd(dutyNow.start) + '–' + shortMd(dutyNow.end) + '</span>' +
             '<em>下周 4 人 · ' + shortMd(dutyNext.start) + '</em>' +
           '</div>' +
           '<div class="duty-roles" data-drill="duty" data-query="' + dq + '" tabindex="0" role="link">' + dutyRoles + '</div>' +

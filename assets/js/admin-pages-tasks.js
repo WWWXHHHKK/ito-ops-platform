@@ -14,27 +14,14 @@
   const TASK_OTHER_TYPES = ['操作', '试验', '工单', '综合', '故障'];
   const LEVELS = ['紧急', '重要', '一般'];
   const TERMINAL = ['已完成', '已取消'];
+  let ledgerPackageIndex = {};
 
   function S() { return ITO.state; }
   function U() { return ITO.ui; }
   function taskTagNames() {
-    const names = (S().wallTags || [])
+    return (S().wallTags || [])
       .filter(function (tag) { return tag.type === '任务标签'; })
       .map(function (tag) { return tag.name; });
-    (D.systemGroups || []).forEach(function (group) {
-      (group.systems || []).forEach(function (name) {
-        if (names.indexOf(name) === -1) names.push(name);
-      });
-    });
-    return names;
-  }
-
-  function systemAliasSet() {
-    const out = {};
-    Object.keys(D.systemAliases || {}).forEach(function (system) {
-      (D.systemAliases[system] || []).forEach(function (alias) { out[alias] = true; });
-    });
-    return out;
   }
 
   function matchesSystemTag(tag, system) {
@@ -64,6 +51,7 @@
   }
   function pd(str) { return new Date(String(str).replace(/-/g, '/').replace('T', ' ')); }
   function now() { return D.meta.demoNow; }
+  function actionNow() { return ITO.nowStamp(); }
 
   function hashQuery() {
     const raw = (location.hash.split('?')[1] || '');
@@ -174,27 +162,159 @@
     return list;
   }
 
-  function stats(list) {
-    let subs = 0, overdue = 0, approval = 0, hung = 0, drafts = 0, canceled = 0, completed = 0, late = 0;
-    list.forEach(function (t) {
-      if (t.draft) drafts += 1;
-      const ds = U().displayStatus(t);
-      if (ds === '已取消') canceled += 1;
-      if (ds === '已完成') completed += 1;
-      if (ds === '审批中') approval += 1;
-      if (ds === '已挂起') hung += 1;
-      if (!t.subs.length) {
-        if (taskOverdue(t)) overdue += 1;
-        if (taskLateClosed(t)) late += 1;
-      } else {
-        visibleSubs(t).forEach(function (s) {
-          subs += 1;
-          if (U().isOverdue(s)) overdue += 1;
-          if (U().isLateClosed(s)) late += 1;
-        });
-      }
+  function taskMonthKey(t) {
+    const m = String(t.id || '').match(/^TS-(\d{4})(\d{2})-/);
+    if (m) return m[1] + '-' + m[2];
+    return String(t.createdAt || '').slice(0, 7);
+  }
+
+  function monthLabelOf(key) {
+    const parts = String(key || '').split('-');
+    return parts.length === 2 ? parts[0] + ' 年 ' + Number(parts[1]) + ' 月' : key;
+  }
+
+  function packageLevel(subs) {
+    return LEVELS.find(function (level) {
+      return subs.some(function (sub) { return sub.level === level; });
+    }) || '一般';
+  }
+
+  function packageTags(subs) {
+    const out = [];
+    subs.forEach(function (sub) {
+      (sub.tags || []).forEach(function (tag) {
+        if (out.indexOf(tag) === -1) out.push(tag);
+      });
     });
-    return { main: list.length, subs: subs, overdue: overdue, late: late, allOverdue: overdue + late, approval: approval, hung: hung, drafts: drafts, canceled: canceled, completed: completed };
+    return out;
+  }
+
+  /* 台账大任务视图：未拆分记录按月份 + 专业组 + 类型归并，128 条历史主任务保持原样。 */
+  function ledgerMainTasks(list) {
+    const groups = {};
+    const packages = [];
+    (list || []).forEach(function (t) {
+      if ((t.subs || []).length) {
+        packages.push(t);
+        return;
+      }
+      const month = taskMonthKey(t);
+      const key = month + '|' + t.group + '|' + t.type;
+      if (!groups[key]) groups[key] = { month: month, group: t.group, type: t.type, subs: [] };
+      groups[key].subs.push(t);
+    });
+
+    Object.keys(groups).forEach(function (key) {
+      const g = groups[key];
+      const group = ITO.getGroup(g.group) || {};
+      const subs = g.subs.slice().sort(function (a, b) {
+        return String(b.due || '').localeCompare(String(a.due || ''));
+      });
+      const created = subs.reduce(function (min, sub) {
+        const value = String(sub.createdAt || '');
+        return !min || (value && value < min) ? value : min;
+      }, '');
+      const updated = subs.reduce(function (max, sub) {
+        const value = String(sub.updatedAt || '');
+        return value > max ? value : max;
+      }, '');
+      const due = subs.reduce(function (max, sub) {
+        const value = String(sub.due || '');
+        return value > max ? value : max;
+      }, '');
+      const groupManagers = (D.groups || []).map(function (item) { return item.manager; }).filter(Boolean);
+      const groupLeaders = (D.groups || []).map(function (item) { return item.leader; }).filter(Boolean);
+      const leaderName = D.roleInfo && D.roleInfo.leader ? D.roleInfo.leader.name : '';
+      const allowedInitiators = [leaderName].concat(groupManagers, groupLeaders).filter(function (name, idx, list) {
+        return name && list.indexOf(name) === idx;
+      });
+      const uniqueInitiators = [];
+      subs.forEach(function (sub) {
+        const name = sub.initiator;
+        if (name && allowedInitiators.indexOf(name) > -1 && uniqueInitiators.indexOf(name) === -1) uniqueInitiators.push(name);
+      });
+      const fallbackOwner = uniqueInitiators.find(function (name) {
+        return groupManagers.indexOf(name) > -1 || groupLeaders.indexOf(name) > -1;
+      }) || (D.roleInfo && D.roleInfo.manager ? D.roleInfo.manager.name : '');
+      const pkg = {
+        id: 'PKG-' + g.month.replace('-', '') + '-' + g.group + '-' + g.type,
+        name: monthLabelOf(g.month) + ' ' + (group.name || g.group) + g.type + '任务',
+        group: g.group,
+        type: g.type,
+        owner: group.manager || group.leader || fallbackOwner,
+        initiator: uniqueInitiators.length === 1
+          ? uniqueInitiators[0]
+          : (group.manager || group.leader || uniqueInitiators[0] || leaderName || (D.roleInfo && D.roleInfo.manager ? D.roleInfo.manager.name : '')),
+        level: packageLevel(subs),
+        due: due,
+        tags: packageTags(subs),
+        mode: 'split',
+        status: '执行中',
+        desc: '按月份、专业组和任务类型归并的任务包，共 ' + subs.length + ' 条子任务。',
+        subs: subs,
+        virtual: true,
+        draft: false,
+        canceled: null,
+        summaryRework: false,
+        leaderApproval: null,
+        extra: {},
+        createdAt: created,
+        updatedAt: updated,
+        createdBy: '系统',
+        updatedBy: '系统',
+        audit: []
+      };
+      packages.push(pkg);
+    });
+
+    const recentId = (S().ui || {}).recentTaskId || '';
+    const refTime = Date.parse(String(D.meta.demoNow || '').replace(/-/g, '/').replace('T', ' '));
+    function ledgerSortTime(task) {
+      const value = Date.parse(String(task.createdAt || '').replace(/-/g, '/').replace('T', ' '));
+      if (isNaN(value)) return 0;
+      return isNaN(refTime) ? value : Math.min(value, refTime);
+    }
+    packages.sort(function (a, b) {
+      if (recentId) {
+        if (a.id === recentId) return -1;
+        if (b.id === recentId) return 1;
+      }
+      return (ledgerSortTime(b) - ledgerSortTime(a)) ||
+        String(b.id).localeCompare(String(a.id));
+    });
+    ledgerPackageIndex = {};
+    packages.forEach(function (pkg) { ledgerPackageIndex[pkg.id] = pkg; });
+    return packages;
+  }
+
+  function ledgerStats(packages, rawList) {
+    let subs = 0, overdue = 0, approval = 0, hung = 0, drafts = 0, canceled = 0, completed = 0, late = 0;
+    (rawList || []).forEach(function (t) {
+      const rows = (t.subs || []).length ? visibleSubs(t) : [t];
+      rows.forEach(function (s) {
+        subs += 1;
+        if (s.draft) drafts += 1;
+        const status = s.status || '待分发';
+        if (status === '已取消') canceled += 1;
+        if (status === '已完成') completed += 1;
+        if (status === '审批中') approval += 1;
+        if (status === '已挂起') hung += 1;
+        if (U().isOverdue(s)) overdue += 1;
+        if (U().isLateClosed(s)) late += 1;
+      });
+    });
+    return {
+      main: packages.length,
+      subs: subs,
+      overdue: overdue,
+      late: late,
+      allOverdue: overdue + late,
+      approval: approval,
+      hung: hung,
+      drafts: drafts,
+      canceled: canceled,
+      completed: completed
+    };
   }
 
   function formatMins(mins) {
@@ -238,6 +358,7 @@
   }
 
   function sourceOf(t) {
+    if (t.virtual) return 'system';
     if (t.source) return t.source;
     if (t.initiator === D.roleInfo.leader.name) return 'leader';
     if (t.initiator === '系统') return 'system';
@@ -246,11 +367,12 @@
 
   function sourceLabel(t) {
     const source = sourceOf(t);
-    return source === 'leader' ? '领导下发' : source === 'system' ? '系统生成' : '主管自建';
+    if (source === 'system') return t.virtual ? '系统归并' : '系统生成';
+    return source === 'leader' ? '领导下发' : '主管自建';
   }
 
   function modeLabel(t) {
-    if (t.mode === 'single') return '未拆分';
+    if (!(t.subs || []).length) return '未拆分';
     return t.subs.length + ' 个任务';
   }
 
@@ -346,7 +468,8 @@
   function isOwnerOrInitiator(task) {
     const st = S();
     if (!st.user) return false;
-    return ITO.roleIs('manager');
+    if (ITO.roleIs('manager')) return true;
+    return task.owner === st.user.name || task.initiator === st.user.name;
   }
 
   function subDeliverableAction(task, sub) {
@@ -357,6 +480,9 @@
 
   function subActions(task, sub) {
     const st = S();
+    if (task.virtual) {
+      return '<button class="btn btn-ghost btn-sm" data-act="detail" data-task="' + sub.id + '" type="button">详情</button>';
+    }
     if (task.draft || task.canceled) return '<span class="muted">—</span>';
     let out = '';
     const editable = sub.status !== '已完成';
@@ -386,6 +512,9 @@
   }
 
   function rowActions(task) {
+    if (task.virtual) {
+      return '<button class="btn btn-ghost btn-sm" type="button" data-act="expand" data-id="' + task.id + '">查看子任务</button>';
+    }
     return editAction(task) + deliverableAction(task);
   }
 
@@ -469,17 +598,28 @@
     return list.map(function (t) {
       const subs = visibleSubs(t);
       const status = U().displayStatus(t);
+      const isNew = !!st.ui && st.ui.recentTaskId === t.id;
       const expanded = !!st.expanded[t.id];
       const caret = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
-      const expandable = t.mode !== 'single';
+      const expandable = subs.length > 0;
+      const virtual = !!t.virtual;
+      const shownSubs = virtual ? subs.slice(0, 8) : subs;
+      const moreSubs = virtual && subs.length > shownSubs.length
+        ? '<div class="sub-more"><button class="link-btn" data-act="view-all-subs" data-id="' + t.id + '" type="button">查看全部 ' + subs.length + ' 条</button></div>'
+        : '';
 
       const mainRow =
-        '<tr class="task-main-row" data-id="' + t.id + '">' +
+        '<tr class="task-main-row' + (isNew ? ' is-new' : '') + '" data-id="' + t.id + '"' + (virtual ? ' data-virtual="1"' : '') + '>' +
           '<td><div class="task-name">' +
             (expandable
               ? '<button class="expand-btn' + (expanded ? ' open' : '') + '" data-act="expand" data-id="' + t.id + '" type="button" aria-label="' + (expanded ? '收起任务' : '展开任务') + '" aria-expanded="' + (expanded ? 'true' : 'false') + '">' + caret + '</button>'
               : '') +
-            '<button class="task-name-text" data-act="detail" data-task="' + t.id + '" type="button"><b>' + U().esc(t.name) + '</b><small>' + t.id + ' · ' + modeLabel(t) + ' · ' + U().esc(t.type) + '</small></button></div></td>' +
+            '<button class="task-name-text" ' + (virtual ? 'data-act="expand" data-id="' + t.id + '"' : 'data-act="detail" data-task="' + t.id + '"') + ' type="button"><b>' + U().esc(t.name) + '</b><small>' + t.id + ' · ' + modeLabel(t) + ' · ' + U().esc(t.type) + '</small></button>' +
+            (isNew ? '<span class="task-new-chip">新</span>' : '') + '</div>' +
+            (expandable
+              ? '<button class="task-hover-hint" type="button" data-act="expand" data-id="' + t.id + '" aria-label="展开 ' + subs.length + ' 条子任务">' + subs.length + ' 条子任务 · 查看</button>'
+              : '') +
+          '</td>' +
           '<td>' + U().groupPill(t.group) + '</td>' +
           '<td style="white-space:nowrap">' + U().roleChip(t.initiator, 'initiator') + '</td>' +
           '<td style="white-space:nowrap">' + U().roleChip(t.owner, 'owner') + '</td>' +
@@ -494,16 +634,19 @@
 
       const subRow = expandable
         ? '<tr class="task-subrow" data-sub="' + t.id + '"' + (expanded ? '' : ' hidden') + '><td colspan="' + cols + '"><div class="sub-list">' +
-            subs.map(function (s) {
-              return '<div class="sub-item' + (U().isOverdue(s) ? ' is-over' : '') + '" data-sub-detail="' + t.id + '|' + s.id + '" tabindex="0" role="button" aria-label="查看执行任务 ' + U().esc(s.name) + '">' +
-                '<span class="sid">' + s.id + '</span>' +
-                '<span class="sname" title="' + U().esc(s.name) + '">' + U().esc(s.name) + '</span>' +
-                '<span class="sowner">' + U().roleChip(s.owner, 'executor') + '</span>' +
-                '<span>' + U().badge(s.status) + '</span>' +
-                '<span class="sdue' + (U().isOverdue(s) ? ' over' : '') + '">' + U().shortDate(s.due) + '</span>' +
-                '<span class="row-actions">' + subActions(t, s) + '</span>' +
-              '</div>';
+            '<table class="ledger-subtable"><thead><tr><th>任务编号</th><th>任务</th><th>执行人</th><th>状态</th><th>截止时间</th><th>操作</th></tr></thead><tbody>' +
+            shownSubs.map(function (s) {
+              const subDetail = virtual ? s.id : t.id + '|' + s.id;
+              return '<tr class="sub-item' + (U().isOverdue(s) ? ' is-over' : '') + '" data-sub-detail="' + subDetail + '" tabindex="0" role="button" aria-label="查看执行任务 ' + U().esc(s.name) + '">' +
+                '<td class="mono">' + U().esc(s.id) + '</td>' +
+                '<td><div class="cell-task"><b>' + U().esc(s.name) + '</b><small>' + U().esc(s.type || '') + '</small></div></td>' +
+                '<td>' + U().roleChip(s.owner, 'executor') + '</td>' +
+                '<td>' + U().badge(s.status) + '</td>' +
+                '<td class="num' + (U().isOverdue(s) ? ' over' : '') + '">' + U().shortDate(s.due) + '</td>' +
+                '<td><div class="row-actions">' + subActions(t, s) + '</div></td>' +
+              '</tr>';
             }).join('') +
+            '</tbody></table>' + moreSubs +
           '</div></td></tr>'
         : '';
 
@@ -511,19 +654,19 @@
     }).join('');
   }
 
-  function statsChipsHtml(list) {
-    const s = stats(list);
+  function statsChipsHtml(packages, rawList) {
+    const s = ledgerStats(packages, rawList);
     const parts = [
       '<span class="stat-chip">主任务 <b>' + s.main + '</b></span>',
-      '<span class="stat-chip">子任务 <b>' + s.subs + '</b></span>',
-      '<span class="stat-chip">审批中 <b>' + s.approval + '</b></span>',
-      '<span class="stat-chip' + (s.hung ? ' warn' : '') + '">已挂起 <b>' + s.hung + '</b></span>',
-      '<span class="stat-chip' + (s.allOverdue ? ' warn' : '') + '" title="含未完成超期与已完成但晚于截止的任务">超期 <b>' + s.allOverdue + '</b></span>',
-      '<span class="stat-chip good">已完成 <b>' + s.completed + '</b></span>'
+      '<span class="stat-chip" title="主任务下挂的执行任务记录">子任务 <b>' + s.subs + '</b></span>',
+      '<span class="stat-chip">子任务审批中 <b>' + s.approval + '</b></span>',
+      '<span class="stat-chip' + (s.hung ? ' warn' : '') + '">子任务已挂起 <b>' + s.hung + '</b></span>',
+      '<span class="stat-chip' + (s.allOverdue ? ' warn' : '') + '" title="含未完成超期与已完成但晚于截止的子任务">子任务超期 <b>' + s.allOverdue + '</b></span>',
+      '<span class="stat-chip good">子任务已完成 <b>' + s.completed + '</b></span>'
     ];
-    parts.push('<span class="stat-chip">草稿 <b>' + s.drafts + '</b></span>');
-    parts.push('<span class="stat-chip">已取消 <b>' + s.canceled + '</b></span>');
-    parts.push('<span class="stat-chip hint">' + (S().role === 'employee' ? '仅显示与我相关的任务' : '按当前筛选统计') + '</span>');
+    parts.push('<span class="stat-chip">子任务草稿 <b>' + s.drafts + '</b></span>');
+    parts.push('<span class="stat-chip">子任务已取消 <b>' + s.canceled + '</b></span>');
+    parts.push('<span class="stat-chip hint">' + (S().role === 'employee' ? '仅显示与我相关的任务' : '状态按子任务统计') + '</span>');
     return parts.join('');
   }
 
@@ -630,6 +773,8 @@
 
     const single = t.mode === 'single' ? t.subs[0] : null;
     const singleApproval = single && single.approval ? single.approval : null;
+    const mainFieldRows = ITO.customFieldRows ? ITO.customFieldRows('task', t) : '';
+    const focusFieldRows = focus && ITO.customFieldRows ? ITO.customFieldRows('task', focus, 'sub') : '';
 
     const approvalBox = t.source === 'leader' && la
       ? '<div class="detail-section"><h4>领导审批</h4><div class="approval-card">' +
@@ -691,7 +836,7 @@
         '<div class="detail-field"><label>创建</label><div>' + U().esc((t.createdAt || '—') + ' · ' + (t.createdBy || '—')) + '</div></div>' +
         '<div class="detail-field"><label>最近更新</label><div>' + U().esc((t.updatedAt || '—') + ' · ' + (t.updatedBy || '—')) + '</div></div>' +
       '</div>' +
-      (ITO.fieldDefsFor && ITO.fieldDefsFor('task').length ? '<div class="detail-section"><h4>扩展字段</h4><div class="table-wrap"><table class="data-table"><tbody>' + ITO.customFieldRows('task', t) + '</tbody></table></div></div>' : '') +
+      (mainFieldRows ? '<div class="detail-section"><h4>扩展字段</h4><div class="table-wrap"><table class="data-table"><tbody>' + mainFieldRows + '</tbody></table></div></div>' : '') +
       (single ? '<div class="detail-section"><h4>执行信息</h4><div class="detail-grid">' +
         '<div class="detail-field"><label>执行人</label><div>' + U().esc(single.owner) + '</div></div>' +
         '<div class="detail-field"><label>预估工时</label><div>' + (single.hours || 0) + ' 小时</div></div>' +
@@ -703,9 +848,9 @@
       '</div></div>' : '') +
       (focus ? '<div class="detail-section"><h4>当前关注任务</h4><div class="focus-sub">' +
         '<b>' + focus.id + ' · ' + U().esc(focus.name) + '</b><span>' + U().esc(focus.owner) + ' · ' + U().esc(focus.status) + '</span></div></div>' : '') +
-      (focus && ITO.fieldDefsFor && ITO.fieldDefsFor('task', 'sub').length
+      (focusFieldRows
         ? '<div class="detail-section"><h4>执行任务扩展字段</h4><div class="table-wrap"><table class="data-table"><tbody>' +
-            ITO.customFieldRows('task', focus, 'sub') + '</tbody></table></div></div>'
+            focusFieldRows + '</tbody></table></div></div>'
         : '') +
       approvalBox +
       deliverableSection +
@@ -734,6 +879,10 @@
       }
       if (t.mode === 'single' && U().isTaskEditable(t) && t.subs[0] && ['待分发', '执行中'].indexOf(t.subs[0].status) > -1 && canManage(t)) {
         foot += '<button class="btn btn-soft" data-reassign type="button">改派执行人</button>';
+      }
+      if (t.mode === 'single' && single && single.status === '待分发' &&
+        (st.role === 'leader' || st.role === 'super' || t.owner === st.user.name)) {
+        foot += '<button class="btn btn-primary" data-act="dispatch" data-task="' + t.id + '" data-sub="' + single.id + '" type="button">派发</button>';
       }
       if (t.mode === 'single' && single && (single.owner === st.user.name || ITO.isSuper())) {
         if (single.status === '执行中') foot += '<button class="btn btn-primary" data-submit-single type="button">提交成果</button>';
@@ -828,24 +977,12 @@
     if (!shell) return;
     const current = selected.slice();
     const available = taskTagNames();
-    const aliases = systemAliasSet();
-    const used = {};
-    const groups = (D.systemGroups || []).map(function (group) {
-      const systems = (group.systems || []).filter(function (name) { return available.indexOf(name) > -1; });
-      systems.forEach(function (name) { used[name] = true; });
-      return { name: group.name, systems: systems };
-    }).filter(function (group) { return group.systems.length; });
-    const other = available.filter(function (tag) { return !used[tag] && !aliases[tag]; });
     const tagButton = function (tag) {
       return '<button class="tag-option' + (current.indexOf(tag) > -1 ? ' is-on' : '') + '" data-tag="' + U().esc(tag) + '" type="button">' + U().esc(tag) + '</button>';
     };
-    const groupHtml = function (name, tags) {
-      if (!tags.length) return '';
-      return '<div class="tag-group"><div class="tag-group-title">' + U().esc(name) + '</div><div class="tag-group-options">' +
-        tags.map(tagButton).join('') + '</div></div>';
-    };
-    const groupedHtml = groups.map(function (group) { return groupHtml(group.name, group.systems); }).join('') +
-      (other.length ? groupHtml('其他标签', other) : '');
+    const groupedHtml = available.length
+      ? '<div class="tag-group"><div class="tag-group-options">' + available.map(tagButton).join('') + '</div></div>'
+      : '';
     const mask = document.createElement('div');
     mask.className = 'tag-pop-mask';
     mask.innerHTML =
@@ -889,6 +1026,14 @@
     const group = st.groups.find(function (g) { return g.id === groupId; });
     const managerName = (group && group.manager) || '';
     const leaders = [D.roleInfo.leader.name];
+    const groupLeadNames = [];
+    st.groups.forEach(function (g) {
+      if (g.manager && groupLeadNames.indexOf(g.manager) === -1) groupLeadNames.push(g.manager);
+      if (g.leader && groupLeadNames.indexOf(g.leader) === -1) groupLeadNames.push(g.leader);
+    });
+    const allowedInitiatorNames = leaders.concat(groupLeadNames).filter(function (name, idx, list) {
+      return name && list.indexOf(name) === idx;
+    });
 
     let currentMode = editing ? (editing.mode || 'split') : 'single';
     const live = !!(editing && U().mainStatus(editing) !== '草稿');
@@ -920,9 +1065,15 @@
     const singleTicket = singleInit ? !!singleInit.ticket : false;
     const singleAuth = singleInit ? (singleInit.auth || '') : '';
 
-    const initiatorNames = leaders.slice();
-    if (editing && editing.initiator && initiatorNames.indexOf(editing.initiator) === -1) initiatorNames.push(editing.initiator);
-    if (st.user.name && initiatorNames.indexOf(st.user.name) === -1) initiatorNames.push(st.user.name);
+    const initiatorNames = allowedInitiatorNames.slice();
+    if (st.user.name && allowedInitiatorNames.indexOf(st.user.name) > -1 && initiatorNames.indexOf(st.user.name) === -1) {
+      initiatorNames.push(st.user.name);
+    }
+    const defaultInitiator = editing
+      ? (editing.initiator || '')
+      : (allowedInitiatorNames.indexOf(st.user.name) > -1 ? st.user.name : leaders[0]);
+    const leaderForm = st.role === 'leader';
+    const execStar = leaderForm ? '' : ' <em>*</em>';
     const initiatorOptions = '<option value="">请选择发起人</option>' +
       initiatorNames.map(function (name) {
         const isLeader = leaders.indexOf(name) > -1;
@@ -930,7 +1081,7 @@
         const groupRole = grp ? (grp.manager === name ? '主管' : '组长') : '自建';
         const meta = isLeader ? '领导层' : (grp ? grp.name + ' · ' + groupRole : '专业组');
         return '<option value="' + U().esc(name) + '"' +
-          (editing && editing.initiator === name ? ' selected' : '') +
+          (name === defaultInitiator ? ' selected' : '') +
           ' data-label="' + U().esc(name) + '" data-meta="' + U().esc(meta) + '" data-role="' + U().esc(isLeader ? '领导' : groupRole) + '">' + U().esc(name) + '</option>';
       }).join('');
 
@@ -954,7 +1105,7 @@
             '<select id="ntGroup"><option value="">请选择专业组</option>' + U().groupOptions(groupId) + '</select></div>' +
           '<div class="form-field"><label>负责人 <em>*</em></label>' +
             '<select id="ntOwner"><option value="">请选择负责人</option>' + U().leadOptions(groupId, editing ? editing.owner : '') + '</select></div>' +
-          '<div class="form-field"><label>发起人</label><select id="ntInitiator">' + initiatorOptions + '</select></div>' +
+          '<div class="form-field"><label>发起人</label><select id="ntInitiator" disabled>' + initiatorOptions + '</select></div>' +
           '<div class="form-field span-2"><label>任务标签</label><div class="tag-field" id="ntTags"></div></div>' +
           '<div class="form-field"><label>发布日期</label><div class="static-field">' + U().esc(D.meta.today) + '</div></div>' +
           '<div class="form-field full"><label>任务描述</label>' +
@@ -966,8 +1117,8 @@
           '<div class="form-grid cols-3">' +
             '<div class="form-field"><label>任务类型</label><select id="ntSingleType"><option value="">请选择类型</option>' + U().statusOptions(TASK_TYPES, singleType) + '</select></div>' +
             '<div class="form-field"><label>预估工时</label><input id="ntSingleHours" type="number" min="0.5" max="200" step="0.5" value="' + singleHours + '" placeholder="请输入工时"></div>' +
-            '<div class="form-field"><label>执行人 <em>*</em></label><select id="ntSingleOwner"><option value="">请选择执行人</option>' + U().peopleOptions(groupId, singleOwner, { auth: singleAuth, hours: singleHours }) + '</select></div>' +
-            '<div class="form-field"><label>截止时间 <em>*</em></label><input id="ntSingleDue" type="datetime-local" value="' + singleDue + '"></div>' +
+            '<div class="form-field"><label>执行人' + execStar + '</label><select id="ntSingleOwner"><option value="">请选择执行人</option>' + U().peopleOptions(groupId, singleOwner, { auth: singleAuth, hours: singleHours }) + '</select></div>' +
+            '<div class="form-field"><label>截止时间' + execStar + '</label><input id="ntSingleDue" type="datetime-local" value="' + singleDue + '"></div>' +
             '<div class="form-field"><label>开票</label><label class="ticket-check-line"><input id="ntSingleTicket" type="checkbox"' + (singleTicket ? ' checked' : '') + '><span>需要开票</span></label></div>' +
             '<div class="form-field"><label>授权</label><select id="ntSingleAuth"><option value="">请选择授权</option>' + U().statusOptions(AUTH_TYPES, singleAuth) + '</select></div>' +
           '</div>' +
@@ -1028,6 +1179,7 @@
         const singleDue = root.querySelector('#ntSingleDue');
         const singleTicket = root.querySelector('#ntSingleTicket');
         const singleAuth = root.querySelector('#ntSingleAuth');
+        const publishLabelBtn = root.querySelector('[data-publish]');
         const overhaulTop = root.querySelector('#ntOverhaulTop');
         const singleOverhaul = root.querySelector('#ntSingleOverhaul');
         const splitOverhaul = root.querySelector('#ntSplitOverhaul');
@@ -1149,6 +1301,7 @@
           hints();
           paintSingleOverhaul();
           paintSplitOverhaul();
+          updatePublishLabel();
         }
 
         function authForRow(i, tr) {
@@ -1418,13 +1571,73 @@
           };
         }
 
+        function updatePublishLabel() {
+          if (!publishLabelBtn || st.role !== 'leader') return;
+          const splitReady = Array.prototype.every.call(tbody.querySelectorAll('tr[data-row]'), function (tr) {
+            return tr.querySelector('[data-f="owner"]').value && tr.querySelector('[data-f="due"]').value;
+          }) && tbody.querySelectorAll('tr[data-row]').length > 0;
+          const ready = currentMode === 'single' ? !!(singleOwner.value && singleDue.value) : splitReady;
+          const prefix = editing ? '确认' : '创建';
+          publishLabelBtn.textContent = ready ? prefix + '并派发' : prefix + '并下发给负责人';
+        }
+
+        root.addEventListener('input', updatePublishLabel);
+        root.addEventListener('change', updatePublishLabel);
+        updatePublishLabel();
+
+        function showCreatedTask(record) {
+          const firstSub = record.subs && record.subs[0] ? record.subs[0] : {};
+          const direct = firstSub.status === '执行中';
+          const statusText = direct
+            ? '执行中 · 已派发给 ' + (record.subs.length > 1 ? record.subs.length + ' 个执行人' : (firstSub.owner || record.owner))
+            : '待分发 · 等待负责人派发';
+          const body = '<div class="detail-grid">' +
+            '<div class="detail-field"><label>任务编号</label><div class="mono">' + U().esc(record.id) + '</div></div>' +
+            '<div class="detail-field"><label>专业组</label><div>' + U().esc((ITO.getGroup(record.group) || {}).name || record.group) + '</div></div>' +
+            '<div class="detail-field"><label>任务名称</label><div>' + U().esc(record.name) + '</div></div>' +
+            '<div class="detail-field"><label>负责人</label><div>' + U().esc(record.owner) + '</div></div>' +
+            '<div class="detail-field"><label>发起人</label><div>' + U().esc(record.initiator) + '</div></div>' +
+            '<div class="detail-field"><label>状态</label><div>' + U().esc(statusText) + '</div></div>' +
+            '<div class="detail-field"><label>截止时间</label><div>' + U().esc(record.due || '待负责人派发时确认') + '</div></div>' +
+          '</div>';
+          U().modal({
+            title: direct ? '任务已创建并派发' : '任务已创建',
+            sub: record.id + ' · ' + ((ITO.getGroup(record.group) || {}).name || record.group),
+            wide: true,
+            body: body,
+            foot: '<button class="btn btn-ghost" data-created-close type="button">关闭</button>' +
+              '<span class="spacer"></span>' +
+              '<button class="btn btn-soft" data-created-list type="button">前往任务台账</button>' +
+              '<button class="btn btn-primary" data-created-view type="button">查看任务</button>',
+            onMount: function (closeCreated, root) {
+              root.querySelector('[data-created-close]').addEventListener('click', closeCreated);
+              root.querySelector('[data-created-view]').addEventListener('click', function () {
+                closeCreated();
+                ACT.detail(record.id);
+              });
+              root.querySelector('[data-created-list]').addEventListener('click', function () {
+                closeCreated();
+                st.taskFilters.q = '';
+                st.taskFilters.group = '';
+                st.taskFilters.level = '';
+                st.taskFilters.status = '';
+                st.taskFilters.type = '';
+                st.taskFilters.age = '';
+                st.ui.recentTaskId = record.id;
+                ITO.go('tasks');
+              });
+            }
+          });
+        }
+
         function save(isDraft, isLive) {
           syncRows();
           const name = nameInput.value.trim();
           const owner = ownerSel.value;
-          const initiator = initSel.value || st.user.name;
+          const initiator = initSel.value || (allowedInitiatorNames.indexOf(st.user.name) > -1 ? st.user.name : leaders[0]);
           const source = leaders.indexOf(initiator) > -1 ? 'leader' : 'self';
           const beforeStatus = editing ? U().mainStatus(editing) : '草稿';
+          const leaderCreator = st.role === 'leader';
           const single = readSingle();
 
           if (!isLive) {
@@ -1442,46 +1655,50 @@
           let kept = rows.slice();
           if (currentMode === 'single') {
             if (!isDraft && !isLive) {
-              const validSingle = U().validateRequired([
-                [levelSel, '请选择任务等级'],
-                [singleType, '请选择任务类型'],
-                [singleHours, '请输入预估工时'],
-                [singleOwner, '请选择执行人'],
-                [singleDue, '请选择截止时间']
-              ]);
               if (single.ticket && !single.auth) {
                 U().showFieldError(singleAuth, '请选择授权');
                 return;
               }
-              if (!validSingle) return;
+              if (!leaderCreator) {
+                const validSingle = U().validateRequired([
+                  [levelSel, '请选择任务等级'],
+                  [singleType, '请选择任务类型'],
+                  [singleHours, '请输入预估工时'],
+                  [singleOwner, '请选择执行人'],
+                  [singleDue, '请选择截止时间']
+                ]);
+                if (!validSingle) return;
+              }
             }
           } else if (isDraft) {
             kept = kept.filter(function (row) { return row.name || row.tags.length || row.ticket; });
           } else {
             if (!kept.length) { U().toast('请至少拆分一个任务', 'warn'); return; }
-            if (subErrors) { subErrors.hidden = true; subErrors.innerHTML = ''; }
-            tbody.querySelectorAll('.is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
-            tbody.querySelectorAll('.sel-wrap.is-invalid, .date-wrap.is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
-            for (let i = 0; i < kept.length; i += 1) {
-              const tr = tbody.querySelector('tr[data-row="' + i + '"]');
-              if (!tr) continue;
-              const checks = [
-                ['name', '请输入任务名称'],
-                ['type', '请选择类型'],
-                ['level', '请选择等级'],
-                ['hours', '请输入工时'],
-                ['owner', '请选择执行人'],
-                ['due', '请选择截止时间']
-              ];
-              checks.forEach(function (pair) {
-                const field = pair[0];
-                const control = tr.querySelector('[data-f="' + field + '"]');
-                const empty = field === 'hours' ? !kept[i].hours : !kept[i][field];
-                if (empty && control) markRowInvalid(control, '第 ' + (i + 1) + ' 行：' + pair[1]);
-              });
+            if (!leaderCreator) {
+              if (subErrors) { subErrors.hidden = true; subErrors.innerHTML = ''; }
+              tbody.querySelectorAll('.is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
+              tbody.querySelectorAll('.sel-wrap.is-invalid, .date-wrap.is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
+              for (let i = 0; i < kept.length; i += 1) {
+                const tr = tbody.querySelector('tr[data-row="' + i + '"]');
+                if (!tr) continue;
+                const checks = [
+                  ['name', '请输入任务名称'],
+                  ['type', '请选择类型'],
+                  ['level', '请选择等级'],
+                  ['hours', '请输入工时'],
+                  ['owner', '请选择执行人'],
+                  ['due', '请选择截止时间']
+                ];
+                checks.forEach(function (pair) {
+                  const field = pair[0];
+                  const control = tr.querySelector('[data-f="' + field + '"]');
+                  const empty = field === 'hours' ? !kept[i].hours : !kept[i][field];
+                  if (empty && control) markRowInvalid(control, '第 ' + (i + 1) + ' 行：' + pair[1]);
+                });
+              }
+              refreshRowErrors();
+              if (tbody.querySelector('.is-invalid')) return;
             }
-            refreshRowErrors();
-            if (tbody.querySelector('.is-invalid')) return;
           }
 
           const assignments = currentMode === 'single'
@@ -1489,12 +1706,16 @@
             : kept.map(function (row) {
                 return { name: row.owner, auth: row.ticket ? row.auth : '无需授权', hours: Number(row.hours) || 0, due: row.due };
               });
-          const risky = (!isDraft && !isLive && ITO.assigneeInfo) ? assignments.map(function (a) {
+          const assignmentsReady = currentMode === 'single'
+            ? !!(single.owner && single.due)
+            : kept.length > 0 && kept.every(function (row) { return row.owner && row.due; });
+          const canCheckAssignments = !isDraft && !isLive && (!leaderCreator || assignmentsReady);
+          const risky = (canCheckAssignments && ITO.assigneeInfo) ? assignments.map(function (a) {
             return { a: a, info: ITO.assigneeInfo(a.name, a.auth, a.hours, a.due) };
           }).filter(function (entry) {
             return entry.info.weekAfter > 100 || entry.info.monthAfter > 100 || !entry.info.authOk;
           }) : [];
-          const fits = (!isDraft && window.ITO.assignmentFit) ? assignments.map(function (a) {
+          const fits = (canCheckAssignments && window.ITO.assignmentFit) ? assignments.map(function (a) {
             return window.ITO.assignmentFit({
               name: a.name,
               group: currentGroup,
@@ -1514,6 +1735,9 @@
               return oldDue !== a.due;
             });
           }
+          const directDispatch = !isDraft && !isLive && (currentMode === 'single'
+            ? !!(single.owner && single.due)
+            : kept.length > 0 && kept.every(function (row) { return row.owner && row.due; }));
           let overhaulConfirmed = false;
 
           const proceed = function () {
@@ -1523,12 +1747,12 @@
           let subs;
           if (currentMode === 'single') {
             const existing = editing && editing.subs[0];
-            const subStatus = isLive ? existing.status : (isDraft ? '草稿' : '待分发');
+            const subStatus = isLive ? existing.status : (isDraft ? '草稿' : (directDispatch ? '执行中' : '待分发'));
             subs = [{
               id: existing ? existing.id : baseId + '-01',
-              name: name, group: currentGroup, owner: single.owner, initiator: initiator,
-              level: single.level, type: single.type, status: subStatus,
-              due: (single.due || '').replace('T', ' '), hours: single.hours, progress: isLive ? existing.progress : 0,
+              name: name, group: currentGroup, owner: single.owner || owner, initiator: initiator,
+              level: single.level || '一般', type: single.type || '操作', status: subStatus,
+              due: (single.due || '').replace('T', ' '), hours: single.hours || 0, progress: isLive ? existing.progress : 0,
               auth: single.ticket ? single.auth : '无需授权', ticket: single.ticket,
               tags: mainTags.slice(),
               approval: isLive ? existing.approval : null,
@@ -1538,11 +1762,11 @@
           } else {
             subs = kept.map(function (row, i) {
               const existing = isLive && editing ? editing.subs.find(function (s) { return s.id === row.id; }) : null;
-              const subStatus = isLive && existing ? existing.status : (isDraft ? '草稿' : '待分发');
+              const subStatus = isLive && existing ? existing.status : (isDraft ? '草稿' : (directDispatch ? '执行中' : '待分发'));
               return {
                 id: existing ? existing.id : baseId + '-' + String(i + 1).padStart(2, '0'),
-                name: row.name || '未命名任务', group: currentGroup, owner: row.owner, initiator: initiator,
-                level: row.level, type: row.type, status: subStatus,
+                name: row.name || (name + (kept.length > 1 ? ' · ' + (i + 1) : '')), group: currentGroup, owner: row.owner || owner, initiator: initiator,
+                level: row.level || '一般', type: row.type || '操作', status: subStatus,
                 due: (row.due || '').replace('T', ' '), hours: row.hours || 0,
                 progress: isLive && existing ? existing.progress : 0,
                 auth: row.ticket ? row.auth : '无需授权', ticket: !!row.ticket,
@@ -1558,7 +1782,7 @@
           const due = dues.length ? dues[dues.length - 1] : '';
           const levels = subs.map(function (s) { return s.level; });
           const level = levels.indexOf('紧急') > -1 ? '紧急' : levels.indexOf('重要') > -1 ? '重要' : (levels[0] || '一般');
-          const type = currentMode === 'single' ? single.type : (subs.length > 1 ? '综合' : (subs[0] ? subs[0].type : '待定'));
+          const type = currentMode === 'single' ? (single.type || '操作') : (subs.length > 1 ? '综合' : (subs[0] ? subs[0].type : '操作'));
           const record = {
             id: baseId, name: name, group: currentGroup, owner: owner,
             initiator: initiator, source: source, level: level, type: type,
@@ -1571,15 +1795,15 @@
           };
 
           if (editing) {
-            Object.assign(editing, record, { updatedAt: D.meta.demoNow, updatedBy: st.user.name });
+            Object.assign(editing, record, { updatedAt: actionNow(), updatedBy: st.user.name });
             editing.audit = editing.audit || [];
-            editing.audit.push({ time: D.meta.demoNow, actor: st.user.name, action: isLive ? '编辑任务' : '更新任务' });
+            editing.audit.push({ time: actionNow(), actor: st.user.name, action: isLive ? '编辑任务' : '更新任务' });
           } else {
-            record.createdAt = D.meta.demoNow;
+            record.createdAt = actionNow();
             record.createdBy = st.user.name;
-            record.updatedAt = D.meta.demoNow;
+            record.updatedAt = actionNow();
             record.updatedBy = st.user.name;
-            record.audit = [{ time: D.meta.demoNow, actor: st.user.name, action: '创建任务' }];
+            record.audit = [{ time: actionNow(), actor: st.user.name, action: '创建任务' }];
             st.tasks.unshift(record);
           }
 
@@ -1602,13 +1826,22 @@
             );
           }
 
+          const createdLive = !isLive && !isDraft;
           st.taskFilters.q = '';
           st.taskFilters.group = '';
           st.taskFilters.level = '';
+          st.taskFilters.type = '';
+          st.taskFilters.age = '';
           st.taskFilters.status = isDraft ? '草稿' : '';
+          if (createdLive) (st.ui = st.ui || {}).recentTaskId = record.id;
           close();
-          U().toast(isLive ? '任务已更新' : isDraft ? '草稿已保存，可稍后继续拆分' : '任务已创建并进入待分发');
-          ITO.refresh();
+          if (createdLive) {
+            ITO.refresh();
+            window.setTimeout(function () { showCreatedTask(record); }, 30);
+          } else {
+            U().toast(isLive ? '任务已更新' : '草稿已保存，可稍后继续拆分');
+            ITO.refresh();
+          }
           };
 
           if (redFits.length) {
@@ -1632,7 +1865,7 @@
             U().modal({
               title: '派发风险确认',
               sub: '以下人员负荷将超过 100% 或缺少作业授权',
-              body: '<div class="detail-section"><p style="margin:0 0 8px">仍可继续派发，确认后任务进入待分发状态。</p><ul style="margin:0;padding-left:18px">' + lines + '</ul></div>',
+              body: '<div class="detail-section"><p style="margin:0 0 8px">仍可继续派发，确认后任务进入执行中。</p><ul style="margin:0;padding-left:18px">' + lines + '</ul></div>',
               foot: '<button class="btn btn-ghost" data-close type="button">返回调整</button><button class="btn btn-primary" data-ok type="button">确认继续</button>',
               onMount: function (closeGuard, root) {
                 root.querySelector('[data-close]').addEventListener('click', closeGuard);
@@ -1849,7 +2082,7 @@
             return;
           }
           okBtn.disabled = true;
-          const submittedAt = now();
+          const submittedAt = actionNow();
           try {
             await window.DeliverableStore.saveSubmission(sub.id, t.id, {
               note: note,
@@ -1935,9 +2168,9 @@
         root.querySelector('[data-pass]').addEventListener('click', function () {
           sub.status = '已完成';
           sub.progress = 100;
-          sub.completedAt = now();
+          sub.completedAt = actionNow();
           sub.approval.status = '通过';
-          sub.approval.decidedAt = now();
+          sub.approval.decidedAt = actionNow();
           sub.approval.comment = comment();
           const closureHours = ITO.ensureCompletionHours ? ITO.ensureCompletionHours(sub, sub.completedAt.slice(0, 10)) : 0;
           if (window.DeliverableStore) {
@@ -1965,7 +2198,7 @@
           sub.status = '执行中';
           sub.progress = 90;
           sub.approval.status = '驳回';
-          sub.approval.decidedAt = now();
+          sub.approval.decidedAt = actionNow();
           sub.approval.comment = comment();
           if (window.DeliverableStore) {
             window.DeliverableStore.saveWorkflow(sub.id, t.id, {
@@ -2025,7 +2258,7 @@
             return;
           }
           okBtn.disabled = true;
-          const submittedAt = now();
+          const submittedAt = actionNow();
           try {
             await window.DeliverableStore.saveSubmission(sub.id, t.id, {
               note: note,
@@ -2120,7 +2353,7 @@
             return;
           }
           okBtn.disabled = true;
-          const submittedAt = now();
+          const submittedAt = actionNow();
           try {
             const version = await window.DeliverableStore.saveSubmission(sub.id, t.id, {
               note: note,
@@ -2206,7 +2439,7 @@
           root.querySelector('[data-cancel]').addEventListener('click', close);
           root.querySelector('[data-pass]').addEventListener('click', function () {
             la.status = '已通过';
-            la.decidedAt = now();
+            la.decidedAt = actionNow();
             la.comment = root.querySelector('#laComment').value.trim() || la.comment;
             if (window.DeliverableStore) window.DeliverableStore.saveLeaderWorkflow(t.id, { leaderApproval: la });
             ITO.log('领导审批通过', t.id + ' ' + t.name, '审批');
@@ -2264,7 +2497,7 @@
           }
           okBtn.disabled = true;
           const before = U().mainStatus(t);
-          const submittedAt = now();
+          const submittedAt = actionNow();
           try {
             await window.DeliverableStore.saveSummary(t.id, {
               note: note,
@@ -2334,7 +2567,7 @@
           if (mode === 'reopen' && !selected.length) { U().toast('请至少选择一个需要重开的任务', 'warn'); return; }
           const before = U().mainStatus(t);
           t.leaderApproval.status = '已驳回';
-          t.leaderApproval.decidedAt = now();
+          t.leaderApproval.decidedAt = actionNow();
           t.leaderApproval.comment = reason.value.trim();
           if (mode === 'summary') {
             t.summaryRework = true;
@@ -2345,7 +2578,7 @@
                 s.status = '执行中';
                 s.progress = 90;
                 s.completedAt = '';
-                s.approval = { level: 1, approver: t.owner, status: '驳回', submittedAt: s.submittedAt || '', dueAt: '', decidedAt: now(), comment: reason.value.trim() };
+                s.approval = { level: 1, approver: t.owner, status: '驳回', submittedAt: s.submittedAt || '', dueAt: '', decidedAt: actionNow(), comment: reason.value.trim() };
               }
             });
           }
@@ -2387,7 +2620,7 @@
         root.querySelector('[data-ok]').addEventListener('click', function () {
           const reason = root.querySelector('#cancelReason').value.trim();
           if (!reason) { U().toast('请填写取消原因', 'warn'); return; }
-          t.canceled = { reason: reason, by: S().user.name, at: now() };
+          t.canceled = { reason: reason, by: S().user.name, at: actionNow() };
           t.draft = false;
           t.subs.forEach(function (s) {
             s.status = '已取消';
@@ -2415,16 +2648,28 @@
     const t = taskById(taskId);
     if (!t) return;
     if (!U().isTaskEditable(t)) { U().toast('当前状态不允许改派', 'warn'); return; }
-    let candidates = t.subs.filter(function (s) { return ['待分发', '执行中'].indexOf(s.status) > -1; });
+    const existingSubs = t.subs || [];
+    let candidates = existingSubs.filter(function (s) { return ['待分发', '执行中'].indexOf(s.status) > -1; });
     if (subId) candidates = candidates.filter(function (s) { return s.id === subId; });
-    if (!candidates.length) { U().toast('没有可改派的执行人', 'warn'); return; }
-    const target = candidates[0];
+    const mainOnly = !existingSubs.length;
+    if (!candidates.length && !mainOnly) { U().toast('没有可改派的执行人', 'warn'); return; }
+    const target = candidates[0] || {
+      id: t.id,
+      name: t.name,
+      owner: t.owner,
+      group: t.group,
+      auth: '无需授权',
+      hours: Number(t.hours) || 0,
+      due: t.due,
+      status: U().mainStatus(t),
+      mainOnly: true
+    };
     U().modal({
-      title: '改派执行人',
+      title: mainOnly ? '改派负责人' : '改派执行人',
       sub: target.id + ' · ' + target.name,
       body:
         '<div class="form-grid">' +
-          U().formRow({ label: '当前执行人', control: '<div class="static-field">' + U().esc(target.owner) + '</div>' }) +
+          U().formRow({ label: mainOnly ? '当前负责人' : '当前执行人', control: '<div class="static-field">' + U().esc(target.owner) + '</div>' }) +
           U().formRow({ label: '新截止时间', required: true, control: '<input id="raDue" type="datetime-local" value="' + dueInput(target.due) + '">' }) +
           U().formRow({ label: '新执行人', required: true, control: '<select id="raOwner"><option value="">请选择新执行人</option>' + U().peopleOptions(target.group, '', { auth: target.auth, hours: target.hours, due: target.due }) + '</select>' }) +
           '<div class="form-field full" id="raRelease"></div>' +
@@ -2509,29 +2754,69 @@
           if (!dueInputEl.value) { U().toast('请选择新的截止时间', 'warn'); return; }
           const old = target.owner;
           const newDue = dueInputEl.value.replace('T', ' ');
+          const newOwner = ownerSel.value;
           const fit = fitNow();
           const commit = function (confirmed) {
-            target.owner = ownerSel.value;
-            target.due = newDue;
-            ITO.log('改派执行人', target.id + ' ' + target.name + ' · ' + old + ' → ' + target.owner +
+            if (mainOnly) {
+              const sub = {
+                id: t.id + '-01',
+                name: t.name + ' · 执行',
+                group: t.group,
+                owner: newOwner,
+                initiator: t.initiator,
+                level: t.level,
+                type: t.type,
+                status: '执行中',
+                due: newDue,
+                hours: Number(t.hours) || 0,
+                progress: 0,
+                auth: '无需授权',
+                ticket: false,
+                tags: (t.tags || []).slice(),
+                extra: {},
+                workLogs: [],
+                actualHours: 0
+              };
+              t.subs = [sub];
+              t.mode = 'split';
+              t.owner = newOwner;
+              t.due = newDue;
+              t.ownerFollowsExecution = true;
+              t.updatedAt = actionNow();
+              t.updatedBy = S().user.name;
+              t.audit = t.audit || [];
+              t.audit.push({ time: actionNow(), actor: S().user.name, action: '改派负责人并生成执行任务' });
+            } else {
+              target.owner = newOwner;
+              target.due = newDue;
+              if (t.ownerFollowsExecution && (t.subs || []).length === 1) {
+                t.owner = newOwner;
+                t.due = newDue;
+              }
+              t.updatedAt = actionNow();
+              t.updatedBy = S().user.name;
+              t.audit = t.audit || [];
+              t.audit.push({ time: actionNow(), actor: S().user.name, action: '改派执行人' });
+            }
+            ITO.log(mainOnly ? '改派负责人' : '改派执行人', target.id + ' ' + target.name + ' · ' + old + ' → ' + newOwner +
               (newDue !== oldDue ? ' · 截止 ' + oldDue + ' → ' + newDue : '') + ' · ' + reason.value.trim(), '任务');
             if (confirmed && fit && fit.level === 'red') {
-              ITO.log('改派执行人 · 大修冲突确认', target.id + ' ' + target.owner + ' · ' + fit.summary.count + ' 项大修任务', '任务');
+              ITO.log('改派执行人 · 大修冲突确认', target.id + ' ' + newOwner + ' · ' + fit.summary.count + ' 项大修任务', '任务');
             }
             ITO.notify(old, {
               type: '任务',
               title: '任务已改派',
-              body: target.name + ' 已改派给 ' + target.owner,
+              body: t.name + ' 已改派给 ' + newOwner,
               link: '#/tasks'
             });
-            ITO.notify(target.owner, {
+            ITO.notify(newOwner, {
               type: '任务',
               title: '你收到一个改派任务',
-              body: t.name + ' · ' + target.name + '，截止 ' + target.due,
+              body: mainOnly ? t.name + ' 已生成执行任务，截止 ' + newDue : t.name + ' · ' + target.name + '，截止 ' + newDue,
               link: '#/mine'
             });
             close();
-            U().toast('已改派给 ' + target.owner);
+            U().toast('已改派给 ' + newOwner);
             ITO.refresh();
           };
           if (fit && fit.level === 'red') {
@@ -2547,6 +2832,41 @@
           } else {
             commit(false);
           }
+        });
+      }
+    });
+  };
+
+  ACT.viewAllSubs = function (packageId) {
+    const pkg = ledgerPackageIndex[packageId];
+    if (!pkg) return;
+    const rows = (pkg.subs || []).map(function (sub) {
+      return '<tr data-sub-task="' + U().esc(sub.id) + '" tabindex="0" role="button" style="cursor:pointer">' +
+        '<td class="mono">' + U().esc(sub.id) + '</td>' +
+        '<td><div class="cell-task"><b>' + U().esc(sub.name) + '</b><small>' + U().esc(sub.type || '') + '</small></div></td>' +
+        '<td>' + U().esc(sub.owner || '—') + '</td>' +
+        '<td>' + U().badge(sub.status || '待分发') + '</td>' +
+        '<td class="num" style="white-space:nowrap">' + U().shortDate(sub.due) + '</td>' +
+      '</tr>';
+    }).join('');
+    U().modal({
+      title: pkg.name,
+      sub: (pkg.subs || []).length + ' 条子任务',
+      xwide: true,
+      body: '<div class="table-wrap" style="max-height:60vh;overflow:auto">' +
+        '<table class="data-table subs-modal-table"><thead><tr><th>任务编号</th><th>任务</th><th>执行人</th><th>状态</th><th>截止时间</th></tr></thead>' +
+        '<tbody>' + rows + '</tbody></table></div>',
+      foot: '<button class="btn btn-ghost" data-close-modal type="button">关闭</button>',
+      onMount: function (close, root) {
+        root.querySelector('[data-close-modal]').addEventListener('click', close);
+        Array.prototype.forEach.call(root.querySelectorAll('[data-sub-task]'), function (tr) {
+          const open = function () {
+            ACT.detail(tr.dataset.subTask);
+          };
+          tr.addEventListener('click', open);
+          tr.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+          });
         });
       }
     });
@@ -2619,7 +2939,7 @@
           if (!date) { U().showFieldError(dateEl, '请选择补录日期'); return; }
           const applied = ITO.addWorkLog ? ITO.addWorkLog(sub, hours, date) : 0;
           if (!applied) { U().showFieldError(hoursEl, '补录工时必须大于 0'); return; }
-          t.updatedAt = D.meta.demoNow;
+          t.updatedAt = actionNow();
           t.updatedBy = S().user.name;
           ITO.log('补录工时', sub.id + ' ' + sub.name + ' · ' + applied + 'h · ' + date + (root.querySelector('#wlNote').value.trim() ? ' · ' + root.querySelector('#wlNote').value.trim() : ''), '任务');
           close();
@@ -2662,7 +2982,7 @@
           if (!dateEl.value) { U().showFieldError(dateEl, '请选择记录日期'); return; }
           if (progress === current && hours <= 0) { U().showFieldError(progressEl, '请更新进度或填写工时'); return; }
           sub.progress = Math.round(progress);
-          sub.updatedAt = D.meta.demoNow;
+          sub.updatedAt = actionNow();
           sub.updatedBy = S().user.name;
           ITO.addWorkLog(sub, hours, dateEl.value, 'progress');
           if (window.DeliverableStore) {
@@ -2710,12 +3030,12 @@
           const note = root.querySelector('#dcNote').value.trim();
           sub.status = '已完成';
           sub.progress = 100;
-          sub.completedAt = now();
+          sub.completedAt = actionNow();
           if (!sub.approval) {
-            sub.approval = { level: 1, approver: t.owner, submittedAt: now(), dueAt: '', decidedAt: now(), comment: note };
+            sub.approval = { level: 1, approver: t.owner, submittedAt: actionNow(), dueAt: '', decidedAt: actionNow(), comment: note };
           }
           sub.approval.status = '通过';
-          sub.approval.decidedAt = now();
+          sub.approval.decidedAt = actionNow();
           sub.approval.comment = note;
           ITO.addWorkLog(sub, hours, dateEl.value, 'closure');
           const added = ITO.ensureCompletionHours(sub, dateEl.value);
@@ -2761,7 +3081,7 @@
           const cf = ITO.readCustomFields(root, 'task', sub.extra || {}, 'sub');
           if (cf.errors.length) { U().toast(cf.errors[0], 'warn'); return; }
           sub.extra = cf.values;
-          sub.updatedAt = D.meta.demoNow;
+          sub.updatedAt = actionNow();
           sub.updatedBy = S().user.name;
           ITO.log('编辑执行任务字段', sub.id + ' · ' + sub.name, '任务');
           close();
@@ -2793,7 +3113,7 @@
   };
 
   ACT.exportTasks = function () {
-    const list = visibleTasks();
+    const list = ledgerMainTasks(visibleTasks());
     const customHeaders = (ITO.customFieldExportHeaders ? ITO.customFieldExportHeaders('task') : [])
       .concat(ITO.customFieldExportHeaders ? ITO.customFieldExportHeaders('task', 'sub').map(function (h) { return '执行·' + h; }) : []);
     const rows = [['主任务编号', '主任务', '模式', '任务编号', '任务', '专业组', '发起人', '任务来源', '负责人', '执行人', '等级', '状态', '完成时间', '审批状态', '审批意见', '授权', '需要开票', '标签', '截止时间', '成果物数量', '成果物文件', '提交说明', '提交版本', '汇总附件数量', '汇总附件', '汇总说明'].concat(customHeaders)];
@@ -2861,7 +3181,8 @@
       }
       if (st.pendingQuery != null) { f.q = st.pendingQuery; st.pendingQuery = null; }
 
-      const list = visibleTasks();
+      const rawList = visibleTasks();
+      const list = ledgerMainTasks(rawList);
       ledgerPage = Math.min(Math.max(1, ledgerPage), Math.max(1, Math.ceil(list.length / LEDGER_PAGE_SIZE)));
       const listPage = list.slice((ledgerPage - 1) * LEDGER_PAGE_SIZE, ledgerPage * LEDGER_PAGE_SIZE);
       const taskCustomHeaders = ITO.customFieldHeaders ? ITO.customFieldHeaders('task') : [];
@@ -2877,7 +3198,7 @@
 
       return U().pageHead({
         title: '任务管理',
-        sub: '专项与常规任务台账 · 覆盖 4 个专业组',
+        sub: '专项任务按月份 + 专业组 + 类型归并为大任务 · 展开查看子任务',
         actions: ''
       }) +
       U().taskTabs('ledger') +
@@ -2914,8 +3235,8 @@
         '</div>' +
       '</div>' +
       '<section class="card table-card" id="ledgerCard">' +
-        '<div class="table-head"><div><h3>专项任务</h3><p class="table-note">手工新建任务 · <button type="button" class="text-link" data-route="overhaul">大修管理</button> · 点击行查看详情，展开可查看任务；审批中的任务不可编辑</p></div>' +
-          '<div class="ledger-meta"><span id="ledgerStats">' + statsChipsHtml(list) + '</span><button class="btn btn-ghost btn-sm" id="taskExportBtn" type="button">' + U().icon('download') + '导出清单</button></div></div>' +
+        '<div class="table-head"><div><h3>专项任务</h3><p class="table-note">手工新建任务 · <button type="button" class="text-link" data-route="overhaul">大修管理</button> · 点击主任务展开子任务</p></div>' +
+          '<div class="ledger-meta"><span id="ledgerStats" class="ledger-stats">' + statsChipsHtml(list, rawList) + '</span><button class="btn btn-ghost btn-sm ledger-export" id="taskExportBtn" type="button">' + U().icon('download') + '导出清单</button></div></div>' +
         '<div class="table-wrap"><table class="data-table task-table">' +
           '<thead><tr><th>任务</th><th>专业组</th><th>发起人</th><th>负责人</th><th>授权</th><th>标签</th><th>优先级</th><th>截止时间</th><th>状态</th>' +
             taskCustomHeaders.map(function (h) { return '<th>' + U().esc(h) + '</th>'; }).join('') +
@@ -2931,13 +3252,14 @@
       const f = st.taskFilters;
 
       function updateRows() {
-        const list = visibleTasks();
+        const rawList = visibleTasks();
+        const list = ledgerMainTasks(rawList);
         ledgerPage = Math.min(Math.max(1, ledgerPage), Math.max(1, Math.ceil(list.length / LEDGER_PAGE_SIZE)));
         document.getElementById('taskTbody').innerHTML = rowsHtml(list.slice((ledgerPage - 1) * LEDGER_PAGE_SIZE, ledgerPage * LEDGER_PAGE_SIZE));
         const pagerBox = document.getElementById('ledgerPager');
         if (pagerBox) pagerBox.innerHTML = ITO.pager('ledger', list.length, ledgerPage, LEDGER_PAGE_SIZE);
         const statsBox = document.getElementById('ledgerStats');
-        if (statsBox) statsBox.innerHTML = statsChipsHtml(list);
+        if (statsBox) statsBox.innerHTML = statsChipsHtml(list, rawList);
       }
       function applyFilter() { ledgerPage = 1; updateRows(); }
 
@@ -3134,8 +3456,11 @@
           if (!btn) return;
           const target = document.getElementById(btn.dataset.jump);
           if (!target) return;
-          const y = target.getBoundingClientRect().top + (window.scrollY || 0) - 150;
-          window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+          const host = ITO.scrollHost ? ITO.scrollHost() : document.querySelector('.app-body');
+          if (!host) return;
+          const y = target.getBoundingClientRect().top - host.getBoundingClientRect().top + host.scrollTop - 150;
+          if (ITO.scrollToY) ITO.scrollToY(y, 'smooth');
+          else host.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
         });
         const spy = function () {
           const bar = document.getElementById('tasksJumpBar');
@@ -3151,7 +3476,8 @@
           });
         };
         if (!window.__tasksSpyBound) {
-          window.addEventListener('scroll', function () { if (window.__tasksSpyFn) window.__tasksSpyFn(); }, { passive: true });
+          const scrollEl = (ITO.scrollHost ? ITO.scrollHost() : document.querySelector('.app-body')) || window;
+          scrollEl.addEventListener('scroll', function () { if (window.__tasksSpyFn) window.__tasksSpyFn(); }, { passive: true });
           window.__tasksSpyBound = true;
         }
         window.__tasksSpyFn = spy;
@@ -3176,17 +3502,29 @@
               }
               return;
             }
+            if (btn.dataset.act === 'view-all-subs') {
+              ACT.viewAllSubs(btn.dataset.id);
+              return;
+            }
             ACT.run(btn.dataset.act, btn.dataset.task, btn.dataset.sub);
             return;
           }
           const subItem = e.target.closest('.sub-item[data-sub-detail]');
           if (subItem) {
             const parts = subItem.dataset.subDetail.split('|');
-            ACT.run('detail-sub', parts[0], parts[1]);
+            if (parts.length === 1) ACT.detail(parts[0]);
+            else ACT.run('detail-sub', parts[0], parts[1]);
             return;
           }
           const row = e.target.closest('tr.task-main-row');
-          if (row) ACT.detail(row.dataset.id);
+          if (row) {
+            if (row.dataset.virtual === '1') {
+              const target = row.querySelector('[data-act="expand"]');
+              if (target) target.click();
+            } else {
+              ACT.detail(row.dataset.id);
+            }
+          }
         });
         tbody.addEventListener('keydown', function (e) {
           if (e.key !== 'Enter' && e.key !== ' ') return;
@@ -3195,13 +3533,19 @@
           if (subItem) {
             e.preventDefault();
             const parts = subItem.dataset.subDetail.split('|');
-            ACT.run('detail-sub', parts[0], parts[1]);
+            if (parts.length === 1) ACT.detail(parts[0]);
+            else ACT.run('detail-sub', parts[0], parts[1]);
             return;
           }
           const row = e.target.closest('tr.task-main-row');
           if (row) {
             e.preventDefault();
-            ACT.detail(row.dataset.id);
+            if (row.dataset.virtual === '1') {
+              const target = row.querySelector('[data-act="expand"]');
+              if (target) target.click();
+            } else {
+              ACT.detail(row.dataset.id);
+            }
           }
         });
       }

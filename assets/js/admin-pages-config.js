@@ -237,6 +237,9 @@
       ['创建', U().esc((tag.createdAt || '—') + ' · ' + (tag.createdBy || '—'))],
       ['最近更新', U().esc((tag.updatedAt || '—') + ' · ' + (tag.updatedBy || '—'))]
     ];
+    if (isPerson && tag.source !== '授权') {
+      rows.splice(3, 0, ['首次领取', U().esc(usage.first || '—')]);
+    }
     if (isPerson && tag.source === '授权') {
       rows.push(['勋章规则', '取得授权后自动获得，不计次数与首次领取时间']);
       rows.push(['标签标识', '<span class="auth-mark">授权</span>']);
@@ -475,6 +478,7 @@
       return {
         count: holders.length,
         unit: '人',
+        first: dates.length ? dates[0] : '—',
         last: dates.length ? dates[dates.length - 1] : '—',
         names: holders.map(function (a) { return a.person; })
       };

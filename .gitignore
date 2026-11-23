@@ -1,4 +1,11 @@
 ﻿*.zip
+*.patch
 .DS_Store
 Thumbs.db
 .zcode/
+ITO-Ops-Platform11.13/
+docs/regression/z85/
+docs/regression/z86/
+docs/regression/z87/
+docs/regression/z88/
+brand/

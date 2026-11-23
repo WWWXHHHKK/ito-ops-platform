@@ -401,6 +401,20 @@ button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; box-
   box-shadow: 0 0 10px rgba(53, 224, 255, 0.35);
 }
 
+.data-cutoff {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid rgba(255, 207, 63, 0.32);
+  background: rgba(255, 207, 63, 0.07);
+  color: #ffcf3f;
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.data-cutoff[hidden] { display: none; }
+
 .topbar-meta {
   font-family: var(--font-mono);
   font-size: 8.5px;
@@ -1482,6 +1496,9 @@ button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; box-
   text-shadow: 0 0 10px rgba(53, 224, 255, 0.24);
 }
 .sla-metric em { grid-column: 1; font-family: var(--font-num); font-size: 8px; font-style: normal; margin-top: 1px; }
+.sla-metric em span { font-size: inherit; letter-spacing: inherit; white-space: normal; }
+.sla-metric em .up { color: var(--red); }
+.sla-metric em .up-good { color: var(--green); }
 
 /* ── 09 resources ────────────────────────────── */
 .res-body { padding: 8px 14px 7px; display: flex; flex-direction: column; }

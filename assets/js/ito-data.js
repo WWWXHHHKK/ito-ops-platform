@@ -10,7 +10,6 @@ window.ITO_DATA = (() => {
 
   const BASE_YEAR = 2026;
   const BASE_DAY = '2026-11-02';
-  const DEMO_TIME = '20:56';
 
   const pad2 = (n) => (n < 10 ? '0' + n : String(n));
   const dayKey = (d) => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
@@ -64,27 +63,33 @@ window.ITO_DATA = (() => {
     return weeks;
   }
 
-  function readDemoOverride() {
+  function readDateParam(name) {
     try {
       if (typeof location === 'undefined' || !location.search) return null;
-      const value = new URLSearchParams(location.search).get('demo');
+      const value = new URLSearchParams(location.search).get(name);
       return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? parseDay(value) : null;
     } catch (e) {
       return null;
     }
   }
 
-  const overrideDay = readDemoOverride();
+  const demoOverrideDay = readDateParam('demo');
+  const asofOverrideDay = readDateParam('asof');
+  const displayOverrideDay = readDateParam('today');
+  const overrideDay = asofOverrideDay || demoOverrideDay;
   const realNow = new Date();
-  const anchorDay = overrideDay || new Date(realNow.getFullYear(), realNow.getMonth(), realNow.getDate());
+  const realDay = new Date(realNow.getFullYear(), realNow.getMonth(), realNow.getDate());
+  const anchorDay = overrideDay || realDay;
+  const displayDay = asofOverrideDay
+    ? (displayOverrideDay || realDay)
+    : (demoOverrideDay || realDay);
   const baseAnchor = parseDay(BASE_DAY);
   const OFFSET_DAYS = Math.round((anchorDay.getTime() - baseAnchor.getTime()) / 86400000);
   const IS_OVERRIDE = !!overrideDay;
   const TODAY = dayKey(anchorDay);
-  /* 自动演示跟随系统时钟；?demo= 固定日期时保留 20:56，便于回归截图。 */
-  const DEMO_NOW = TODAY + ' ' + (IS_OVERRIDE
-    ? DEMO_TIME
-    : pad2(realNow.getHours()) + ':' + pad2(realNow.getMinutes()));
+  const DISPLAY_TODAY = dayKey(displayDay);
+  /* 自动演示跟随系统时钟；?demo= 固定数据日期与显示日期；?asof= 只固定数据日期，显示日期跟随系统。 */
+  const DEMO_NOW = TODAY + ' ' + pad2(realNow.getHours()) + ':' + pad2(realNow.getMinutes());
 
   const groups = [
     { id: 'app',    name: '应用组',     code: 'APP',    manager: '王主管', leader: '李工', fullStrength: 13, color: '#9F2936', desc: '业务系统、接口与版本发布' },
@@ -95,10 +100,11 @@ window.ITO_DATA = (() => {
 
   const groupHistory = {
     months: ['2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11'],
-    app: [6, 7, 8, 9, 9, 10],
-    comm: [4, 5, 6, 7, 8, 10],
-    online: [5, 6, 7, 8, 8, 10],
-    infra: [3, 4, 5, 6, 7, 10]
+    /* 人员规模保持稳定：基础设施组 7–10 波动，其余专业组 8–10 波动。 */
+    app: [9, 9, 10, 9, 10, 10],
+    comm: [8, 9, 9, 10, 9, 10],
+    online: [9, 10, 9, 10, 9, 10],
+    infra: [7, 8, 9, 8, 9, 10]
   };
 
   const staff = [
@@ -445,9 +451,9 @@ window.ITO_DATA = (() => {
     pool: ['郭工', '赵工', '周工', '罗工', '梁工', '宋工', '唐工', '许工', '邓工'],
     rotation: ['郭工', '赵工', '周工', '罗工', '梁工', '宋工', '唐工', '许工', '邓工'],
     externalPool: [
-      { name: '吴工（工程公司）', phone: '13800001209' },
-      { name: '沈工（工程公司）', phone: '13800001210' },
-      { name: '韩工（工程公司）', phone: '13800001211' }
+      { name: '吴立诚', phone: '13800001209' },
+      { name: '沈望舒', phone: '13800001210' },
+      { name: '韩立言', phone: '13800001211' }
     ],
     currentKey: '',
     nextKey: '',
@@ -461,7 +467,7 @@ window.ITO_DATA = (() => {
     { post: '通信值班-线路', code: 'TX-XL', name: '赵工', phone: '13800001203' },
     { post: '通信值班-网络', code: 'TX-WL', name: '周工', phone: '13800001205' },
     { post: '通信值班-桌面', code: 'TX-ZM', name: '罗工', phone: '13800001221' },
-    { post: '工程公司项目部通讯技术助理', code: '', name: '吴工（工程公司）', phone: '13800001209', external: true }
+    { post: '通讯技术助理', code: 'TX-JS', name: '吴立诚', phone: '13800001209', external: true }
   ];
 
   const dutyTypes = [
@@ -504,7 +510,7 @@ window.ITO_DATA = (() => {
       { type: 'RP2 授权',         target: 5, groups: ['comm', 'online'],             scope: 'RP2 系统操作与设备隔离' },
       { type: '登高车作业授权',   target: 6, groups: ['comm', 'infra'],              scope: '登高车作业与防坠落措施' },
       { type: '低压电工证',       target: 6, groups: ['online', 'infra'],            scope: '低压配电与电气作业' },
-      { type: '高压电工证',       target: 3, groups: ['infra'],                      scope: '高压配电与倒闸操作' },
+      { type: '高压电工证',       target: 3, groups: ['comm'],                       scope: '高压配电与倒闸操作' },
       { type: '工具库授权',       target: 8, groups: ['app', 'comm', 'online', 'infra'], scope: '工具库借还、校验与盘点' }
     ];
     const VALID_TO = ['2027-03-31', '2027-06-30', '2027-09-30'];
@@ -630,113 +636,8 @@ window.ITO_DATA = (() => {
     { name: 'DTT',  stars: 1, count: 2,  group: 'online', desc: '监测数据质量专项' }
   ];
 
-  /* 个人成就：人员标签带 1–3 星，任务标签只累计完成次数 */
-  const personAchievements = [
-    { person: '李工', name: 'KCC', type: '人员标签', stars: 3, count: 12, firstClaimed: '2025-08-12', desc: '核心业务系统变更与发布' },
-    { person: '李工', name: 'KNS', type: '人员标签', stars: 2, count: 8,  firstClaimed: '2025-11-03', desc: 'KNS 接口与性能优化' },
-    { person: '李工', name: '终端', type: '人员标签', stars: 1, count: 4,  firstClaimed: '2026-01-18', desc: '终端安全与基线核查' },
-    { person: '李工', name: '机房', type: '任务标签', stars: 0, count: 8,  firstClaimed: '2025-09-06', desc: '核心机房巡检与动力环境保障' },
-    { person: '李工', name: 'DTT',  type: '任务标签', stars: 0, count: 2,  firstClaimed: '2026-02-11', desc: '监测数据质量专项' },
-    { person: '王主管', name: 'KCC', type: '人员标签', stars: 2, count: 9,  firstClaimed: '2025-09-02', desc: '核心业务系统变更与发布' },
-    { person: '张经理', name: 'KCC', type: '人员标签', stars: 1, count: 3, firstClaimed: '2025-10-21', desc: '核心业务系统变更与发布' },
-    { person: '张经理', name: '巡检', type: '任务标签', stars: 0, count: 5, firstClaimed: '2025-11-27', desc: '季度巡检与整改闭环' },
-    { person: '张经理', name: '变更', type: '任务标签', stars: 0, count: 4, firstClaimed: '2026-02-03', desc: '高风险变更与割接审批' },
-    { person: '陈工', name: 'KCC', type: '人员标签', stars: 2, count: 7, firstClaimed: '2025-10-12', desc: '核心业务系统变更与发布' },
-    { person: '陈工', name: '机房', type: '人员标签', stars: 1, count: 3, firstClaimed: '2026-01-08', desc: '核心机房巡检与动力环境保障' },
-    { person: '赵工', name: '通信线路', type: '人员标签', stars: 3, count: 11, firstClaimed: '2025-07-21', desc: '通信线路维护与应急保障' },
-    { person: '周工', name: '通信网络', type: '人员标签', stars: 2, count: 6, firstClaimed: '2025-11-15', desc: '通信网络配置与故障处置' },
-    { person: '孙工', name: '终端', type: '人员标签', stars: 3, count: 9, firstClaimed: '2025-09-03', desc: '终端安全与基线核查' },
-    { person: '吴工', name: '终端', type: '人员标签', stars: 2, count: 5, firstClaimed: '2026-02-17', desc: '终端安全与基线核查' },
-    { person: '刘工', name: '机房', type: '人员标签', stars: 3, count: 13, firstClaimed: '2025-06-11', desc: '核心机房巡检与动力环境保障' },
-    { person: '郑工', name: '机房', type: '人员标签', stars: 2, count: 7, firstClaimed: '2025-12-01', desc: '核心机房巡检与动力环境保障' }
-  ];
-
-  /* 新成员的能力标签：让个人统计 / 月报有内容 */
-  const GROUP_TAG = { app: 'KCC', comm: '通信线路', online: '终端', infra: '机房' };
-  const GROUP_TAG_DESC = {
-    app: '核心业务系统变更与发布',
-    comm: '通信线路维护与应急保障',
-    online: '终端安全与基线核查',
-    infra: '核心机房巡检与动力环境保障'
-  };
-  staff.filter(function (p) { return Number(String(p.uid).slice(1)) > 20008; }).forEach(function (p, i) {
-    const tag = GROUP_TAG[p.group];
-    const exists = personAchievements.some(function (a) {
-      return a.person === p.name && a.type === '人员标签';
-    });
-    if (!tag || exists) return;
-    personAchievements.push({
-      person: p.name,
-      name: tag,
-      type: '人员标签',
-      stars: (i % 3) + 1,
-      count: 3 + (i % 8),
-      firstClaimed: '2025-' + pad2((i % 9) + 1) + '-' + pad2((i % 20) + 1),
-      desc: GROUP_TAG_DESC[p.group]
-    });
-  });
-
-  /* 能力标签补充：每人至少保留 2 个非授权类人员标签，避免个人详情过空。 */
-  const GROUP_EXTRA_TAGS = {
-    app: ['接口平台', '应用系统', '数据库', '报表平台'],
-    comm: ['通信线路', '通信网络', '通信传输', '应急通信', '通信值班'],
-    online: ['监测平台', '采集终端', '桌面运维', '网络安全'],
-    infra: ['动力环境', '供配电', '暖通空调', '消防安防']
-  };
-  const EXTRA_TAG_DESC = {
-    '接口平台': '接口联调与平台接入保障',
-    '应用系统': '业务系统运行维护与发布',
-    '数据库': '数据库运维、备份与性能优化',
-    '报表平台': '报表开发与数据质量保障',
-    '通信线路': '通信线路维护与应急保障',
-    '通信网络': '通信网络配置与故障处置',
-    '通信传输': '传输链路维护与切换验证',
-    '应急通信': '应急通信保障与现场处置',
-    '通信值班': '通信值班调度与交接',
-    '监测平台': '监测平台运行维护与告警处置',
-    '采集终端': '采集终端配置与数据核对',
-    '桌面运维': '桌面终端与办公设备维护',
-    '网络安全': '网络安全策略与基线核查',
-    '动力环境': '机房动力环境巡检与保障',
-    '供配电': '供配电系统维护与倒换验证',
-    '暖通空调': '暖通空调运行维护',
-    '消防安防': '消防安防设施巡检与联动'
-  };
-  staff.forEach(function (p, i) {
-    p.tags = (p.tags || []).slice();
-    const domainTags = ['KCC', 'KNS', '终端', '机房', '通信线路', '通信网络', '通信传输', '应急通信', '通信值班'];
-    const hasDomain = domainTags.some(function (name) { return p.tags.indexOf(name) > -1; });
-    if (!hasDomain && GROUP_TAG[p.group]) p.tags.push(GROUP_TAG[p.group]);
-    const staffPool = (GROUP_EXTRA_TAGS[p.group] || []).filter(function (name) { return p.tags.indexOf(name) === -1; });
-    if (staffPool.length) p.tags.push(staffPool[i % staffPool.length]);
-    p.tags = p.tags.filter(function (tag, idx, list) { return list.indexOf(tag) === idx; });
-  });
-
-  staff.forEach(function (p, i) {
-    const own = personAchievements.filter(function (a) {
-      return a.person === p.name && a.type === '人员标签';
-    }).map(function (a) { return a.name; });
-    const need = 2 - own.length;
-    if (need <= 0) return;
-    const pool = (GROUP_EXTRA_TAGS[p.group] || []).filter(function (name) {
-      return own.indexOf(name) === -1;
-    });
-    if (!pool.length) return;
-    for (let n = 0; n < need && n < pool.length; n += 1) {
-      const name = pool[(i + n) % pool.length];
-      if (own.indexOf(name) > -1) continue;
-      own.push(name);
-      personAchievements.push({
-        person: p.name,
-        name: name,
-        type: '人员标签',
-        stars: (i % 3) + 1,
-        count: 3 + ((i + n) % 8),
-        firstClaimed: '2025-' + pad2((i % 9) + 1) + '-' + pad2((i % 20) + 1),
-        desc: EXTRA_TAG_DESC[name] || '专业能力标签'
-      });
-    }
-  });
+  /* 个人成就：人员标签 / 任务标签均由 40 个任务标签派生，授权标签由授权台账补充。 */
+  const personAchievements = [];
 
   const permissions = {
     leader:   { task: true,  inspect: true,  duty: true,  maintain: true,  overhaul: true, group: true,  auth: true,  message: true,  dictionary: false, config: false },
@@ -757,7 +658,14 @@ window.ITO_DATA = (() => {
   const taskTags = [
     '机房', '终端', 'KCC', 'KNS', 'KDN', 'KSM', 'DTT', 'DKM', 'DTD', 'DTC', 'DTW',
     'DTP', 'DTG', 'DTA', 'DTS', 'DTI', 'DTV', '视频会议系统', '卫星电话系统',
-    '无线对讲系统', '厂房通信系统'
+    '无线对讲系统', '厂房通信系统', 'DTH', 'DTK', 'DTL', 'DTM', 'DTJ',
+    '机房动环', '通信电源', '弱电日常', '门禁', 'DTX', '桌面电话', 'AP',
+    'DTF 网络设备', 'DTW 网络设备', 'AC', '宜搭平台', 'RPA', 'AI 智能体',
+    '信息发布 LED 屏系统', '协同办公', '邮件系统', '门户网站', '统一身份',
+    '备份平台', '云平台', 'UPS', '空调', '消防', '打印机', '扫描仪',
+    '视频会议终端', '移动终端设备', '交换机', '路由器', '防火墙', '负载均衡',
+    '安全基线', '漏洞修复', '弱口令', '恶意代码', '边界防护', '审计留痕',
+    '计划内', '临时作业', '维护窗口', '夜间作业', '跨组协同', '需验收', '需复盘'
   ];
 
   const taskTagMeta = [
@@ -784,6 +692,72 @@ window.ITO_DATA = (() => {
     { name: '厂房通信系统', count: 3, firstClaimed: '2025-10-30', desc: '厂房通信线路巡检' }
   ];
 
+  /* 人员标签与任务标签共用 40 个任务标签；每名成员按专业组分配 2–3 个，
+     授权标签由作业授权台账补充，QC 只进入属性勋章。 */
+  (function seedTaskBasedPersonTags() {
+    const TASK_TAG_GROUPS = {
+      app: ['KCC', 'KNS', 'KDN', 'KSM', 'DKM', 'DTA', 'DTS', 'DTI', 'DTP', '宜搭平台', 'RPA', 'AI 智能体'],
+      comm: ['DTV', 'DTW', 'DTG', 'DTL', 'DTF 网络设备', 'DTW 网络设备', '视频会议系统', '卫星电话系统', '无线对讲系统', '厂房通信系统'],
+      online: ['终端', 'DTT', 'DTD', 'DTC', 'DTH', 'DTK', 'DTM', 'DTJ', 'DTX', '桌面电话', 'AP', '信息发布 LED 屏系统'],
+      infra: ['机房', '机房动环', '通信电源', '弱电日常', '门禁', 'AC']
+    };
+    const roleTagNames = ['核心岗', '管理', '工程师', '高级工程师', '助理工程师'];
+    const metaOf = function (name) {
+      return taskTagMeta.find(function (m) { return m.name === name; }) || {};
+    };
+    const groupStaff = { app: [], comm: [], online: [], infra: [] };
+    staff.forEach(function (p) { if (groupStaff[p.group]) groupStaff[p.group].push(p); });
+    const assigned = {};
+    staff.forEach(function (p) { assigned[p.name] = []; });
+    Object.keys(TASK_TAG_GROUPS).forEach(function (g) {
+      const people = groupStaff[g] || [];
+      const pool = TASK_TAG_GROUPS[g] || [];
+      if (!people.length || !pool.length) return;
+      pool.forEach(function (tag, idx) {
+        const person = people[idx % people.length];
+        if (assigned[person.name].indexOf(tag) === -1) assigned[person.name].push(tag);
+      });
+      people.forEach(function (person, idx) {
+        let guard = 0;
+        while (assigned[person.name].length < 2 && guard < pool.length) {
+          const tag = pool[(idx + guard) % pool.length];
+          if (assigned[person.name].indexOf(tag) === -1) assigned[person.name].push(tag);
+          guard += 1;
+        }
+      });
+    });
+    staff.forEach(function (p, personIdx) {
+      const tags = assigned[p.name] || [];
+      tags.forEach(function (name, tagIdx) {
+        const meta = metaOf(name);
+        const pCount = 3 + ((personIdx + tagIdx * 3) % 8);
+        const tCount = 2 + ((personIdx + tagIdx * 2) % 6);
+        const claimed = '2025-' + pad2((personIdx % 12) + 1) + '-' + pad2((personIdx % 20) + 1);
+        personAchievements.push({
+          person: p.name, name: name, type: '人员标签',
+          stars: Math.max(1, Math.min(3, Math.ceil(pCount / 3))), count: pCount,
+          firstClaimed: claimed, desc: meta.desc || '完成对应任务后累计'
+        });
+        personAchievements.push({
+          person: p.name, name: name, type: '任务标签',
+          stars: 0, count: tCount,
+          firstClaimed: claimed, desc: meta.desc || '完成对应任务后累计'
+        });
+      });
+      const roleTags = (p.tags || []).filter(function (t) { return roleTagNames.indexOf(t) > -1; });
+      p.tags = roleTags.concat(tags).filter(function (tag, idx, list) { return list.indexOf(tag) === idx; });
+    });
+    ['赵工', '赵主管'].forEach(function (name) {
+      const person = staff.find(function (p) { return p.name === name; });
+      if (!person) return;
+      personAchievements.push({
+        person: name, name: 'QC授权', type: '人员标签', stars: 3, count: 1,
+        source: '授权', firstClaimed: '', desc: '大修专项 QC 授权'
+      });
+      if (person.tags.indexOf('QC授权') === -1) person.tags.push('QC授权');
+    });
+  })();
+
   function wallStars(count, star2, star3) {
     const two = Number(star2) || 5;
     const three = Number(star3) || 10;
@@ -808,9 +782,11 @@ window.ITO_DATA = (() => {
           name: a.name, type: '人员标签', count: 0, stars: 0,
           star2: rules.star2, star3: rules.star3,
           firstClaimed: a.firstClaimed || '', desc: a.desc || '',
-          unlock: '完成对应标签任务并累计提升星级'
+          source: a.source || '',
+          unlock: a.source === '授权' ? '取得对应授权后自动获得该标签' : '完成对应标签任务并累计提升星级'
         };
       }
+      if (a.source === '授权') personMap[a.name].source = '授权';
       personMap[a.name].count += a.count;
       if (!personMap[a.name].firstClaimed || a.firstClaimed < personMap[a.name].firstClaimed) {
         personMap[a.name].firstClaimed = a.firstClaimed;
@@ -930,6 +906,7 @@ window.ITO_DATA = (() => {
     choose(comm, 'RP1 授权', 7, 'RP1 系统操作与隔离验证', 2);
     choose(comm, 'RP2 授权', 8, 'RP2 系统操作与设备隔离', 0);
     choose(comm, '低压电工证', 10, '通信低压配电与电气作业', 1);
+    choose(comm, '高压电工证', 3, '通信高压配电与倒闸操作', 0);
     choose(online, '工作负责人授权', 3, '在线监测作业组织与现场管控', 2);
     choose(online, '准备工程师授权', 2, '在线监测作业准备与风险识别', 0);
     choose(online, 'RP1 授权', 4, 'RP1 系统操作与隔离验证', 0);
@@ -954,6 +931,27 @@ window.ITO_DATA = (() => {
         return x.person === pair[0] && x.type === pair[1] && x.status !== '已过期';
       });
       if (a) a.validTo = '2026-12-20';
+    });
+  })();
+
+  /* 高压电工证固定给通信组 3 人：赵明川 / 郭远山 / 梁思远（种子阶段对应赵工 / 郭工 / 梁工）。 */
+  (function pinHighVoltageHolders() {
+    const names = ['赵工', '郭工', '梁工'];
+    for (let i = auths.length - 1; i >= 0; i -= 1) {
+      if (auths[i].type === '高压电工证') auths.splice(i, 1);
+    }
+    names.forEach(function (name, index) {
+      const person = staff.find(function (p) { return p.name === name; });
+      if (!person) return;
+      auths.push({
+        id: 'AU-2026-02' + pad2(60 + index),
+        person: name,
+        type: '高压电工证',
+        group: person.group,
+        scope: '通信高压配电与倒闸操作',
+        validTo: ['2027-03-31', '2027-06-30', '2027-09-30'][index],
+        status: '有效'
+      });
     });
   })();
 
@@ -1199,18 +1197,16 @@ window.ITO_DATA = (() => {
     { key: 'facility', name: '机房及电源', systems: ['DTJ', '机房', '机房动环', '通信电源', '弱电日常', '门禁'] },
     { key: 'line', name: '线路通信系统', systems: ['DTX', 'DTG', 'DTW', '卫星电话', '桌面电话', '厂房通信', 'AP'] },
     { key: 'meeting', name: '会议系统', systems: ['视频会议'] },
-    { key: 'network', name: '网络系统', systems: ['DTF网络设备', 'DTW系统网络设备', 'AC'] },
+    { key: 'network', name: '网络系统', systems: ['DTF 网络设备', 'DTW 网络设备', 'AC'] },
     { key: 'mobile', name: '移动终端', systems: ['移动终端设备'] },
-    { key: 'appsys', name: '应用系统', systems: ['宜搭平台', 'RPA', 'AI智能体'] },
-    { key: 'publish', name: '信息发布系统', systems: ['信息发布LED屏系统'] }
+    { key: 'appsys', name: '应用系统', systems: ['宜搭平台', 'RPA', 'AI 智能体'] },
+    { key: 'publish', name: '信息发布系统', systems: ['信息发布 LED 屏系统'] }
   ];
 
   const systemAliases = {
-    '移动终端设备': ['终端'],
     '视频会议': ['视频会议系统'],
     '卫星电话': ['卫星电话系统'],
-    '厂房通信': ['厂房通信系统'],
-    'DTF网络设备': ['DTF']
+    '厂房通信': ['厂房通信系统']
   };
 
   /* 业务系统统一纳入任务标签字典；已有别名时不再重复生成同义标签。 */
@@ -1281,10 +1277,10 @@ window.ITO_DATA = (() => {
     };
   });
 
-  /* ── 月度 / 季度考核演示数据 ───────────────────
+  /* ── 季度考核与月度明细演示数据 ─────────────────
      固定 2026-11 / 2026 Q4 口径，不随演示日期平移。
      总分 = SLA 80 + 安质环 20，合格线 95。
-     记分项一律整数；季度取季度内已结算月份的均分，允许一位小数。 */
+     记分项一律整数；季度 SLA = 80 + 季度加分合计 - 季度扣分合计。 */
   const assessment = {
     target: 95,
     baseSla: 80,
@@ -1294,120 +1290,28 @@ window.ITO_DATA = (() => {
       month: { key: '2026-11', label: '2026 年 11 月', short: '11 月', start: '2026-11-01', end: '2026-11-30' },
       quarter: { key: '2026-Q4', label: '2026 Q4', short: 'Q4', start: '2026-10-01', end: '2026-12-31', months: ['2026-10', '2026-11', '2026-12'] }
     },
-    monthTrend: [
-      { key: '2026-07', label: '7 月', total: 93, sla: 74, safety: 19 },
-      { key: '2026-08', label: '8 月', total: 94, sla: 75, safety: 19 },
-      { key: '2026-09', label: '9 月', total: 95, sla: 76, safety: 19 },
-      { key: '2026-10', label: '10 月', total: 95, sla: 76, safety: 19 },
-      { key: '2026-11', label: '11 月', total: 96, sla: 77, safety: 19 }
+    quarters: [
+      { key: '2026-Q1', label: '2026 Q1', short: 'Q1', start: '2026-01-01', end: '2026-03-31', months: ['2026-01', '2026-02', '2026-03'] },
+      { key: '2026-Q2', label: '2026 Q2', short: 'Q2', start: '2026-04-01', end: '2026-06-30', months: ['2026-04', '2026-05', '2026-06'] },
+      { key: '2026-Q3', label: '2026 Q3', short: 'Q3', start: '2026-07-01', end: '2026-09-30', months: ['2026-07', '2026-08', '2026-09'] },
+      { key: '2026-Q4', label: '2026 Q4', short: 'Q4', start: '2026-10-01', end: '2026-12-31', months: ['2026-10', '2026-11', '2026-12'] }
     ],
-    /* 7–11 月月度明细：趋势下钻与月度考核共用，合计与 monthTrend 一致。 */
-    months: {
-      '2026-07': {
-        label: '2026 年 7 月',
-        deductions: [
-          { date: '2026-07-09 17:40', category: '任务超期', item: '任务超期 2 次', count: 2, points: -2 },
-          { date: '2026-07-16 11:20', category: '变更管理', item: '变更未按标准流程 1 次', count: 1, points: -3 },
-          { date: '2026-07-23 16:10', category: '过程管理', item: '过程管理数据/记录更新不及时 1 次', count: 1, points: -2 }
-        ],
-        bonuses: [
-          { date: '2026-07-06 10:20', category: '用户满意度', item: '一般用户表扬', count: 1, points: 1 },
-          { date: '2026-07-21 09:50', category: '运维保障', item: '主动发现隐患', count: 1, points: 2 }
-        ],
-        safetyEvents: [
-          {
-            id: 'SE-202607-001', date: '2026-07-17 14:30', level: '黄灯',
-            category: '信息安全', indicator: '未关机电脑',
-            item: '办公终端非工作时间未关机 2 台', impact: '已现场关机，无业务影响', points: -1
-          }
-        ]
-      },
-      '2026-08': {
-        label: '2026 年 8 月',
-        deductions: [
-          { date: '2026-08-07 18:10', category: '任务超期', item: '任务超期 2 次', count: 2, points: -2 },
-          { date: '2026-08-13 10:40', category: '变更管理', item: '变更未按标准流程 1 次', count: 1, points: -3 },
-          { date: '2026-08-25 16:30', category: '过程管理', item: '过程管理数据/记录更新不及时 1 次', count: 1, points: -2 }
-        ],
-        bonuses: [
-          { date: '2026-08-05 11:00', category: '用户满意度', item: '一般用户表扬', count: 1, points: 1 },
-          { date: '2026-08-12 15:20', category: '5S 管理', item: '拍照表扬', count: 1, points: 1 },
-          { date: '2026-08-26 10:10', category: '运维保障', item: '主动发现隐患', count: 1, points: 2 }
-        ],
-        safetyEvents: [
-          {
-            id: 'SE-202608-001', date: '2026-08-14 10:20', level: '黄灯',
-            category: '工业安全', indicator: '人员行为',
-            item: '现场作业未按规定佩戴标识 1 人次', impact: '已现场纠正，无业务影响', points: -1
-          }
-        ]
-      },
-      '2026-09': {
-        label: '2026 年 9 月',
-        deductions: [
-          { date: '2026-09-04 17:30', category: '任务超期', item: '任务超期 2 次', count: 2, points: -2 },
-          { date: '2026-09-11 10:20', category: '变更管理', item: '变更未按标准流程 1 次', count: 1, points: -3 },
-          { date: '2026-09-22 15:40', category: '过程管理', item: '过程管理数据/记录更新不及时 1 次', count: 1, points: -2 }
-        ],
-        bonuses: [
-          { date: '2026-09-03 16:40', category: '5S 管理', item: '拍照表扬', count: 1, points: 1 },
-          { date: '2026-09-18 10:30', category: '创新创优', item: '合理化建议被采纳', count: 1, points: 3 }
-        ],
-        safetyEvents: [
-          {
-            id: 'SE-202609-001', date: '2026-09-09 15:40', level: '黄灯',
-            category: '内部工单抽查', indicator: 'IT100工单偏差',
-            item: '工单关闭描述不完整 2 条', impact: '已补充说明，无业务影响', points: -1
-          }
-        ]
-      },
-      '2026-10': {
-        label: '2026 年 10 月',
-        deductions: [
-          { date: '2026-10-12 17:20', category: '任务超期', item: '任务超期 2 次', count: 2, points: -2 },
-          { date: '2026-10-20 11:10', category: '变更管理', item: '变更未按标准流程 1 次', count: 1, points: -3 },
-          { date: '2026-10-28 16:00', category: '过程管理', item: '过程管理数据/记录更新不及时 1 次', count: 1, points: -2 }
-        ],
-        bonuses: [
-          { date: '2026-10-08 10:10', category: '用户满意度', item: '一般用户表扬', count: 1, points: 1 },
-          { date: '2026-10-16 15:00', category: '5S 管理', item: '拍照表扬', count: 1, points: 1 },
-          { date: '2026-10-27 09:30', category: '运维保障', item: '主动发现隐患', count: 1, points: 2 }
-        ],
-        safetyEvents: [
-          {
-            id: 'SE-202610-001', date: '2026-10-22 16:10', level: '黄灯',
-            category: '信息安全', indicator: '弱口令事件',
-            item: '弱口令账号 1 个', impact: '已强制改密，无业务影响', points: -1
-          }
-        ]
-      },
-      '2026-11': {
-        label: '2026 年 11 月',
-        deductions: [
-          { date: '2026-11-16 18:00', category: '任务超期', item: '任务超期 2 次', count: 2, points: -2 },
-          { date: '2026-11-12 15:30', category: '变更管理', item: '变更未按标准流程 1 次', count: 1, points: -3 },
-          { date: '2026-11-20 10:10', category: '过程管理', item: '过程管理数据/记录更新不及时 1 次', count: 1, points: -2 }
-        ],
-        bonuses: [
-          { date: '2026-11-08 10:30', category: '用户满意度', item: '一般用户表扬', count: 1, points: 1 },
-          { date: '2026-11-11 16:10', category: '5S 管理', item: '拍照表扬', count: 1, points: 1 },
-          { date: '2026-11-15 14:00', category: '创新创优', item: '合理化建议被采纳', count: 1, points: 3 },
-          { date: '2026-11-22 09:40', category: '运维保障', item: '主动发现隐患', count: 1, points: 2 },
-          { date: '2026-11-30 17:00', category: '用户满意度', item: '招标方满意度', count: 0, points: 1 },
-          { date: '2026-11-30 17:10', category: '学科建设', item: '论文 / 知识成果 / 专利 / 技能比武', count: 0, points: 2 },
-          { date: '2026-11-30 17:20', category: '运维指标', item: '季度无超期', count: 0, points: 2 }
-        ],
-        safetyEvents: [
-          {
-            id: 'SE-202611-001', date: '2026-11-08 14:20', level: '黄灯',
-            category: '工业安全', indicator: '文档规范',
-            item: '文档记录填写不规范 1 项', impact: '已现场纠正，无业务影响', points: -1
-          }
-        ]
-      }
-    },
-    /* 工单按提交日期归属月份：月度取本月，季度取季度内已结算月份。 */
+    monthTrend: [],
+    months: {},
+    /* 工单扣分按提交日期归属月份，计入季度总分；月度明细不重复列同一工单。 */
     tickets: [
+      {
+        id: 'IT100-202602-005', system: 'SAP', type: '事件', item: '月度报表导出超时',
+        submitted: '2026-02-12 09:20', responded: '2026-02-12 09:45', completed: '2026-02-14 16:10',
+        timelyResponse: true, overdue: true, points: -2,
+        deductions: [{ reason: 'IT100 超期完成', points: -2 }]
+      },
+      {
+        id: 'IT100-202605-011', system: 'OA', type: '服务请求', item: '流程附件上传失败',
+        submitted: '2026-05-20 14:10', responded: '2026-05-20 14:30', completed: '2026-05-22 10:20',
+        timelyResponse: true, overdue: true, points: -2,
+        deductions: [{ reason: 'IT100 超期完成', points: -2 }]
+      },
       {
         id: 'IT100-202607-014', system: 'SAP', type: '事件', item: '报表导出任务失败',
         submitted: '2026-07-18 09:40', responded: '2026-07-18 10:05', completed: '2026-07-20 15:20',
@@ -1417,14 +1321,14 @@ window.ITO_DATA = (() => {
       {
         id: 'IT100-202608-021', system: 'SAP', type: '服务请求', item: '成本中心权限维护',
         submitted: '2026-08-19 14:10', responded: '2026-08-19 14:35', completed: '2026-08-21 17:40',
-        timelyResponse: true, overdue: true, points: -2,
-        deductions: [{ reason: 'IT100 超期完成', points: -2 }]
+        timelyResponse: true, overdue: true, points: 0,
+        deductions: []
       },
       {
         id: 'IT100-202609-009', system: '统一身份', type: '事件', item: '账号锁定解锁延迟',
         submitted: '2026-09-16 09:10', responded: '2026-09-16 11:05', completed: '2026-09-16 11:40',
-        timelyResponse: false, overdue: false, points: -1,
-        deductions: [{ reason: 'IT100 未及时响应', points: -1 }]
+        timelyResponse: false, overdue: true, points: 0,
+        deductions: []
       },
       {
         id: 'IT100-202610-018', system: 'SAP', type: '事件', item: '财务凭证打印异常',
@@ -1435,11 +1339,8 @@ window.ITO_DATA = (() => {
       {
         id: 'IT100-202611-006', system: 'SAP', type: '事件', item: '月结凭证过账失败',
         submitted: '2026-11-05 08:50', responded: '2026-11-05 10:20', completed: '2026-11-07 16:30',
-        timelyResponse: false, overdue: true, points: -3,
-        deductions: [
-          { reason: 'IT100 未及时响应', points: -1 },
-          { reason: 'IT100 超期完成', points: -2 }
-        ]
+        timelyResponse: false, overdue: true, points: -2,
+        deductions: [{ reason: 'IT100 超期完成', points: -2 }]
       },
       {
         id: 'IT100-202611-012', system: 'OA', type: '服务请求', item: '流程表单字段调整',
@@ -1487,117 +1388,788 @@ window.ITO_DATA = (() => {
       { type: '重要节点', item: '月度结账保障', date: '2026-11-30', impact: '无影响', points: 0 },
       { type: '关键区域', item: '配电室倒闸配合', date: '2026-11-12', impact: '无影响', points: 0 }
     ],
+    slaStandards: [
+        {
+            "seq": 1,
+            "category": "用户满意度",
+            "sub": "诚信",
+            "requirement": "工作中，未按管理要求进行事件通报，造成迟报、谎报、瞒报等不诚信行为的次数",
+            "indicator": "0次",
+            "standard": "1、迟报一次扣5分；2、谎报一次扣10分；3、瞒报一次扣10分；4、以上造成电站重大损失超过500万的，一次扣100分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 2,
+            "category": "用户满意度",
+            "sub": "用户评价",
+            "requirement": "季度SLA指标评价结果",
+            "indicator": ">90分",
+            "standard": "未达指标扣5分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 3,
+            "category": "用户满意度",
+            "sub": "工作纪律",
+            "requirement": "违反电站规定及作业规范的次数",
+            "indicator": "0次",
+            "standard": "1、电站规定一次扣5分；2、作业规范一次3分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 4,
+            "category": "用户满意度",
+            "sub": "运维团队稳定性",
+            "requirement": "团队管理执行到位",
+            "indicator": "运维人员日常、季度、年度考核完成",
+            "standard": "未完成考核扣5分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 5,
+            "category": "用户满意度",
+            "sub": "系统稳定性",
+            "requirement": "关键系统非计划不可用次数",
+            "indicator": "0次（因同一事件造成多系统不可用计为1次）",
+            "standard": "一次扣10分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 6,
+            "category": "用户满意度",
+            "sub": "系统稳定性",
+            "requirement": "非关键系统非计划不可用次数",
+            "indicator": "0次（因同一事件造成多系统不可用计为1次）",
+            "standard": "一次扣5分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 7,
+            "category": "运维保障",
+            "sub": "运维事项",
+            "requirement": "及时响应SAP、IT100工作单",
+            "indicator": "不及时响应工单数",
+            "standard": "一单扣1分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 8,
+            "category": "运维保障",
+            "sub": "运维事项",
+            "requirement": "按时完成IT100工单",
+            "indicator": "超期工单数",
+            "standard": "一单扣2分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 9,
+            "category": "运维保障",
+            "sub": "运维事项",
+            "requirement": "因缺备件无法按时完成维修导致设备不可用的次数为",
+            "indicator": "0次（经业务评估是乙方责任的，影响业务次数）",
+            "standard": "一次扣2分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 10,
+            "category": "运维保障",
+            "sub": "运维事项",
+            "requirement": "按期完成生产计划",
+            "indicator": "生产计划超期次数",
+            "standard": "一次扣2分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 11,
+            "category": "运维保障",
+            "sub": "运维事项",
+            "requirement": "按时按质完成运维业务的日检、周检、月检、季检、半年及年度定检",
+            "indicator": "超期、未完成或发现有质量偏差的次数",
+            "standard": "1、超期一次扣1分；2、未完成一次扣2分；3、质量偏差一次扣2分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 12,
+            "category": "运维保障",
+            "sub": "运维事项",
+            "requirement": "发现质量偏差按要求填单跟踪",
+            "indicator": "发现未按要求填单次数",
+            "standard": "一次扣1分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 13,
+            "category": "运维保障",
+            "sub": "运维事项",
+            "requirement": "按期提交维修记录、事件报告单",
+            "indicator": "完成设备维修后，24小时内未提交维修记录、事件报告单的次数",
+            "standard": "1、维修记录一次扣1分；2、事件报告单一次扣2分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 14,
+            "category": "运维保障",
+            "sub": "运维事项",
+            "requirement": "日常运维管理",
+            "indicator": "日常巡检全部完成",
+            "standard": "发生未按照要求进行系统巡检或巡检结果弄虚作假，一次扣3分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 15,
+            "category": "运维保障",
+            "sub": "运维事项",
+            "requirement": "视频会议系统管理",
+            "indicator": "影响会议的次数",
+            "standard": "重要会议一次扣5分普通会议一次扣3分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 16,
+            "category": "运维保障",
+            "sub": "网络专业运维",
+            "requirement": "区域汇聚及以上范围网络故障",
+            "indicator": "发生故障次数为0次",
+            "standard": "发生一次，扣5分；",
+            "kind": "deduction"
+        },
+        {
+            "seq": 17,
+            "category": "运维保障",
+            "sub": "网络专业运维",
+            "requirement": "接入层以下区域网络故障",
+            "indicator": "发生故障次数≤2次",
+            "standard": "超出2次，每次扣2分。",
+            "kind": "deduction"
+        },
+        {
+            "seq": 18,
+            "category": "运维保障",
+            "sub": "网络专业运维",
+            "requirement": "网络专业运维事件正常处理率",
+            "indicator": "100%",
+            "standard": "每发生一次运维事件未按照正常流程处置，扣2分。",
+            "kind": "deduction"
+        },
+        {
+            "seq": 19,
+            "category": "运维保障",
+            "sub": "系统专业运维",
+            "requirement": "核心系统和设备故障",
+            "indicator": "发生故障次数为0次",
+            "standard": "发生一次，扣10分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 20,
+            "category": "运维保障",
+            "sub": "系统专业运维",
+            "requirement": "系统专业运维事件正常处理率",
+            "indicator": "100%",
+            "standard": "每发生一次运维事件未按照正常流程处置，则扣2分。",
+            "kind": "deduction"
+        },
+        {
+            "seq": 21,
+            "category": "运维保障",
+            "sub": "系统专业运维",
+            "requirement": "因日常运维管理措施不到位导致的普通运维事件发生次数",
+            "indicator": "0次",
+            "standard": "每发生一次扣3分。",
+            "kind": "deduction"
+        },
+        {
+            "seq": 22,
+            "category": "运维保障",
+            "sub": "系统专业运维",
+            "requirement": "系统专业专项任务完成率",
+            "indicator": "100%",
+            "standard": "每发生一次不及时完成情况，扣2分。",
+            "kind": "deduction"
+        },
+        {
+            "seq": 23,
+            "category": "运维保障",
+            "sub": "机房专业运维",
+            "requirement": "精密空调、供配电（含UPS、精密配电柜等）、门禁系统故障次数",
+            "indicator": "0次",
+            "standard": "每发生一次扣5分。",
+            "kind": "deduction"
+        },
+        {
+            "seq": 24,
+            "category": "运维保障",
+            "sub": "机房专业运维",
+            "requirement": "机房专业运维事件正常处理率",
+            "indicator": "100%",
+            "standard": "每发生一次运维事件未按照正常流程处置，则扣2分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 25,
+            "category": "运维保障",
+            "sub": "机房专业运维",
+            "requirement": "机房专业专项任务完成率",
+            "indicator": "100%",
+            "standard": "每发生一次不及时完成情况，扣2分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 26,
+            "category": "运维保障",
+            "sub": "通信移交接产（若有）",
+            "requirement": "复检及时率",
+            "indicator": "100%",
+            "standard": "每超期1项，扣1分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 27,
+            "category": "运维保障",
+            "sub": "通信移交接产（若有）",
+            "requirement": "移交接产月会任务完成率",
+            "indicator": "100%",
+            "standard": "",
+            "kind": "deduction"
+        },
+        {
+            "seq": 28,
+            "category": "运维保障",
+            "sub": "通信系统运行",
+            "requirement": "厂区系统可用率",
+            "indicator": "电网通信不出现电网通报、电量考核事件",
+            "standard": "每月累计不可用时间≥450分钟或出现电量考核事件，扣15分；；每月累计不可用时间≥420分钟且＜450分钟或出现电网通报事件，扣10分；；指标达标但出现不可用事件，每事件扣3分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 29,
+            "category": "运维保障",
+            "sub": "通信系统运行",
+            "requirement": "",
+            "indicator": "≥99.92%（DTV、DTF、KNS、KCC等每月累计不可用时间＜420分钟）",
+            "standard": "",
+            "kind": "deduction"
+        },
+        {
+            "seq": 30,
+            "category": "运维保障",
+            "sub": "通信系统运行",
+            "requirement": "系统故障上报及时率",
+            "indicator": "100%",
+            "standard": "每出现一次未及时上报，扣2分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 31,
+            "category": "运维保障",
+            "sub": "通信系统维修",
+            "requirement": "预防性维修按计划完成率",
+            "indicator": "100%",
+            "standard": "每1项指标未达标，扣2分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 32,
+            "category": "运维保障",
+            "sub": "通信系统维修",
+            "requirement": "PM按时递包率",
+            "indicator": "100%",
+            "standard": "",
+            "kind": "deduction"
+        },
+        {
+            "seq": 33,
+            "category": "运维保障",
+            "sub": "通信系统维修",
+            "requirement": "NMO工单按时准备率",
+            "indicator": "100%",
+            "standard": "",
+            "kind": "deduction"
+        },
+        {
+            "seq": 34,
+            "category": "运维保障",
+            "sub": "通信系统维修",
+            "requirement": "退包次数",
+            "indicator": "0次",
+            "standard": "",
+            "kind": "deduction"
+        },
+        {
+            "seq": 35,
+            "category": "运维保障",
+            "sub": "通信系统维修",
+            "requirement": "1/2级工单数",
+            "indicator": "季度内每月平均值＜5单",
+            "standard": "1项及以上指标未达指标，扣1分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 36,
+            "category": "运维保障",
+            "sub": "通信系统维修",
+            "requirement": "等备件工单数",
+            "indicator": "季度内每月平均值＜30单",
+            "standard": "",
+            "kind": "deduction"
+        },
+        {
+            "seq": 37,
+            "category": "运维保障",
+            "sub": "通信系统维修",
+            "requirement": "重大故障处理报告提交及时率",
+            "indicator": "100%",
+            "standard": "每出现一次未及时提交，扣2分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 38,
+            "category": "运维保障",
+            "sub": "客户端运维",
+            "requirement": "工单完成率",
+            "indicator": ">90%",
+            "standard": "90%以下每少1个百分点扣1分。",
+            "kind": "deduction"
+        },
+        {
+            "seq": 39,
+            "category": "运维保障",
+            "sub": "客户端运维",
+            "requirement": "工单超期率",
+            "indicator": "<2%",
+            "standard": "2%以上每多1个百分点扣1分。",
+            "kind": "deduction"
+        },
+        {
+            "seq": 40,
+            "category": "运维保障",
+            "sub": "客户端运维",
+            "requirement": "用户有效投诉次数",
+            "indicator": "0次",
+            "standard": "实际发生1次扣5分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 41,
+            "category": "运维保障",
+            "sub": "客户端运维",
+            "requirement": "客户端巡检、会议室巡检、漏洞扫描、病毒木马处理等专项工作按时完成率",
+            "indicator": "100%",
+            "standard": "每未完成一次，扣2分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 42,
+            "category": "运维保障",
+            "sub": "任务管理",
+            "requirement": "按时完成任务管理系统分派的工作任务",
+            "indicator": "任务超期次数",
+            "standard": "一次扣 1 分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 43,
+            "category": "运维保障",
+            "sub": "任务管理",
+            "requirement": "每周录入一次任务执行日志",
+            "indicator": "未录入执行日志的次数",
+            "standard": "一次扣 0.5 分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 44,
+            "category": "运维保障",
+            "sub": "过程管理",
+            "requirement": "设备、归档文件资料、系统配置参数等数据准确性及更新的及时性",
+            "indicator": "检查发现数据不准确、更新不及时的次数",
+            "standard": "一次扣2分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 45,
+            "category": "运维保障",
+            "sub": "变更工作",
+            "requirement": "按照变更流程，按时按质完成系统变更",
+            "indicator": "经监督或审计，没有按照标准流程开展变更工作的",
+            "standard": "一次扣3分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 46,
+            "category": "运维保障",
+            "sub": "变更工作",
+            "requirement": "",
+            "indicator": "由乙方责任造成变更失败的次数",
+            "standard": "",
+            "kind": "deduction"
+        },
+        {
+            "seq": 47,
+            "category": "运维保障",
+            "sub": "设备操作",
+            "requirement": "按时按质完成日常切换、定期试验、协助性的日常切换操作、预防性维修工作",
+            "indicator": "未按要求完成次数",
+            "standard": "一次扣2分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 48,
+            "category": "运维保障",
+            "sub": "定期试验",
+            "requirement": "保障电站通信相关定期试验结果",
+            "indicator": "定期试验结果故障点",
+            "standard": "一个故障点扣1分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 49,
+            "category": "运维保障",
+            "sub": "关键区域保障",
+            "requirement": "保障主控区域通信系统（含操作台、呼叫站、电话终端）正常运行，不影响电站运行人员办公，满足电站正常运行需求",
+            "indicator": "影响电站运行人员办公或不满足电站正常运行需求次数",
+            "standard": "一次扣5分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 50,
+            "category": "运维保障",
+            "sub": "电站授权考试",
+            "requirement": "保障电站入厂安全、基本安全、工作负责人等授权考试通过",
+            "indicator": "考试不及格的人/次",
+            "standard": "每人次扣1分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 51,
+            "category": "运维保障",
+            "sub": "重要节点信息化保障",
+            "requirement": "按时完成重要节点保障工作",
+            "indicator": "未按时完成重要节点信息化保障，导致重要节点工作进度收到影响的次数",
+            "standard": "一次扣3分",
+            "kind": "deduction"
+        },
+        {
+            "seq": 1,
+            "category": "用户满意度",
+            "sub": "用户评价",
+            "requirement": "用户有效表扬",
+            "indicator": "发生有效表扬的次数",
+            "standard": "一般用户表扬一次加1分；2、部门领导表扬一次加3分；3、公司领导表扬一次加5分",
+            "kind": "bonus"
+        },
+        {
+            "seq": 2,
+            "category": "用户满意度",
+            "sub": "招标方满意度评分",
+            "requirement": "此项由用户信息归口部门和分中心共同评定，视运维服务商当季度表现情况及本表格以外维度进行综合考量，并加分或扣分（-20～ 20）",
+            "indicator": "邮件、会议或管理层反馈",
+            "standard": "-20～+ 20",
+            "kind": "bonus"
+        },
+        {
+            "seq": 3,
+            "category": "用户满意度",
+            "sub": "5S管理",
+            "requirement": "严格执行甲方办公室5S规定",
+            "indicator": "拍照表扬的次数",
+            "standard": "一次加1分",
+            "kind": "bonus"
+        },
+        {
+            "seq": 4,
+            "category": "用户满意度",
+            "sub": "学科建设",
+            "requirement": "参与公司信息化论文、知识成果、专利、技能比武、宣传等活动，并获奖项、荣誉等",
+            "indicator": "获得奖励的级别",
+            "standard": "1、一等奖加5分；2、二等奖加4分；3、三等奖加3分；4、优秀奖加2分；5、录用加1分",
+            "kind": "bonus"
+        },
+        {
+            "seq": 5,
+            "category": "用户满意度",
+            "sub": "创新创优",
+            "requirement": "合理化建议、工作效能奖申报，并获奖",
+            "indicator": "获得奖励的级别",
+            "standard": "1、一等奖加15分；2、二等奖加10分；3、三等奖加5分；4、建议被采纳加3分",
+            "kind": "bonus"
+        },
+        {
+            "seq": 6,
+            "category": "运维保障",
+            "sub": "过程管理",
+            "requirement": "主动发现设备/人因隐患、缺陷，未造成影响，提出解决方案并及时上报和有效处理，杜绝较大以上事件发生",
+            "indicator": "发现并解决隐患、缺陷的次数",
+            "standard": "一次加2分",
+            "kind": "bonus"
+        },
+        {
+            "seq": 7,
+            "category": "运维保障",
+            "sub": "运维指标",
+            "requirement": "生产计划、工单(IT100/SAP)、任务管理 季度无超期",
+            "indicator": "全部同时无超期且达到考核指标",
+            "standard": "加3分",
+            "kind": "bonus"
+        }
+    ],
     safetyStandards: [
-      {
-        category: '工业安全', item: '工业安全', scope: '因安质环相关原因，受到政府行政处罚并造成重大外部影响',
-        green: '违反次数=0', yellow: '—', red: '一票否决', status: '', note: ''
-      },
-      {
-        category: '工业安全', item: '人员伤亡', scope: '本单位发生三级以上工业安全事件、不发生死亡事故',
-        green: '违反次数=0', yellow: '—', red: '一票否决', status: '', note: ''
-      },
-      {
-        category: '工业安全', item: '安全生产', scope: '严格遵守电厂安全生产管理规定，违反电厂职业安全及辐射防护、经验反馈、质保相关要求',
-        green: '不规范问题=0',
-        yellow: '1、≥内部检查发现不规范问题>0；2、其他部门发现提出警告',
-        red: '1、内部检查发现不规范问题>3；2、其他部门发现通报次数>0',
-        status: '', note: ''
-      },
-      {
-        category: '工业安全', item: '管理巡视', scope: '工业安全巡视发现不符合项等',
-        green: '不符合项=0',
-        yellow: '1、≥内部检查发现不规范问题>0；2、其他部门发现提出警告',
-        red: '1、内部检查发现不规范问题>3；2、其他部门发现通报次数>0',
-        status: '', note: ''
-      },
-      {
-        category: '工业安全', item: '人员行为', scope: '违反电厂发布的人员行为规范要求的次数',
-        green: '次数=0',
-        yellow: '1、≥违反次数>0；2、其他部门发现提出警告',
-        red: '1、违反次数>3；2、其他部门发现通报次数>0',
-        status: '', note: ''
-      },
-      {
-        category: '工业安全', item: '工作过程', scope: '不符合电厂工作过程管理、安全管理、工作包管理等程序要求的次数',
-        green: '次数=0',
-        yellow: '1、≥不符合次数>0；2、其他部门发现提出警告',
-        red: '1、不符合次数>3；2、其他部门发现通报次数>0',
-        status: '', note: ''
-      },
-      {
-        category: '工业安全', item: '文档规范', scope: '文档记录填写不规范数量',
-        green: '数量=0',
-        yellow: '1、≥数量>0；2、其他部门发现提出警告',
-        red: '1、数量>3；2、其他部门发现通报次数>0',
-        status: '', note: ''
-      },
-      {
-        category: '工业安全', item: '计划关闭', scope: 'IT100生产计划、SAP维修大纲关闭率',
-        green: '关闭率100%', yellow: '≥已执行但未关闭数量>0', red: '未关闭数量>1',
-        status: '', note: ''
-      },
-      {
-        category: '工业安全', item: '人因事件', scope: '遵守程序，反对违章，发生人因事件',
-        green: '人因事件=0',
-        yellow: '1、≥内部检查发现违反次数>0；2、其他部门发现提出警告',
-        red: '1、内部检查发现违反次数>1；2、其他部门发现通报次数>0',
-        status: '', note: ''
-      },
-      {
-        category: '内部工单抽查', item: 'SAP工单偏差', scope: '内部自查发现问题数量',
-        green: '—', yellow: '—', red: '—', status: '1 个', note: '无异常'
-      },
-      {
-        category: '内部工单抽查', item: 'IT100工单偏差', scope: '内部自查发现问题数量',
-        green: '—', yellow: '—', red: '—', status: '—', note: '无异常'
-      },
-      {
-        category: '信息安全', item: '木马病毒事件', scope: '被通报发生感染木马、病毒的事件',
-        green: '未被通报', yellow: '被通报未被考核', red: '被通报且被考核',
-        status: '', note: ''
-      },
-      {
-        category: '信息安全', item: '弱口令事件', scope: '被通报发现应用、信息系统、服务器及终端等弱口令的事件',
-        green: '未被通报', yellow: '被通报未被考核', red: '被通报且被考核',
-        status: '', note: ''
-      },
-      {
-        category: '信息安全', item: '未关机电脑', scope: '被通报扫描到非工作时间未关机电脑的问题',
-        green: '未被通报', yellow: '被通报未被考核', red: '被通报且被考核',
-        status: '', note: ''
-      },
-      {
-        category: '信息安全', item: '非标软件', scope: '被通报存在非集团正版（许可）软件与高风险软件的问题',
-        green: '未被通报', yellow: '被通报未被考核', red: '被通报且被考核',
-        status: '', note: ''
-      },
-      {
-        category: '信息安全', item: '网络安全漏洞', scope: '集团下发漏洞预警排查情况',
-        green: '排查不涉及', yellow: '排查涉及，不影响考核', red: '排查涉及，影响考核',
-        status: '', note: ''
-      },
-      {
-        category: '信息安全', item: '信息报送', scope: '被通报存在信息传达、报送与任务完成不及时的问题',
-        green: '未被通报', yellow: '被通报未被考核', red: '被通报且被考核',
-        status: '', note: ''
-      },
-      {
-        category: '信息安全', item: '信息资产', scope: '被通报存在信息资产管理不善（互联网资产未报备、信息数据及个人数据泄露、电脑丢失等）问题',
-        green: '未被通报', yellow: '被通报未被考核', red: '被通报且被考核',
-        status: '', note: ''
-      },
-      {
-        category: '信息安全', item: '网络安全事件', scope: '发生网络安全事件情况',
-        green: '未发生', yellow: '未发生', red: '发生网络安全事件',
-        status: '', note: ''
-      },
-      {
-        category: '信息安全', item: '网络保障', scope: '重大敏感时期网络安全保障，结果收到上级单位通报',
-        green: '未被通报', yellow: '被通报未被考核', red: '通报且被考核',
-        status: '', note: ''
-      }
+        {
+            "seq": 1,
+            "item": "质保检查发OBN / OBS未及吋整改，且未按时完成延期申请审批",
+            "standard": "每超期3个月扣2分，不足3个月按一次扣",
+            "veto": false
+        },
+        {
+            "seq": 2,
+            "item": "质保检查发CAR未及时整改，且未按时完成延期申请审批",
+            "standard": "每超期3个月扣4分，不足3个月按一次扣",
+            "veto": false
+        },
+        {
+            "seq": 3,
+            "item": "质保检查发SCAR未及时整改，且未按时完成延期申请审批",
+            "standard": "每超期3个月扣8分，不足3个月按一次扣",
+            "veto": false
+        },
+        {
+            "seq": 4,
+            "item": "人因IOE（内部运行事件）",
+            "standard": "一票否决",
+            "veto": true
+        },
+        {
+            "seq": 5,
+            "item": "人因LOE（执照运行事件）",
+            "standard": "一票否决",
+            "veto": true
+        },
+        {
+            "seq": 6,
+            "item": "人员轻伤事件",
+            "standard": "一票否决",
+            "veto": true
+        },
+        {
+            "seq": 7,
+            "item": "安全质量红线违章",
+            "standard": "一票否决",
+            "veto": true
+        },
+        {
+            "seq": 8,
+            "item": "人员重伤、消防事件",
+            "standard": "一票否决",
+            "veto": true
+        },
+        {
+            "seq": 9,
+            "item": "人员死亡及以上人身事故、火灾事故",
+            "standard": "一票否决",
+            "veto": true
+        },
+        {
+            "seq": 10,
+            "item": "安全质量违章（A类/B/类C类）",
+            "standard": "6分/4分/2分/次",
+            "veto": false
+        },
+        {
+            "seq": 11,
+            "item": "急救箱事件、一般未遂事件、零级火险事件",
+            "standard": "10分/次",
+            "veto": false
+        },
+        {
+            "seq": 12,
+            "item": "重大未遂事件、医学处置事件",
+            "standard": "一票否决",
+            "veto": true
+        },
+        {
+            "seq": 13,
+            "item": "电厂范围内发生的治安事件",
+            "standard": "一票否决",
+            "veto": true
+        },
+        {
+            "seq": 14,
+            "item": "人员入场作业前，未经过三级安全教育并考核合格。",
+            "standard": "5分/人·次",
+            "veto": false
+        },
+        {
+            "seq": 15,
+            "item": "人因影响大修或日常抢修等工作关键路径",
+            "standard": "5分/天，不足1天按一次扣",
+            "veto": false
+        },
+        {
+            "seq": 16,
+            "item": "预警刹车“整改通知”级",
+            "standard": "2分/次",
+            "veto": false
+        },
+        {
+            "seq": 17,
+            "item": "预警刹车“通报批评”级",
+            "standard": "4分/次",
+            "veto": false
+        },
+        {
+            "seq": 18,
+            "item": "预警刹车“挂牌督办”级",
+            "standard": "8分/次",
+            "veto": false
+        },
+        {
+            "seq": 19,
+            "item": "预警刹车“约谈”级",
+            "standard": "16分/次",
+            "veto": false
+        },
+        {
+            "seq": 20,
+            "item": "预警刹车停工令+电厂要求停工",
+            "standard": "一票否决",
+            "veto": true
+        },
+        {
+            "seq": 21,
+            "item": "人因或维修设备质量延误机组并网投运",
+            "standard": "5分/天，不足1天按一次扣",
+            "veto": false
+        },
+        {
+            "seq": 22,
+            "item": "质量控制点（W/H）越点",
+            "standard": "5分/次",
+            "veto": false
+        },
+        {
+            "seq": 23,
+            "item": "不遵守工作文件、不按程序操作",
+            "standard": "2分/次",
+            "veto": false
+        },
+        {
+            "seq": 24,
+            "item": "值班期间未按应急值班规定及时到现场处理",
+            "standard": "2分/次",
+            "veto": false
+        },
+        {
+            "seq": 25,
+            "item": "拒绝或不配合监督检查",
+            "standard": "5分/次",
+            "veto": false
+        },
+        {
+            "seq": 26,
+            "item": "改进行动、管理巡视、经验反馈、纠正行动、会议要求、整改通知等未能按时完成或完成质量不满足要求",
+            "standard": "1分/次",
+            "veto": false
+        }
     ]
   };
+
+  /* 月度明细：Q1–Q3 每季扣 15 / 加 11 / 安质环 1，Q4 扣 13 / 加 11 / 安质环 2，
+     与文档分值一一对应，季度合计保持 95 / 96。工单扣分单独计入，不重复列在月度条目。 */
+  (function seedAssessmentHistory() {
+    const pad = function (n) { return n < 10 ? '0' + n : String(n); };
+    const labelOf = function (key) { return key.slice(0, 4) + ' 年 ' + Number(key.slice(5)) + ' 月'; };
+    const at = function (key, day, time) { return key + '-' + pad(day) + ' ' + time; };
+    const deductionDefs = {
+      task:     { category: '任务管理', item: '任务超期 1 次', count: 1, points: -1 },
+      change:   { category: '变更工作', item: '变更未按标准流程 1 次', count: 1, points: -3 },
+      process:  { category: '过程管理', item: '过程管理数据/记录更新不及时 1 次', count: 1, points: -2 },
+      periodic: { category: '定期试验', item: '定期试验发现故障点 1 个', count: 1, points: -1 },
+      complaint:{ category: '客户端运维', item: '用户有效投诉 1 次', count: 1, points: -5 }
+    };
+    const bonusDefs = {
+      praise:     { category: '用户评价', item: '一般用户表扬', count: 1, points: 1 },
+      fiveS:      { category: '5S管理', item: '拍照表扬', count: 1, points: 1 },
+      hidden:     { category: '过程管理', item: '主动发现隐患', count: 1, points: 2 },
+      innovation: { category: '创新创优', item: '合理化建议被采纳', count: 1, points: 3 }
+    };
+    const safetyDef = {
+      category: '改进行动', indicator: '整改通知', item: '整改通知逾期 1 项',
+      impact: '已补充完成，无业务影响', points: -1, level: '黄灯', standardSeq: 26
+    };
+    const patterns = {
+      A: {
+        deductions: [['task', 9, '17:40'], ['change', 16, '11:20']],
+        bonuses: [['praise', 6, '10:20'], ['hidden', 21, '09:50']],
+        safety: []
+      },
+      B: {
+        deductions: [['task', 7, '18:10'], ['process', 13, '10:40'], ['periodic', 25, '16:30']],
+        bonuses: [['praise', 5, '11:00'], ['fiveS', 12, '15:20'], ['hidden', 26, '10:10']],
+        safety: [['safety', 18, '14:30']]
+      },
+      C: {
+        deductions: [['complaint', 22, '15:40']],
+        bonuses: [['fiveS', 3, '16:40'], ['innovation', 18, '10:30']],
+        safety: []
+      },
+      Q4A: {
+        deductions: [['change', 20, '11:10'], ['process', 28, '16:00']],
+        bonuses: [['praise', 8, '10:10'], ['fiveS', 16, '15:00'], ['hidden', 27, '09:30']],
+        safety: [['safety', 22, '16:10']]
+      },
+      Q4B: {
+        deductions: [['complaint', 20, '10:10']],
+        bonuses: [['praise', 8, '10:30'], ['fiveS', 11, '16:10'], ['innovation', 15, '14:00'], ['hidden', 22, '09:40']],
+        safety: [['safety', 18, '14:20']]
+      }
+    };
+    const monthPlan = [
+      ['2026-01', 'A'], ['2026-02', 'B'], ['2026-03', 'C'],
+      ['2026-04', 'A'], ['2026-05', 'B'], ['2026-06', 'C'],
+      ['2026-07', 'A'], ['2026-08', 'B'], ['2026-09', 'C'],
+      ['2026-10', 'Q4A'], ['2026-11', 'Q4B']
+    ];
+    const makeItem = function (def, key, day, time) {
+      return Object.assign({}, def, { date: at(key, day, time) });
+    };
+    monthPlan.forEach(function (pair) {
+      const key = pair[0];
+      const pattern = patterns[pair[1]];
+      const source = {
+        label: labelOf(key),
+        deductions: pattern.deductions.map(function (row) {
+          return makeItem(deductionDefs[row[0]], key, row[1], row[2]);
+        }),
+        bonuses: pattern.bonuses.map(function (row) {
+          return makeItem(bonusDefs[row[0]], key, row[1], row[2]);
+        }),
+        safetyEvents: pattern.safety.map(function (row, idx) {
+          return Object.assign({}, safetyDef, {
+            id: 'SE-' + key.replace('-', '') + '-' + pad(idx + 1),
+            date: at(key, row[1], row[2])
+          });
+        })
+      };
+      assessment.months[key] = source;
+    });
+    const sum = function (list, fn) {
+      return (list || []).reduce(function (total, item) { return total + fn(item); }, 0);
+    };
+    assessment.monthTrend = monthPlan.map(function (pair) {
+      const key = pair[0];
+      const m = assessment.months[key];
+      const ticketDed = assessment.tickets.filter(function (t) {
+        return String(t.submitted || '').slice(0, 7) === key;
+      }).reduce(function (total, t) {
+        return total + sum(t.deductions || [], function (d) { return Math.abs(Number(d.points) || 0); });
+      }, 0);
+      const ded = sum(m.deductions, function (x) { return Math.abs(Number(x.points) || 0); }) + ticketDed;
+      const bonus = sum(m.bonuses, function (x) { return Number(x.points) || 0; });
+      const safetyDed = sum(m.safetyEvents, function (x) { return Math.abs(Number(x.points) || 0); });
+      const safety = m.safetyEvents.some(function (x) { return x.level === '红灯'; }) ? 0 : Math.max(0, 20 - safetyDed);
+      const sla = Math.max(0, Math.min(80, 80 + bonus - ded));
+      return { key: key, label: Number(key.slice(5)) + ' 月', total: sla + safety, sla: sla, safety: safety };
+    });
+  })();
 
   const data = {
     meta: {
@@ -1628,9 +2200,12 @@ window.ITO_DATA = (() => {
   data.meta.baseDay = BASE_DAY;
   data.meta.demoNow = DEMO_NOW;
   data.meta.today = TODAY;
+  data.meta.displayToday = DISPLAY_TODAY;
   data.meta.offsetDays = OFFSET_DAYS;
   data.meta.autoDate = !IS_OVERRIDE;
-  data.meta.demoOverride = IS_OVERRIDE;
+  data.meta.demoOverride = !!demoOverrideDay;
+  data.meta.asofOverride = !!asofOverrideDay;
+  data.meta.asof = asofOverrideDay ? dayKey(asofOverrideDay) : '';
 
   /* 11 月巡检 / 维保补录：让展示时近 7 天与本月记录不为空。 */
   (function seedNovemberRecords() {
@@ -2024,7 +2599,7 @@ window.ITO_DATA = (() => {
       });
       if (w.external) {
         roster.push({
-          post: '工程公司项目部通讯技术助理', code: '',
+          post: '通讯技术助理', code: 'TX-JS',
           name: w.external.name, phone: w.external.phone, external: true
         });
       }
@@ -2423,9 +2998,6 @@ window.ITO_DATA = (() => {
     '杜工': '杜文清',
     '叶工': '叶青云',
     '张经理': '张维远',
-    '吴工（工程公司）': '吴立诚（工程公司）',
-    '沈工（工程公司）': '沈望舒（工程公司）',
-    '韩工（工程公司）': '韩立言（工程公司）',
     '周皓': '周允成'
   };
   const NAME_KEYS = Object.keys(NAME_MAP).sort(function (a, b) { return b.length - a.length; });

@@ -8,7 +8,9 @@
 
   window.ITO = window.ITO || {};
   const D = window.ITO_DATA;
-  const BUILD_VERSION = '20261116z44';
+  const BUILD_VERSION = '20261120z89';
+  const DEMO_PARAM = new URLSearchParams(location.search).get('demo');
+  const ASOF_PARAM = new URLSearchParams(location.search).get('asof');
   const DATA_SOURCE = window.ITO_DATA_SOURCE;
   const PERSIST_KEYS = [
     'tasks', 'personalArchive', 'messages', 'logs', 'staff', 'groups', 'auths',
@@ -61,6 +63,44 @@
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
   const clone = (v) => JSON.parse(JSON.stringify(v));
+
+  /* 后台页面以 .app-body 为唯一滚动容器；window 滚动在固定舞台内无效。 */
+  function scrollHost() {
+    return document.querySelector('.app-body') || document.scrollingElement || document.documentElement;
+  }
+  function getScrollTop() {
+    const el = scrollHost();
+    return el ? Math.max(0, Number(el.scrollTop) || 0) : 0;
+  }
+  function setScrollTop(top) {
+    const el = scrollHost();
+    if (!el) return;
+    el.scrollTop = Math.max(0, Number(top) || 0);
+  }
+  function scrollToY(top, behavior) {
+    const el = scrollHost();
+    const value = Math.max(0, Number(top) || 0);
+    if (!el) return;
+    if (behavior && el.scrollTo) el.scrollTo({ top: value, behavior: behavior });
+    else el.scrollTop = value;
+  }
+
+  /* 后台固定设计宽度 1920，高度随窗口比例铺满；只整体等比缩放，不横向重排。 */
+  const ADMIN_STAGE = document.getElementById('adminStage');
+  const ADMIN_STAGE_WIDTH = 1920;
+  function fitAdminStage() {
+    if (!ADMIN_STAGE) return;
+    const vw = Math.max(1, window.innerWidth || 1);
+    const vh = Math.max(1, window.innerHeight || 1);
+    const scale = Math.max(0.1, vw / ADMIN_STAGE_WIDTH);
+    const stageHeight = Math.max(1, vh / scale);
+    ADMIN_STAGE.style.height = stageHeight.toFixed(3) + 'px';
+    ADMIN_STAGE.style.setProperty('--admin-stage-h', stageHeight.toFixed(3) + 'px');
+    ADMIN_STAGE.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+  }
+  window.addEventListener('resize', fitAdminStage);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', fitAdminStage);
+  fitAdminStage();
 
   function snapshotData() {
     const out = {};
@@ -165,6 +205,7 @@
     external: '<path d="M14 3h7v7M21 3l-9 9"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/>',
     play: '<path d="m7 4 13 8-13 8V4z"/>',
     lock: '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+    spark: '<path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"/><path d="M19 16v4M17 18h4"/>',
     chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'
   };
 
@@ -175,7 +216,9 @@
   function pad(n) { return n < 10 ? '0' + n : String(n); }
 
   function nowStamp() {
-    return D.meta.demoNow;
+    const d = new Date();
+    const date = D.meta.demoOverride ? String(D.meta.today || todayKey()) : todayKey();
+    return date + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   }
 
   function todayKey() {
@@ -652,7 +695,7 @@
     backdrop.className = 'modal-backdrop';
     backdrop.style.zIndex = String(200 + modalStack.length * 4);
     backdrop.innerHTML =
-      '<div class="modal' + (o.xwide ? ' xwide' : o.wide ? ' wide' : '') + (o.detail ? ' detail' : '') + (o.inset ? ' inset' : '') + '" role="dialog" aria-modal="true" aria-label="' + esc(o.title) + '">' +
+      '<div class="modal' + (o.xxwide ? ' xxwide' : (o.xwide ? ' xwide' : (o.wide ? ' wide' : ''))) + (o.detail ? ' detail' : '') + (o.inset ? ' inset' : '') + '" role="dialog" aria-modal="true" aria-label="' + esc(o.title) + '">' +
         '<div class="modal-head">' +
           '<div><h2>' + esc(o.title) + '</h2>' + (o.sub ? '<p>' + esc(o.sub) + '</p>' : '') + '</div>' +
           '<button class="modal-close" type="button" aria-label="关闭">' + icon('close') + '</button>' +
@@ -679,7 +722,7 @@
       }
       if (typeof o.onClose === 'function') o.onClose();
       if (!modalStack.length && previouslyFocused && previouslyFocused.focus && document.contains(previouslyFocused)) {
-        try { previouslyFocused.focus(); } catch (e) { /* noop */ }
+        try { previouslyFocused.focus({ preventScroll: true }); } catch (e) { /* noop */ }
       }
     };
     entry.close = close;
@@ -753,7 +796,7 @@
       document.removeEventListener('keydown', onKey);
       popOverlay();
       if (previouslyFocused && previouslyFocused.focus && document.contains(previouslyFocused)) {
-        try { previouslyFocused.focus(); } catch (e) { /* noop */ }
+        try { previouslyFocused.focus({ preventScroll: true }); } catch (e) { /* noop */ }
       }
     };
     const onKey = (e) => {
@@ -876,11 +919,11 @@
     groups: () => perm('group'),
     auth: () => perm('auth'),
     messages: () => perm('message'),
-    dictionary: () => perm('dictionary'),
-    alerts: () => perm('config'),
-    roles: () => roleIs('admin'),
+    dictionary: () => !isSuper() && perm('dictionary'),
+    alerts: () => !isSuper() && perm('config'),
+    roles: () => !isSuper() && roleIs('admin'),
     tags: () => !!state.role,
-    logs: () => roleIs('admin')
+    logs: () => !isSuper() && roleIs('admin')
   };
 
   const ROUTE_TITLE = {
@@ -894,7 +937,8 @@
 
   /* 同一路由在不同身份下使用不同名称，页面标题与侧边栏必须保持一致。 */
   function routeTitle(route) {
-    if (route === 'mine' && state.role === 'leader') return '团队任务';
+    if (route === 'mine' && (state.role === 'leader' || state.role === 'super')) return '团队任务';
+    if (route === 'mine' && state.role === 'manager') return '我的任务';
     if (route === 'personal') {
       return state.role === 'leader' ? '运营统计' : state.role === 'manager' ? '团队统计' : '个人统计';
     }
@@ -947,7 +991,7 @@
   }
 
   function refresh() {
-    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const scrollY = getScrollTop();
     normalizeApprovals();
     persistState();
     render({ preservePager: true, preserveScroll: true, scrollY: scrollY });
@@ -1017,6 +1061,7 @@
 
   function navHtml() {
     return NAV.map((group) => {
+      if (group.adminOnly && isSuper()) return '';
       const items = group.items.filter((it) => can(it.id) && (!it.hide || !it.hide()));
       if (!items.length) return '';
       const label = group.label || '';
@@ -1080,9 +1125,10 @@
     const bell = document.getElementById('bellBtn');
     if (bell) bell.style.display = state.role === 'admin' ? 'none' : '';
     updateDevDock();
-    const dateObj = parseDate(D.meta.today);
+    const dateObj = parseDate(D.meta.displayToday || D.meta.today);
     const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][dateObj.getDay()];
-    $('#dateChip').textContent = D.meta.today.replace(/-/g, '.') + ' ' + weekday;
+    const cutoff = D.meta.asofOverride ? ' · 数据截止 ' + String(D.meta.asof || D.meta.today).slice(5).replace('-', '/') : '';
+    $('#dateChip').textContent = String(D.meta.displayToday || D.meta.today).replace(/-/g, '.') + ' ' + weekday + cutoff;
     const unread = unreadCount();
     const bellCount = $('#bellCount');
     const bellBtn = $('#bellBtn');
@@ -1284,6 +1330,8 @@
       return;
     }
 
+    const previousRoute = state.route;
+    if (previousRoute === 'tasks' && route !== 'tasks') state.expanded = {};
     state.route = route;
     state.routeParams = hashParams();
     disposeCharts();
@@ -1325,25 +1373,30 @@
 
     if (opts.preserveScroll) {
       const y = Number(opts.scrollY) || 0;
-      requestAnimationFrame(function () {
-        window.scrollTo({ top: y, behavior: 'auto' });
-      });
+      requestAnimationFrame(function () { setScrollTop(y); });
     } else {
-      window.scrollTo({ top: 0, behavior: 'auto' });
+      setScrollTop(0);
     }
     persistState();
   }
 
   /* ── login ───────────────────────────────── */
   const ROLE_ICON = { leader: 'chart', manager: 'users', employee: 'user', admin: 'shield' };
+  const ROLE_LABEL = {
+    leader: { cn: '领导', en: 'LEADER' },
+    manager: { cn: '主管', en: 'MANAGER' },
+    employee: { cn: '员工', en: 'EMPLOYEE' },
+    admin: { cn: '系统管理员', en: 'ADMIN' }
+  };
 
   function renderLogin() {
     const grid = $('#roleGrid');
     grid.innerHTML = Object.keys(D.roleInfo).filter((key) => key !== 'super').map((key) => {
       const r = D.roleInfo[key];
+      const label = ROLE_LABEL[key] || { cn: r.role, en: '' };
       return '<button class="role-card" type="button" data-role="' + key + '">' +
         '<span class="role-icon ' + key + '">' + icon(ROLE_ICON[key]) + '</span>' +
-        '<span class="role-name">' + esc(r.role === r.name ? r.role : r.role + ' · ' + r.name) + '</span>' +
+        '<span class="role-name">' + esc(label.cn) + (label.en ? ' <em>' + esc(label.en) + '</em>' : '') + '</span>' +
         '<span class="role-desc">' + esc(r.desc) + '</span>' +
         '<span class="role-arrow">→</span>' +
         '</button>';
@@ -1351,7 +1404,7 @@
 
     grid.addEventListener('click', (e) => {
       const card = e.target.closest('[data-role]');
-      if (card) enterApp(card.dataset.role, { routeMode: 'default' });
+      if (card) enterApp(card.dataset.role, { routeMode: 'auto' });
     });
   }
 
@@ -1360,8 +1413,9 @@
     if (roleKey === 'super' && !devMode) return;
     const opts = options || {};
     const mode = opts.routeMode || 'auto';
-    const prevScroll = window.scrollY || 0;
+    const prevScroll = getScrollTop();
     state.role = roleKey;
+    state.expanded = {};
     state.user = D.roleInfo[roleKey];
     sessionStorage.setItem('ito.admin.role', roleKey);
 
@@ -1411,7 +1465,7 @@
     $('#sideNav').innerHTML = '';
     updateDevDock();
     location.hash = '';
-    window.scrollTo(0, 0);
+    setScrollTop(0);
   }
 
   /* ── task status migration / approval clock ─ */
@@ -1534,7 +1588,7 @@
         status: '计划中'
       };
       if (existing) Object.assign(existing, data);
-      else st.planTasks.push(Object.assign({ id: planTaskId(plan, type), createdAt: D.meta.demoNow, createdBy: st.user ? st.user.name : '系统' }, data));
+      else st.planTasks.push(Object.assign({ id: planTaskId(plan, type), createdAt: nowStamp(), createdBy: st.user ? st.user.name : '系统' }, data));
       pending.push(existing || st.planTasks[st.planTasks.length - 1]);
     };
     (st.inspectionPlans || []).forEach(function (plan) { add(plan, 'inspection'); });
@@ -1573,7 +1627,7 @@
           };
           const existing = (st.planTasks || []).find(function (task) { return task.id === 'PT-' + planId; });
           if (existing) Object.assign(existing, data);
-          else st.planTasks.push(Object.assign({ id: 'PT-' + planId, createdAt: D.meta.demoNow, createdBy: '系统' }, data));
+          else st.planTasks.push(Object.assign({ id: 'PT-' + planId, createdAt: nowStamp(), createdBy: '系统' }, data));
           pending.push(existing || st.planTasks[st.planTasks.length - 1]);
         });
       });
@@ -1594,8 +1648,8 @@
     if (!task) return;
     task.status = '已完成';
     task.actualHours = Number(actualHours) || task.hours || 0;
-    task.completedAt = D.meta.demoNow;
-    task.updatedAt = D.meta.demoNow;
+    task.completedAt = nowStamp();
+    task.updatedAt = nowStamp();
     task.updatedBy = state.user ? state.user.name : '系统';
   }
 
@@ -1809,7 +1863,15 @@
       if (hrefBtn) {
         e.preventDefault();
         const href = hrefBtn.getAttribute('data-href');
-        if (href) location.href = href;
+        if (href) {
+          const param = ASOF_PARAM
+            ? 'asof=' + encodeURIComponent(ASOF_PARAM)
+            : (DEMO_PARAM ? 'demo=' + encodeURIComponent(DEMO_PARAM) : '');
+          const target = param && href === 'index.html'
+            ? 'index.html?' + param
+            : href;
+          location.href = target;
+        }
       }
     });
 
@@ -2002,7 +2064,12 @@
   };
   ITO.go = go;
   ITO.nextTaskId = nextTaskId;
+  ITO.nowStamp = nowStamp;
   ITO.refresh = refresh;
+  ITO.scrollHost = scrollHost;
+  ITO.getScrollTop = getScrollTop;
+  ITO.setScrollTop = setScrollTop;
+  ITO.scrollToY = scrollToY;
   ITO.log = log;
   ITO.persistState = persistState;
   ITO.resetDemoData = resetDemoData;
@@ -2046,8 +2113,9 @@
   }
 
   function staffOptions(groupId, selected) {
+    const leaderName = D.roleInfo && D.roleInfo.leader ? D.roleInfo.leader.name : '';
     return state.staff
-      .filter((s) => !groupId || s.group === groupId)
+      .filter((s) => (!groupId || s.group === groupId) && s.name !== leaderName)
       .sort((a, b) => groupOrder(a.group) - groupOrder(b.group) || a.name.localeCompare(b.name, 'zh'))
       .map((s) => {
         const group = state.groups.find((g) => g.id === s.group) || {};
@@ -2089,7 +2157,8 @@
       list.push({ name: group.manager, title: '组主管', gid: group.id });
       seen[group.manager] = true;
     }
-    state.staff.filter((s) => !groupId || s.group === groupId).forEach((s) => {
+    const leaderName = D.roleInfo && D.roleInfo.leader ? D.roleInfo.leader.name : '';
+    state.staff.filter((s) => (!groupId || s.group === groupId) && s.name !== leaderName).forEach((s) => {
       if (seen[s.name]) return;
       seen[s.name] = true;
       list.push(s);
@@ -2279,16 +2348,24 @@
     function openPop() {
       closeAllSelects();
       activeSelectPopup = { pop: pop, trigger: trigger, select: select };
-      if (!pop.isConnected) document.body.appendChild(pop);
+      const stage = document.getElementById('adminStage');
+      const host = stage || document.body;
+      if (!pop.isConnected) host.appendChild(pop);
+      const stageRect = stage ? stage.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+      const stageWidth = stage ? 1920 : window.innerWidth;
+      const stageHeight = stage ? (stage.clientHeight || 1600) : window.innerHeight;
+      const scale = stage ? (stageRect.width / stageWidth) : 1;
       const rect = trigger.getBoundingClientRect();
-      const width = Math.max(rect.width, 260);
+      const localLeft = (rect.left - stageRect.left) / scale;
+      const localBottom = (rect.bottom - stageRect.top) / scale;
+      const width = Math.max(rect.width / scale, 260);
       pop.hidden = false;
       list.setAttribute('aria-label', (select.dataset.fieldLabel || select.getAttribute('aria-label') || '请选择') + '选项');
       trigger.setAttribute('aria-expanded', 'true');
-      pop.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)) + 'px';
-      pop.style.top = (rect.bottom + 4) + 'px';
+      pop.style.left = Math.max(8, Math.min(localLeft, stageWidth - width - 8)) + 'px';
+      pop.style.top = (localBottom + 4) + 'px';
       pop.style.width = width + 'px';
-      pop.style.maxHeight = Math.min(330, Math.max(180, window.innerHeight - rect.bottom - 16)) + 'px';
+      pop.style.maxHeight = Math.min(330, Math.max(180, stageHeight - localBottom - 16)) + 'px';
       trigger.classList.add('is-open');
       searchInput.value = '';
       renderList('');

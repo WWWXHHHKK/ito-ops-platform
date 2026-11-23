@@ -78,7 +78,11 @@
   const meetingPeople = (staffByGroup.comm || []).filter(function (p) { return !managerNames[p.name]; });
   const meetingPool = meetingPeople.length ? meetingPeople : D.staff.filter(function (p) { return !managerNames[p.name]; });
 
-  const SYSTEMS = (D.taskTags || []).concat([
+  /* 任务名称生成只用系统 / 资产类标签；安全合规与作业管理只作为任务标签。 */
+  const NON_SYSTEM_TAGS = ['安全基线', '漏洞修复', '弱口令', '恶意代码', '边界防护', '审计留痕', '计划内', '临时作业', '维护窗口', '夜间作业', '跨组协同', '需验收', '需复盘'];
+  const SYSTEMS = (D.taskTags || []).filter(function (name) {
+    return NON_SYSTEM_TAGS.indexOf(name) === -1;
+  }).concat([
     '核心交换机', '防火墙', 'UPS', '空调', '语音网关', '数据库', '监控平台', '办公终端', '存储阵列'
   ]).filter(function (name, index, list) { return name && list.indexOf(name) === index; });
   const SYSTEM_TAG = {
@@ -243,6 +247,46 @@
       updatedBy: initiator,
       audit: [{ time: dateTime(createdAt), actor: initiator, action: '创建任务' }]
     };
+  }
+
+  function makeStatusSample(opts) {
+    const created = new Date(demoNow.getTime() - (opts.daysAgo || 2) * 86400000);
+    const due = new Date(demoNow.getTime() + (opts.dueInDays || 8) * 86400000);
+    const createdAt = dateTime(created);
+    const dueAt = dateTime(due);
+    const sub = {
+      id: '', name: opts.name + ' · 执行', group: opts.group, owner: opts.subOwner,
+      initiator: '张经理', level: '一般', type: '操作', status: opts.subStatus || '执行中',
+      due: dueAt, hours: 0, progress: opts.progress || 0,
+      auth: '无需授权', ticket: false, tags: ['状态样例']
+    };
+    if (opts.subStatus === '已完成') {
+      sub.progress = 100;
+      sub.completedAt = dateTime(new Date(created.getTime() + 6 * 3600000));
+    }
+    if (opts.draft) {
+      sub.draft = true;
+    }
+    const task = {
+      id: '', name: opts.name, group: opts.group, owner: opts.owner, initiator: '张经理',
+      level: '一般', type: '操作', due: dueAt, tags: ['状态样例'],
+      source: 'self', mode: 'single', desc: '状态样例：' + opts.desc,
+      subs: [sub], extra: {}, draft: !!opts.draft, canceled: null, summaryRework: false,
+      leaderApproval: null, status: opts.draft ? '草稿' : '执行中', progress: 0, hours: 0,
+      completedAt: '', createdAt: createdAt, createdBy: '张经理', updatedAt: createdAt, updatedBy: '张经理',
+      audit: [{ time: createdAt, actor: '张经理', action: '创建任务' }]
+    };
+    if (opts.approvalStatus) {
+      task.leaderApproval = {
+        status: opts.approvalStatus,
+        approver: '张经理',
+        submittedAt: createdAt,
+        dueAt: dateTime(new Date(created.getTime() + 72 * 3600000)),
+        decidedAt: opts.approvalStatus === '已驳回' ? dateTime(new Date(created.getTime() + 12 * 3600000)) : '',
+        comment: opts.approvalComment || ''
+      };
+    }
+    return task;
   }
 
   function makeMeeting(monthKey, rng, forcedStatus) {
@@ -422,15 +466,107 @@
         t.completedAt = dateTime(todaySlot(i, 9));
       });
 
-      // Keep every other completion off today's date without changing its on-time/late class.
-      completed.forEach(function (t, i) {
-        if (closedToday.indexOf(t) > -1) return;
-        if (String(t.completedAt).slice(0, 10) !== todayKey) return;
-        const due = parse(t.due);
-        const completedAt = parse(t.completedAt);
-        t.completedAt = dateTime(new Date(completedAt.getTime() + (i < 409 ? -24 : 24) * 3600000));
-        if (i < 409 && parse(t.completedAt) > due) t.completedAt = dateTime(new Date(due.getTime() - 3600000));
-      });
+      /* 月末演示：若当天没有足够的临到期任务，补足 9 条按时闭环，
+         保持今日闭环 9、净流入 +3，且不改变 409 / 51 的按时/晚闭环结构。 */
+      if (closedToday.length < 9) {
+        const extras = completed
+          .slice(0, 409)
+          .filter(function (t) { return closedToday.indexOf(t) === -1; })
+          .slice(0, 9 - closedToday.length);
+        const extraDue = new Date(demoNow.getTime() + 2 * 3600000);
+        extras.forEach(function (t, i) {
+          t.due = dateTime(extraDue);
+          t.completedAt = dateTime(todaySlot(closedToday.length + i, 9));
+        });
+        extras.forEach(function (t) { closedToday.push(t); });
+      }
+
+      /* 自然波动：工作日高、周末低，保留今日 9 条与 409 / 51 结构，且不出现 0 点。 */
+      const todayDay = demoNow.getDate();
+      if (todayKey.slice(0, 7) === '2026-11' && todayDay > 1) {
+        const priorDays = [];
+        for (let d = 1; d < todayDay; d += 1) priorDays.push(d);
+        const todaySet = new Set(closedToday);
+        const onTimeRest = completed.slice(0, 409).filter(function (t) { return !todaySet.has(t); });
+        const late = completed.slice(409);
+        const pool = onTimeRest.concat(late);
+        const need = pool.length;
+        const raw = priorDays.map(function (d) {
+          const date = new Date(demoNow.getFullYear(), demoNow.getMonth(), d);
+          const dow = date.getDay();
+          const weekend = dow === 0 || dow === 6;
+          const base = weekend ? 10.5 : 17.2;
+          const wave = Math.sin(d * 1.37) * 2.6 + Math.cos(d * 0.63) * 1.8;
+          const jitter = ((d * 37) % 7) - 3;
+          return Math.max(4, base + wave + jitter);
+        });
+        const rawTotal = raw.reduce(function (n, v) { return n + v; }, 0);
+        const counts = raw.map(function (v) { return Math.max(1, Math.floor(v * need / rawTotal)); });
+        let diff = need - counts.reduce(function (n, v) { return n + v; }, 0);
+        const fractions = raw.map(function (v, i) {
+          return { i: i, f: v * need / rawTotal - counts[i] };
+        }).sort(function (a, b) { return b.f - a.f; });
+        let fi = 0;
+        while (diff > 0) {
+          counts[fractions[fi % fractions.length].i] += 1;
+          diff -= 1;
+          fi += 1;
+        }
+        while (diff < 0) {
+          for (let i = counts.length - 1; i >= 0 && diff < 0; i -= 1) {
+            if (counts[i] > 1) {
+              counts[i] -= 1;
+              diff += 1;
+            }
+          }
+        }
+        const ordered = [];
+        let oi = 0;
+        let li = 0;
+        for (let i = 0; i < need; i += 1) {
+          const takeLate = li < late.length && Math.floor((i + 1) * late.length / need) > Math.floor(i * late.length / need);
+          if (takeLate) ordered.push({ t: late[li++], late: true });
+          else ordered.push({ t: onTimeRest[oi++], late: false });
+        }
+        while (li < late.length) ordered.push({ t: late[li++], late: true });
+        while (oi < onTimeRest.length) ordered.push({ t: onTimeRest[oi++], late: false });
+        let cursor = 0;
+        priorDays.forEach(function (day, di) {
+          const count = counts[di];
+          for (let k = 0; k < count; k += 1) {
+            const item = ordered[cursor++];
+            if (!item) break;
+            const stamp = new Date(demoNow.getFullYear(), demoNow.getMonth(), day, 9 + (k % 9), (k * 7) % 60);
+            item.t.completedAt = dateTime(stamp);
+            item.t.due = dateTime(new Date(stamp.getTime() + (item.late ? -2 : 4) * 3600000));
+          }
+        });
+      }
+    }
+
+    /* 状态样例：4 条独立主任务，带真实子任务；草稿不计入驾驶舱新增与在办。 */
+    if (monthKey === '2026-11') {
+      items.push(makeStatusSample({
+        name: '状态样例｜草稿任务', group: 'online', owner: '李主管', subOwner: '孙工',
+        draft: true, subStatus: '草稿', progress: 0, daysAgo: 3, dueInDays: 6,
+        desc: '在线组草稿状态，用于验证草稿筛选与只读展示'
+      }));
+      items.push(makeStatusSample({
+        name: '状态样例｜已挂起任务', group: 'online', owner: '李主管', subOwner: '吴工',
+        subStatus: '已挂起', progress: 30, daysAgo: 2, dueInDays: 7,
+        desc: '在线组已挂起状态，用于验证挂起筛选与重新提交'
+      }));
+      items.push(makeStatusSample({
+        name: '状态样例｜待汇总任务', group: 'infra', owner: '刘主管', subOwner: '郑工',
+        subStatus: '已完成', progress: 100, daysAgo: 2, dueInDays: 8,
+        approvalStatus: '待汇总', desc: '基础设施组待汇总状态，用于验证待汇总队列'
+      }));
+      items.push(makeStatusSample({
+        name: '状态样例｜审批驳回任务', group: 'online', owner: '李主管', subOwner: '孙工',
+        subStatus: '已完成', progress: 100, daysAgo: 2, dueInDays: 8,
+        approvalStatus: '已驳回', approvalComment: '验收材料不完整，退回补充',
+        desc: '在线组审批驳回状态，用于验证驳回展示'
+      }));
     }
 
     return items;
@@ -468,20 +604,6 @@
   allTasks.sort(function (a, b) { return String(b.id).localeCompare(String(a.id)); });
   D.tasks = allTasks;
 
-  /* 团队 / 主管 / 员工趋势图：按任务所属月份统计已完成主任务。 */
-  const trendMonths = MONTHS.map(function (m) { return m.key; });
-  const trendTeam = {};
-  groupIds.forEach(function (g) { trendTeam[g] = []; });
-  trendMonths.forEach(function (monthKey) {
-    const code = monthKey.replace('-', '');
-    groupIds.forEach(function (g) {
-      trendTeam[g].push(allTasks.filter(function (t) {
-        return t.status === '已完成' && t.group === g && t.id.slice(3, 9) === code;
-      }).length);
-    });
-  });
-  D.teamTrend = trendTeam;
-
   const orderedIds = Object.keys(idMap).sort(function (a, b) { return b.length - a.length; });
 
   function replaceString(value) {
@@ -512,7 +634,7 @@
   window.ITO_TASK_ID_MAP = idMap;
 
   const novTasks = monthItems['2026-11'];
-  const activeTasks = novTasks.filter(t => t.status !== '已完成' && t.status !== '已取消');
+  const activeTasks = novTasks.filter(t => !t.draft && t.status !== '已完成' && t.status !== '已取消');
   const completedTasks = novTasks.filter(t => t.status === '已完成');
   const overdueTasks = activeTasks.filter(t => parse(t.due) < demoNow);
   const dueSoonTasks = activeTasks.filter(function (t) {
@@ -585,7 +707,7 @@
     overdue: overdueTasks.length,
     sla: slaScore,
     openingBacklog: 0,
-    newTasks: novTasks.length,
+    newTasks: novTasks.filter(t => !t.draft).length,
     groupActive: groupActive,
     health: {
       normal: normalTasks.length,
